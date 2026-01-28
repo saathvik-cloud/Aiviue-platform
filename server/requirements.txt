@@ -1,0 +1,40 @@
+# AIVIUE BACKEND - REQUIREMENTS
+
+# CORE FRAMEWORK
+fastapi
+uvicorn
+python-multipart
+
+# DATABASE
+sqlalchemy
+alembic
+asyncpg
+psycopg2-binary
+
+# REDIS (Cache, Events, Sessions)
+redis
+
+# LLM - GOOGLE GEMINI
+google-genai
+
+# DATA VALIDATION & SETTINGS
+pydantic
+pydantic-settings
+python-dotenv
+
+# HTTP CLIENT (Async)
+httpx
+
+# LOGGING & MONITORING
+structlog
+
+# SECURITY
+python-jose[cryptography]
+passlib[bcrypt]
+
+# UTILITIES
+python-dateutil
+
+# TESTING
+pytest
+pytest-asyncio
