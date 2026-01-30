@@ -20,6 +20,7 @@ google-genai
 # DATA VALIDATION & SETTINGS
 pydantic
 pydantic-settings
+email-validator
 python-dotenv
 
 # HTTP CLIENT (Async)
