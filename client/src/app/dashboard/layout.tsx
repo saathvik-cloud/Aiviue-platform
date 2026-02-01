@@ -1,0 +1,283 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { usePathname, useRouter } from 'next/navigation';
+import { ROUTES, NAV_ITEMS } from '@/constants';
+import { useAuthStore } from '@/stores';
+import { getInitials } from '@/lib/utils';
+import { 
+  LayoutDashboard, 
+  Briefcase, 
+  User, 
+  LogOut, 
+  Menu, 
+  X,
+  Plus,
+  ChevronDown,
+  Settings,
+  HelpCircle
+} from 'lucide-react';
+
+const iconMap = {
+  LayoutDashboard,
+  Briefcase,
+  User,
+};
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { employer, isAuthenticated, clearEmployer, isLoading } = useAuthStore();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push(ROUTES.LOGIN);
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  const handleLogout = () => {
+    clearEmployer();
+    router.push(ROUTES.HOME);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center gradient-bg">
+        <div className="w-10 h-10 rounded-full border-4 border-t-transparent animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen flex gradient-bg">
+      {/* Mobile Sidebar Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Gradient Sidebar */}
+      <aside 
+        className={`
+          fixed lg:static inset-y-0 left-0 z-50
+          w-64 flex flex-col
+          transform transition-transform duration-300 ease-out
+          lg:transform-none gradient-sidebar
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}
+      >
+        {/* Logo */}
+        <div className="p-5 flex items-center justify-between">
+          <Link href={ROUTES.DASHBOARD} className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/20">
+              <Image
+                src="/aiviue-logo.png"
+                alt="AIVIUE"
+                width={28}
+                height={28}
+                className="w-6 h-6"
+                priority
+              />
+            </div>
+            <span className="text-lg font-bold text-white">AIVIUE</span>
+          </Link>
+          <button 
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 px-3 py-4 space-y-1">
+          <p className="px-3 text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">
+            General
+          </p>
+          {NAV_ITEMS.map((item) => {
+            const Icon = iconMap[item.icon as keyof typeof iconMap];
+            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+            
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setSidebarOpen(false)}
+                className={`
+                  flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
+                  ${isActive 
+                    ? 'bg-white/20 text-white' 
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                  }
+                `}
+              >
+                {Icon && <Icon className="w-5 h-5" />}
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Post a Job CTA */}
+        <div className="px-3 py-4">
+          <Link
+            href={ROUTES.JOB_NEW}
+            onClick={() => setSidebarOpen(false)}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold transition-all bg-white text-[var(--primary)] hover:shadow-lg hover:shadow-white/20"
+          >
+            <Plus className="w-5 h-5" />
+            Post a Job
+          </Link>
+        </div>
+
+        {/* User Info at bottom */}
+        <div className="p-4 border-t border-white/10">
+          <div className="flex items-center gap-3">
+            <div 
+              className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold"
+              style={{ background: 'linear-gradient(135deg, #EC4899 0%, #7C3AED 100%)', color: 'white' }}
+            >
+              {employer ? getInitials(employer.name) : '?'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">
+                {employer?.name || 'User'}
+              </p>
+              <p className="text-xs text-white/60 truncate">
+                {employer?.company_name || 'Company'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+        {/* Top Header */}
+        <header className="glass-navbar sticky top-0 z-30 px-4 sm:px-6 py-3 flex items-center justify-between">
+          {/* Mobile Menu Button */}
+          <button 
+            onClick={() => setSidebarOpen(true)}
+            className="lg:hidden p-2 rounded-xl hover:bg-white/50 transition-colors"
+            style={{ color: 'var(--neutral-gray)' }}
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+
+          {/* Page Title */}
+          <div className="hidden lg:block">
+            <h1 className="text-lg font-semibold" style={{ color: 'var(--neutral-dark)' }}>
+              {pathname === ROUTES.DASHBOARD && 'Dashboard'}
+              {pathname === ROUTES.JOBS && 'Jobs'}
+              {pathname === ROUTES.JOB_NEW && 'Create New Job'}
+              {pathname === ROUTES.DASHBOARD_PROFILE && 'Profile'}
+              {pathname.match(/\/dashboard\/jobs\/[^/]+$/) && !pathname.includes('/edit') && 'Job Details'}
+              {pathname.includes('/edit') && 'Edit Job'}
+            </h1>
+          </div>
+
+          {/* Right side - User Menu */}
+          <div className="relative ml-auto">
+            <button 
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="flex items-center gap-2 p-1.5 sm:p-2 rounded-xl hover:bg-white/50 transition-colors"
+            >
+              <div 
+                className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+                style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)' }}
+              >
+                {employer ? getInitials(employer.name) : '?'}
+              </div>
+              <span className="hidden sm:block text-sm font-medium" style={{ color: 'var(--neutral-dark)' }}>
+                {employer?.name?.split(' ')[0] || 'User'}
+              </span>
+              <ChevronDown className="w-4 h-4 hidden sm:block" style={{ color: 'var(--neutral-gray)' }} />
+            </button>
+
+            {/* Styled Dropdown Menu */}
+            {userMenuOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40"
+                  onClick={() => setUserMenuOpen(false)}
+                />
+                <div className="glass-dropdown absolute right-0 mt-2 w-56 rounded-2xl py-2 z-50">
+                  {/* User info header */}
+                  <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--neutral-border)' }}>
+                    <p className="text-sm font-medium" style={{ color: 'var(--neutral-dark)' }}>
+                      {employer?.name}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--neutral-gray)' }}>
+                      {employer?.email}
+                    </p>
+                  </div>
+                  
+                  {/* Menu items */}
+                  <div className="py-1">
+                    <Link
+                      href={ROUTES.DASHBOARD_PROFILE}
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[var(--primary-50)] transition-colors"
+                      style={{ color: 'var(--neutral-dark)' }}
+                    >
+                      <User className="w-4 h-4" style={{ color: 'var(--neutral-gray)' }} />
+                      Profile
+                    </Link>
+                    <Link
+                      href={ROUTES.DASHBOARD_PROFILE}
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[var(--primary-50)] transition-colors"
+                      style={{ color: 'var(--neutral-dark)' }}
+                    >
+                      <Settings className="w-4 h-4" style={{ color: 'var(--neutral-gray)' }} />
+                      Settings
+                    </Link>
+                    <a
+                      href="#"
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[var(--primary-50)] transition-colors"
+                      style={{ color: 'var(--neutral-dark)' }}
+                    >
+                      <HelpCircle className="w-4 h-4" style={{ color: 'var(--neutral-gray)' }} />
+                      Help Center
+                    </a>
+                  </div>
+                  
+                  {/* Logout */}
+                  <div className="border-t py-1" style={{ borderColor: 'var(--neutral-border)' }}>
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-red-50 transition-colors w-full text-left"
+                      style={{ color: 'var(--status-closed)' }}
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </header>
+
+        {/* Page Content */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
