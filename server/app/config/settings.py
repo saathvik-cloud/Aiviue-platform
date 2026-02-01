@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
     
+    # Feature Flags
+    enable_screening_events: bool = False  # Set True when Screening Agent is ready
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

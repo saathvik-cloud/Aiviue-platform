@@ -478,7 +478,9 @@ class JobService:
             await self.cache.delete(str(job_id))
         
         # Publish event (for Screening System)
-        if self.publisher:
+        # Only sends if enabled AND publisher is available
+        from app.config import settings
+        if settings.enable_screening_events and self.publisher:
             await self.publisher.publish_job_published(
                 job_id=str(job.id),
                 employer_id=str(job.employer_id),
@@ -494,6 +496,9 @@ class JobService:
                 compensation=job.compensation,
                 openings_count=job.openings_count,
             )
+            logger.info(f"Event sent to Screening Agent: job.published")
+        else:
+            logger.debug(f"Screening events disabled - skipping job.published event")
         
         return self._to_response(job)
     
@@ -553,13 +558,17 @@ class JobService:
         if self.cache:
             await self.cache.delete(str(job_id))
         
-        # Publish event
-        if self.publisher:
+        # Publish event (only if enabled)
+        from app.config import settings
+        if settings.enable_screening_events and self.publisher:
             await self.publisher.publish_job_closed(
                 job_id=str(job.id),
                 employer_id=str(job.employer_id),
                 reason=reason,
             )
+            logger.info(f"Event sent to Screening Agent: job.closed")
+        else:
+            logger.debug(f"Screening events disabled - skipping job.closed event")
         
         return self._to_response(job)
     

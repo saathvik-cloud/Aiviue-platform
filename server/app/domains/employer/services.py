@@ -109,8 +109,9 @@ class EmployerService:
             },
         )
         
-        # 4. Publish event (if publisher available)
-        if self.publisher:
+        # 4. Publish event (only if screening events enabled)
+        from app.config import settings
+        if settings.enable_screening_events and self.publisher:
             await self.publisher.publish(
                 EventTypes.EMPLOYER_CREATED,
                 {
@@ -120,6 +121,7 @@ class EmployerService:
                     "company_name": employer.company_name,
                 },
             )
+            logger.info(f"Event sent: employer.created")
         
         # 5. Return response
         return self._to_response(employer)
@@ -328,8 +330,9 @@ class EmployerService:
         if self.cache:
             await self.cache.delete(str(employer_id))
         
-        # 5. Publish event
-        if self.publisher:
+        # 5. Publish event (only if screening events enabled)
+        from app.config import settings
+        if settings.enable_screening_events and self.publisher:
             await self.publisher.publish(
                 EventTypes.EMPLOYER_UPDATED,
                 {
@@ -337,6 +340,7 @@ class EmployerService:
                     "changes": update_data,
                 },
             )
+            logger.info(f"Event sent: employer.updated")
         
         return self._to_response(employer)
     
