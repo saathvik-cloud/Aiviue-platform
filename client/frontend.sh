@@ -9,7 +9,7 @@
 #  Prerequisites:
 #  - Node.js installed
 #  - npm install completed
-#  - Backend server running (./server.sh)
+#  - Backend server running (./server.sh) 
 #
 #  Usage: ./frontend.sh
 # ===========================================
