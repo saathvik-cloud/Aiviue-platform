@@ -31,6 +31,7 @@ from tests.test_data import (
     SAMPLE_EMPLOYER,
     SAMPLE_JOB,
     generate_unique_email,
+    generate_unique_phone,
     generate_uuid,
 )
 
@@ -103,9 +104,10 @@ def api_client(test_client) -> TestClient:
 
 @pytest.fixture
 def sample_employer_data() -> dict:
-    """Generate sample employer data with unique email."""
+    """Generate sample employer data with unique email and phone."""
     data = SAMPLE_EMPLOYER.copy()
     data["email"] = generate_unique_email("employer")
+    data["phone"] = generate_unique_phone()  # Ensure unique phone
     return data
 
 

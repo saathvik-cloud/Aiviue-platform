@@ -166,6 +166,11 @@ class Job(Base, FullAuditMixin):
         nullable=True,
         comment="When job was closed",
     )
+    close_reason: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="Reason for closing the job",
+    )
     
     # Relationships
     employer: Mapped["Employer"] = relationship(
@@ -240,9 +245,9 @@ class Extraction(Base, UUIDMixin, TimestampMixin):
     )
     
     # Idempotency
-    idempotency_key: Mapped[str] = mapped_column(
+    idempotency_key: Mapped[str | None] = mapped_column(
         String(255),
-        nullable=False,
+        nullable=True,
         unique=True,
         comment="Idempotency key for this extraction",
     )
@@ -286,10 +291,10 @@ class Extraction(Base, UUIDMixin, TimestampMixin):
     )
     
     # Completion time
-    completed_at: Mapped[datetime | None] = mapped_column(
+    processed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
-        comment="When extraction completed",
+        comment="When extraction was processed",
     )
     
     # Table indexes

@@ -239,6 +239,7 @@ class JobResponse(BaseModel):
     # Timestamps
     published_at: Optional[datetime]
     closed_at: Optional[datetime]
+    close_reason: Optional[str]
     
     # Metadata
     is_active: bool
@@ -389,7 +390,7 @@ class ExtractionResponse(BaseModel):
     # Metadata
     attempts: int = Field(..., description="Processing attempts")
     created_at: datetime
-    completed_at: Optional[datetime]
+    processed_at: Optional[datetime]
     
     model_config = ConfigDict(from_attributes=True)
 

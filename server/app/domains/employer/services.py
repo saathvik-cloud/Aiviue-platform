@@ -74,7 +74,7 @@ class EmployerService:
         
         Steps:
         1. Sanitize input
-        2. Check for duplicate email/mobile
+        2. Check for duplicate email/phone
         3. Create employer
         4. Publish event
         5. Return response
@@ -86,15 +86,15 @@ class EmployerService:
             EmployerResponse
         
         Raises:
-            ConflictError: If email or mobile already exists
+            ConflictError: If email or phone already exists
         """
         # 1. Sanitize input
         sanitized_data = self._sanitize_create_data(request)
         
         # 2. Check for duplicates
         await self._check_duplicate_email(sanitized_data["email"])
-        if sanitized_data.get("mobile"):
-            await self._check_duplicate_mobile(sanitized_data["mobile"])
+        if sanitized_data.get("phone"):
+            await self._check_duplicate_phone(sanitized_data["phone"])
         
         # 3. Create employer
         employer = await self.repo.create(sanitized_data)
@@ -269,7 +269,7 @@ class EmployerService:
         Steps:
         1. Sanitize input
         2. Check if employer exists
-        3. Check for duplicate mobile (if changed)
+        3. Check for duplicate phone (if changed)
         4. Update with optimistic locking
         5. Invalidate cache
         6. Publish event
@@ -283,7 +283,7 @@ class EmployerService:
         
         Raises:
             NotFoundError: If employer not found
-            ConflictError: If version mismatch or mobile duplicate
+            ConflictError: If version mismatch or phone duplicate
         """
         # 1. Sanitize and get changed fields
         update_data = self._sanitize_update_data(request)
@@ -292,14 +292,14 @@ class EmployerService:
             # No fields to update, just return current
             return await self.get_by_id(employer_id)
         
-        # 2. Check for duplicate mobile if changing
-        if "mobile" in update_data and update_data["mobile"]:
-            existing = await self.repo.get_by_mobile(update_data["mobile"])
+        # 2. Check for duplicate phone if changing
+        if "phone" in update_data and update_data["phone"]:
+            existing = await self.repo.get_by_phone(update_data["phone"])
             if existing and existing.id != employer_id:
                 raise ConflictError(
-                    message="Mobile number already in use",
-                    error_code="MOBILE_ALREADY_EXISTS",
-                    context={"mobile": update_data["mobile"]},
+                    message="Phone number already in use",
+                    error_code="PHONE_ALREADY_EXISTS",
+                    context={"phone": update_data["phone"]},
                 )
         
         # 3. Update with optimistic locking
@@ -398,12 +398,16 @@ class EmployerService:
         return {
             "name": sanitize_text(request.name),
             "email": request.email.lower().strip(),
-            "mobile": request.mobile.strip() if request.mobile else None,
+            "phone": request.phone.strip() if request.phone else None,
             "company_name": sanitize_text(request.company_name),
             "company_description": sanitize_text(request.company_description) if request.company_description else None,
             "company_website": request.company_website.strip() if request.company_website else None,
             "company_size": request.company_size,
             "industry": sanitize_text(request.industry) if request.industry else None,
+            "headquarters_location": sanitize_text(request.headquarters_location) if request.headquarters_location else None,
+            "city": sanitize_text(request.city) if request.city else None,
+            "state": sanitize_text(request.state) if request.state else None,
+            "country": sanitize_text(request.country) if request.country else None,
         }
     
     def _sanitize_update_data(
@@ -415,8 +419,8 @@ class EmployerService:
         
         if request.name is not None:
             data["name"] = sanitize_text(request.name)
-        if request.mobile is not None:
-            data["mobile"] = request.mobile.strip() if request.mobile else None
+        if request.phone is not None:
+            data["phone"] = request.phone.strip() if request.phone else None
         if request.company_name is not None:
             data["company_name"] = sanitize_text(request.company_name)
         if request.company_description is not None:
@@ -427,6 +431,14 @@ class EmployerService:
             data["company_size"] = request.company_size
         if request.industry is not None:
             data["industry"] = sanitize_text(request.industry) if request.industry else None
+        if request.headquarters_location is not None:
+            data["headquarters_location"] = sanitize_text(request.headquarters_location) if request.headquarters_location else None
+        if request.city is not None:
+            data["city"] = sanitize_text(request.city) if request.city else None
+        if request.state is not None:
+            data["state"] = sanitize_text(request.state) if request.state else None
+        if request.country is not None:
+            data["country"] = sanitize_text(request.country) if request.country else None
         
         return data
     
@@ -439,13 +451,13 @@ class EmployerService:
                 context={"email": email},
             )
     
-    async def _check_duplicate_mobile(self, mobile: str) -> None:
-        """Check if mobile already exists."""
-        if await self.repo.exists_by_mobile(mobile):
+    async def _check_duplicate_phone(self, phone: str) -> None:
+        """Check if phone already exists."""
+        if await self.repo.exists_by_phone(phone):
             raise ConflictError(
-                message="Mobile number already exists",
-                error_code="MOBILE_ALREADY_EXISTS",
-                context={"mobile": mobile},
+                message="Phone number already exists",
+                error_code="PHONE_ALREADY_EXISTS",
+                context={"phone": phone},
             )
     
     def _to_response(self, employer: Employer) -> EmployerResponse:
@@ -454,15 +466,18 @@ class EmployerService:
             id=employer.id,
             name=employer.name,
             email=employer.email,
-            mobile=employer.mobile,
+            phone=employer.phone,
             company_name=employer.company_name,
             company_description=employer.company_description,
             company_website=employer.company_website,
             company_size=employer.company_size,
             industry=employer.industry,
-            is_email_verified=employer.is_email_verified,
-            is_mobile_verified=employer.is_mobile_verified,
+            headquarters_location=employer.headquarters_location,
+            city=employer.city,
+            state=employer.state,
+            country=employer.country,
             is_verified=employer.is_verified,
+            verified_at=employer.verified_at,
             is_active=employer.is_active,
             version=employer.version,
             created_at=employer.created_at,

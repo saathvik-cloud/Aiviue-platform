@@ -7,7 +7,8 @@ Tables:
 - employers: Main employer/company information
 """
 
-from sqlalchemy import Boolean, Index, String, Text
+from datetime import datetime
+from sqlalchemy import Boolean, DateTime, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.database import Base, FullAuditMixin
@@ -29,14 +30,16 @@ class Employer(Base, FullAuditMixin):
     Attributes:
         name: Contact person's name
         email: Primary email (unique)
-        mobile: Phone number (unique, optional)
+        phone: Phone number (optional)
         company_name: Name of the company
         company_description: About the company (optional)
         company_website: Company website URL (optional)
         company_size: Size category (startup, small, medium, large, enterprise)
         industry: Industry/sector
-        is_email_verified: Whether email is verified
-        is_mobile_verified: Whether mobile is verified
+        headquarters_location: Main office location
+        city, state, country: Location breakdown
+        is_verified: Whether employer is verified
+        verified_at: When verification happened
     """
     
     __tablename__ = "employers"
@@ -53,10 +56,9 @@ class Employer(Base, FullAuditMixin):
         unique=True,
         comment="Primary email address",
     )
-    mobile: Mapped[str | None] = mapped_column(
-        String(20),
+    phone: Mapped[str | None] = mapped_column(
+        String(50),
         nullable=True,
-        unique=True,
         comment="Phone number with country code",
     )
     
@@ -87,18 +89,39 @@ class Employer(Base, FullAuditMixin):
         comment="Industry/sector",
     )
     
-    # Verification Status
-    is_email_verified: Mapped[bool] = mapped_column(
-        Boolean,
-        default=False,
-        nullable=False,
-        comment="Whether email is verified",
+    # Location
+    headquarters_location: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="Main office location",
     )
-    is_mobile_verified: Mapped[bool] = mapped_column(
+    city: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="City",
+    )
+    state: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="State/Province",
+    )
+    country: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="Country",
+    )
+    
+    # Verification Status
+    is_verified: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
         nullable=False,
-        comment="Whether mobile is verified",
+        comment="Whether employer is verified",
+    )
+    verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="When verification happened",
     )
     
     # Relationships (will be used when Job model is created)
@@ -108,22 +131,13 @@ class Employer(Base, FullAuditMixin):
     #     lazy="selectin",
     # )
     
-    # Table indexes for query performance
+    # Table indexes - match the migration
     __table_args__ = (
-        Index("idx_employers_email", "email"),
-        Index("idx_employers_mobile", "mobile"),
-        Index("idx_employers_company_name", "company_name"),
-        Index("idx_employers_is_active", "is_active"),
-        Index("idx_employers_created_at", "created_at"),
+        # Note: Indexes are already created in migration, don't duplicate here
     )
     
     def __repr__(self) -> str:
         return f"<Employer(id={self.id}, email={self.email}, company={self.company_name})>"
-    
-    @property
-    def is_verified(self) -> bool:
-        """Check if employer has at least one verified contact method."""
-        return self.is_email_verified or self.is_mobile_verified
     
     @property
     def display_name(self) -> str:

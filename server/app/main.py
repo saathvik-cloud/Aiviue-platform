@@ -55,11 +55,21 @@ async def lifespan(app: FastAPI):
         },
     )
     
+    # Initialize Database connection check
+    try:
+        from sqlalchemy import text
+        from app.shared.database import async_session_factory
+        async with async_session_factory() as session:
+            await session.execute(text("SELECT 1"))
+        logger.info("Database connected", extra={"database": "PostgreSQL"})
+    except Exception as e:
+        logger.error(f"Database connection failed: {e}", extra={"error": str(e)})
+    
     # Initialize Redis (optional - graceful if not available)
     try:
         from app.shared.cache import init_redis
         await init_redis()
-        logger.info("Redis connected")
+        logger.info("Redis connected", extra={"redis_url": settings.redis_url})
     except Exception as e:
         logger.warning(f"Redis not available: {e}")
     

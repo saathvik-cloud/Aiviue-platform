@@ -43,16 +43,24 @@ EMPLOYER_PREFIX = "/api/v1/employers"
 @pytest.fixture
 def test_employer(api_client):
     """Create a test employer and clean up after test."""
+    from tests.test_data import generate_unique_phone
+    
     employer_data = SAMPLE_EMPLOYER.copy()
     employer_data["email"] = generate_unique_email("job_test_employer")
+    employer_data["phone"] = generate_unique_phone()  # Ensure unique phone
     
     response = api_client.post(EMPLOYER_PREFIX, json=employer_data)
     employer = response.json()
     
+    # Check if creation succeeded
+    if "error" in employer:
+        pytest.fail(f"Failed to create test employer: {employer}")
+    
     yield employer
     
-    # Cleanup
-    api_client.delete(f"{EMPLOYER_PREFIX}/{employer['id']}?version={employer['version']}")
+    # Cleanup (only if we have an ID)
+    if "id" in employer and "version" in employer:
+        api_client.delete(f"{EMPLOYER_PREFIX}/{employer['id']}?version={employer['version']}")
 
 
 # =============================================================================
@@ -118,7 +126,9 @@ class TestCreateJob:
         response = api_client.post(API_PREFIX, json=job_data)
         
         # Should fail because employer doesn't exist
-        assert response.status_code in [404, 422]
+        assert response.status_code == 404
+        data = response.json()
+        assert data["error"]["code"] == "EMPLOYER_NOT_FOUND"
     
     def test_create_job_invalid_work_type(self, api_client, test_employer):
         """

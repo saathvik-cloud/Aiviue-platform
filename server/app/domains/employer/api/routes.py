@@ -42,7 +42,7 @@ router = APIRouter(
     responses={
         400: {"description": "Validation error"},
         404: {"description": "Employer not found"},
-        409: {"description": "Conflict (duplicate email/mobile or version mismatch)"},
+        409: {"description": "Conflict (duplicate email/phone or version mismatch)"},
         500: {"description": "Internal server error"},
     },
 )
@@ -94,17 +94,18 @@ async def get_service(
     - `company_name`: Company/organization name
     
     **Optional fields:**
-    - `mobile`: Phone number (must be unique if provided)
+    - `phone`: Phone number (must be unique if provided)
     - `company_description`: About the company
     - `company_website`: Website URL
     - `company_size`: startup, small, medium, large, enterprise
     - `industry`: Industry/sector
+    - `headquarters_location`, `city`, `state`, `country`: Location info
     
     **Returns:** Created employer with generated UUID and timestamps.
     """,
     responses={
         201: {"description": "Employer created successfully"},
-        409: {"description": "Email or mobile already exists"},
+        409: {"description": "Email or phone already exists"},
     },
 )
 async def create_employer(
@@ -204,9 +205,10 @@ async def get_employer(
     - Get current version from GET response
     
     **Updatable fields:**
-    - `name`, `mobile`, `company_name`
+    - `name`, `phone`, `company_name`
     - `company_description`, `company_website`
     - `company_size`, `industry`
+    - `headquarters_location`, `city`, `state`, `country`
     
     **Note:** Email cannot be updated (use separate endpoint for email change).
     
@@ -214,7 +216,7 @@ async def get_employer(
     """,
     responses={
         404: {"description": "Employer not found"},
-        409: {"description": "Version conflict or mobile already exists"},
+        409: {"description": "Version conflict or phone already exists"},
     },
 )
 async def update_employer(

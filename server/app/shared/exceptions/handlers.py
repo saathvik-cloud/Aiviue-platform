@@ -88,17 +88,18 @@ async def app_exception_handler(
     request_id = get_request_id(request)
     
     # Log with appropriate level
+    # Note: 'message' is a reserved key in Python logging, use 'error_message' instead
     log_data = {
         "error_type": exc.error_type,
         "error_code": exc.error_code,
-        "message": exc.message,
+        "error_message": exc.message,  # Changed from 'message' to avoid LogRecord conflict
         "request_id": request_id,
         "path": request.url.path,
         "method": request.method,
     }
     
     if exc.context:
-        log_data["context"] = exc.context
+        log_data["error_context"] = exc.context  # Changed from 'context'
     
     # Log 5xx as error, others as warning
     if exc.status_code >= 500:
@@ -114,6 +115,25 @@ async def app_exception_handler(
         context=exc.context,
         request_id=request_id,
     )
+
+
+def _serialize_validation_errors(errors: list) -> list:
+    """
+    Serialize validation errors to ensure they are JSON-compatible.
+    
+    Pydantic errors may contain non-serializable objects like ValueError.
+    """
+    serialized = []
+    for error in errors:
+        serialized_error = {
+            "type": error.get("type", "unknown"),
+            "loc": list(error.get("loc", [])),
+            "msg": str(error.get("msg", "")),
+            "input": str(error.get("input", ""))[:100],  # Truncate long inputs
+        }
+        # Don't include 'ctx' as it may contain non-serializable objects
+        serialized.append(serialized_error)
+    return serialized
 
 
 async def validation_exception_handler(
@@ -141,21 +161,24 @@ async def validation_exception_handler(
     if len(error_details) > 3:
         message += f" (and {len(error_details) - 3} more errors)"
     
+    # Serialize errors to avoid JSON serialization issues
+    serialized_errors = _serialize_validation_errors(errors)
+    
     logger.warning(
         f"Validation error: {message}",
         extra={
             "request_id": request_id,
             "path": request.url.path,
-            "errors": errors,
+            "validation_errors": serialized_errors,  # Changed from 'errors'
         }
     )
     
     return create_error_response(
-        status_code=400,
+        status_code=422,  # Changed from 400 to 422 (standard for validation errors)
         error_type="VALIDATION_ERROR",
         error_code="REQUEST_VALIDATION_FAILED",
         message=message,
-        context={"errors": errors} if settings.debug else None,
+        context={"errors": serialized_errors} if settings.debug else None,
         request_id=request_id,
     )
 
@@ -172,6 +195,7 @@ async def pydantic_exception_handler(
     request_id = get_request_id(request)
     
     errors = exc.errors()
+    serialized_errors = _serialize_validation_errors(errors)
     message = f"Data validation failed: {len(errors)} error(s)"
     
     logger.warning(
@@ -179,16 +203,16 @@ async def pydantic_exception_handler(
         extra={
             "request_id": request_id,
             "path": request.url.path,
-            "errors": errors,
+            "validation_errors": serialized_errors,
         }
     )
     
     return create_error_response(
-        status_code=400,
+        status_code=422,  # Changed from 400 to 422 (standard for validation errors)
         error_type="VALIDATION_ERROR",
         error_code="DATA_VALIDATION_FAILED",
         message=message,
-        context={"errors": errors} if settings.debug else None,
+        context={"errors": serialized_errors} if settings.debug else None,
         request_id=request_id,
     )
 

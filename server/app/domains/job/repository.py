@@ -362,7 +362,7 @@ class ExtractionRepository:
             extraction_id,
             ExtractionStatus.COMPLETED,
             extracted_data=extracted_data,
-            completed_at=datetime.now(timezone.utc),
+            processed_at=datetime.now(timezone.utc),
         )
     
     async def mark_failed(

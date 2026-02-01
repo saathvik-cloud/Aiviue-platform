@@ -120,22 +120,22 @@ class EmployerRepository:
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
     
-    async def get_by_mobile(
+    async def get_by_phone(
         self,
-        mobile: str,
+        phone: str,
         include_inactive: bool = False,
     ) -> Optional[Employer]:
         """
-        Get employer by mobile number.
+        Get employer by phone number.
         
         Args:
-            mobile: Mobile number
+            phone: Phone number
             include_inactive: Include soft-deleted records
         
         Returns:
             Employer or None if not found
         """
-        query = select(Employer).where(Employer.mobile == mobile)
+        query = select(Employer).where(Employer.phone == phone)
         
         if not include_inactive:
             query = query.where(Employer.is_active == True)
@@ -169,23 +169,23 @@ class EmployerRepository:
         count = result.scalar()
         return count > 0
     
-    async def exists_by_mobile(
+    async def exists_by_phone(
         self,
-        mobile: str,
+        phone: str,
         exclude_id: Optional[UUID] = None,
     ) -> bool:
         """
-        Check if mobile already exists.
+        Check if phone already exists.
         
         Args:
-            mobile: Mobile to check
+            phone: Phone to check
             exclude_id: Exclude this ID from check (for updates)
         
         Returns:
-            True if mobile exists
+            True if phone exists
         """
         query = select(func.count()).select_from(Employer).where(
-            Employer.mobile == mobile
+            Employer.phone == phone
         )
         
         if exclude_id:
@@ -304,20 +304,7 @@ class EmployerRepository:
         
         # Verification status
         if filters.is_verified is not None:
-            if filters.is_verified:
-                conditions.append(
-                    or_(
-                        Employer.is_email_verified == True,
-                        Employer.is_mobile_verified == True,
-                    )
-                )
-            else:
-                conditions.append(
-                    and_(
-                        Employer.is_email_verified == False,
-                        Employer.is_mobile_verified == False,
-                    )
-                )
+            conditions.append(Employer.is_verified == filters.is_verified)
         
         if conditions:
             query = query.where(and_(*conditions))

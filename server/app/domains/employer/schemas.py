@@ -41,9 +41,9 @@ class EmployerCreateRequest(BaseModel):
         description="Primary email address",
         examples=["john@acme.com"],
     )
-    mobile: Optional[str] = Field(
+    phone: Optional[str] = Field(
         None,
-        max_length=20,
+        max_length=50,
         description="Phone number with country code",
         examples=["+1-555-123-4567"],
     )
@@ -79,6 +79,28 @@ class EmployerCreateRequest(BaseModel):
         examples=["Technology"],
     )
     
+    # Location (optional)
+    headquarters_location: Optional[str] = Field(
+        None,
+        max_length=255,
+        description="Main office location",
+    )
+    city: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="City",
+    )
+    state: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="State/Province",
+    )
+    country: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="Country",
+    )
+    
     @field_validator("company_size")
     @classmethod
     def validate_company_size(cls, v: Optional[str]) -> Optional[str]:
@@ -89,17 +111,17 @@ class EmployerCreateRequest(BaseModel):
             )
         return v
     
-    @field_validator("mobile")
+    @field_validator("phone")
     @classmethod
-    def validate_mobile(cls, v: Optional[str]) -> Optional[str]:
-        """Basic mobile number validation."""
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Basic phone number validation."""
         if v is not None:
             # Remove spaces and dashes for validation
             cleaned = v.replace(" ", "").replace("-", "")
             if not cleaned.replace("+", "").isdigit():
-                raise ValueError("Mobile must contain only digits, +, spaces, and dashes")
+                raise ValueError("Phone must contain only digits, +, spaces, and dashes")
             if len(cleaned) < 10:
-                raise ValueError("Mobile number too short")
+                raise ValueError("Phone number too short")
         return v
 
 
@@ -118,9 +140,9 @@ class EmployerUpdateRequest(BaseModel):
         max_length=255,
         description="Contact person's full name",
     )
-    mobile: Optional[str] = Field(
+    phone: Optional[str] = Field(
         None,
-        max_length=20,
+        max_length=50,
         description="Phone number with country code",
     )
     company_name: Optional[str] = Field(
@@ -147,6 +169,26 @@ class EmployerUpdateRequest(BaseModel):
         None,
         max_length=100,
         description="Industry/sector",
+    )
+    headquarters_location: Optional[str] = Field(
+        None,
+        max_length=255,
+        description="Main office location",
+    )
+    city: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="City",
+    )
+    state: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="State/Province",
+    )
+    country: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="Country",
     )
     
     # Version for optimistic locking
@@ -181,7 +223,7 @@ class EmployerResponse(BaseModel):
     # Contact Information
     name: str = Field(..., description="Contact person's full name")
     email: str = Field(..., description="Primary email address")
-    mobile: Optional[str] = Field(None, description="Phone number")
+    phone: Optional[str] = Field(None, description="Phone number")
     
     # Company Information
     company_name: str = Field(..., description="Company name")
@@ -190,10 +232,15 @@ class EmployerResponse(BaseModel):
     company_size: Optional[str] = Field(None, description="Company size")
     industry: Optional[str] = Field(None, description="Industry/sector")
     
+    # Location
+    headquarters_location: Optional[str] = Field(None, description="Main office location")
+    city: Optional[str] = Field(None, description="City")
+    state: Optional[str] = Field(None, description="State/Province")
+    country: Optional[str] = Field(None, description="Country")
+    
     # Verification Status
-    is_email_verified: bool = Field(..., description="Email verified status")
-    is_mobile_verified: bool = Field(..., description="Mobile verified status")
-    is_verified: bool = Field(..., description="Has any verified contact method")
+    is_verified: bool = Field(..., description="Whether employer is verified")
+    verified_at: Optional[datetime] = Field(None, description="When verified")
     
     # Metadata
     is_active: bool = Field(..., description="Active status")
@@ -291,14 +338,18 @@ class EmployerInDB(BaseModel):
     id: UUID
     name: str
     email: str
-    mobile: Optional[str]
+    phone: Optional[str]
     company_name: str
     company_description: Optional[str]
     company_website: Optional[str]
     company_size: Optional[str]
     industry: Optional[str]
-    is_email_verified: bool
-    is_mobile_verified: bool
+    headquarters_location: Optional[str]
+    city: Optional[str]
+    state: Optional[str]
+    country: Optional[str]
+    is_verified: bool
+    verified_at: Optional[datetime]
     is_active: bool
     version: int
     created_at: datetime

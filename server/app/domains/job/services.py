@@ -209,7 +209,7 @@ class ExtractionService:
             error_message=extraction.error_message,
             attempts=extraction.attempts,
             created_at=extraction.created_at,
-            completed_at=extraction.completed_at,
+            processed_at=extraction.processed_at,
         )
 
 
@@ -250,6 +250,9 @@ class JobService:
         
         Returns:
             JobResponse
+        
+        Raises:
+            NotFoundError: If employer_id doesn't exist
         """
         # Check idempotency
         if request.idempotency_key:
@@ -257,6 +260,15 @@ class JobService:
             if existing:
                 logger.info(f"Returning existing job for idempotency key")
                 return self._to_response(existing)
+        
+        # Validate employer exists (foreign key check before insert)
+        employer_exists = await self._check_employer_exists(request.employer_id)
+        if not employer_exists:
+            raise NotFoundError(
+                message="Employer not found",
+                error_code="EMPLOYER_NOT_FOUND",
+                context={"employer_id": str(request.employer_id)},
+            )
         
         # Sanitize input
         data = self._sanitize_create_data(request)
@@ -593,6 +605,27 @@ class JobService:
     
     # ==================== HELPERS ====================
     
+    async def _check_employer_exists(self, employer_id: UUID) -> bool:
+        """
+        Check if employer exists in database.
+        
+        Args:
+            employer_id: UUID of employer
+        
+        Returns:
+            True if employer exists and is active
+        """
+        from sqlalchemy import select, func
+        from app.domains.employer.models import Employer
+        
+        query = select(func.count()).select_from(Employer).where(
+            Employer.id == employer_id,
+            Employer.is_active == True,
+        )
+        result = await self.session.execute(query)
+        count = result.scalar()
+        return count > 0
+    
     def _sanitize_create_data(self, request: JobCreateRequest) -> dict[str, Any]:
         """Sanitize and prepare data for creation."""
         return {
@@ -671,6 +704,7 @@ class JobService:
             is_draft=job.is_draft,
             published_at=job.published_at,
             closed_at=job.closed_at,
+            close_reason=job.close_reason,
             is_active=job.is_active,
             version=job.version,
             created_at=job.created_at,

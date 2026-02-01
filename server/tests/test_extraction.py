@@ -59,17 +59,33 @@ class TestSubmitExtraction:
     
     def test_submit_extraction_with_employer_id(self, api_client):
         """
-        Test submitting extraction with employer_id.
+        Test submitting extraction with valid employer_id.
         Expected: 202 Accepted.
         """
+        from tests.test_data import SAMPLE_EMPLOYER, generate_unique_email, generate_unique_phone
+        
+        # First create a real employer (employer_id has FK constraint)
+        employer_data = SAMPLE_EMPLOYER.copy()
+        employer_data["email"] = generate_unique_email("extract_test")
+        employer_data["phone"] = generate_unique_phone()
+        
+        emp_response = api_client.post("/api/v1/employers", json=employer_data)
+        employer = emp_response.json()
+        
+        if "error" in employer:
+            pytest.skip(f"Could not create employer: {employer}")
+        
         request_data = {
             "raw_jd": SAMPLE_JD_RAW,
-            "employer_id": generate_uuid(),
+            "employer_id": employer["id"],
         }
         
         response = api_client.post(f"{API_PREFIX}/extract", json=request_data)
         
         assert_response_success(response, 202)
+        
+        # Cleanup
+        api_client.delete(f"/api/v1/employers/{employer['id']}?version={employer['version']}")
     
     def test_submit_extraction_empty_jd(self, api_client):
         """
@@ -283,9 +299,11 @@ class TestExtractionEdgeCases:
         """
         Test extracting from minimal JD.
         Expected: 202 Accepted (extraction should handle gracefully).
+        Note: min_length=50 characters required for raw_jd.
         """
         request_data = {
-            "raw_jd": "Hiring Python developer. Remote. $100k.",
+            # At least 50 chars required
+            "raw_jd": "We are hiring a Python developer. Remote position available. Salary $100k.",
         }
         
         response = api_client.post(f"{API_PREFIX}/extract", json=request_data)

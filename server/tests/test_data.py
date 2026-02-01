@@ -21,6 +21,16 @@ def generate_unique_email(prefix: str = "test") -> str:
     return f"{prefix}_{uuid.uuid4().hex[:8]}@pytest.com"
 
 
+def generate_unique_phone() -> str:
+    """Generate a unique test phone number to avoid conflicts."""
+    import random
+    # Generate random 10-digit number (only digits, no hex)
+    area_code = random.randint(200, 999)
+    prefix = random.randint(200, 999)
+    line = random.randint(1000, 9999)
+    return f"+1-{area_code}-{prefix}-{line}"
+
+
 def generate_uuid() -> str:
     """Generate a new UUID string."""
     return str(uuid.uuid4())
@@ -33,11 +43,11 @@ def generate_uuid() -> str:
 SAMPLE_EMPLOYER = {
     "name": "John Doe",
     "email": "john.doe@acmecorp.com",
-    "phone": "+1234567890",
+    "phone": "+1-234-567-8900",  # With country code and formatting
     "company_name": "Acme Corporation",
     "company_description": "We build amazing products that solve real problems.",
     "company_website": "https://acmecorp.com",
-    "company_size": "50-200",
+    "company_size": "medium",  # Valid values: startup, small, medium, large, enterprise
     "industry": "Technology",
     "headquarters_location": "New York, NY",
     "city": "New York",
@@ -53,9 +63,9 @@ SAMPLE_EMPLOYER_MINIMAL = {
 
 SAMPLE_EMPLOYER_UPDATE = {
     "name": "John Doe Updated",
-    "phone": "+9876543210",
+    # Note: Don't include phone here - use generate_unique_phone() in tests if updating phone
     "company_description": "Updated description - Now we build even better products!",
-    "company_size": "200-500",
+    "company_size": "large",  # Valid values: startup, small, medium, large, enterprise
 }
 
 INVALID_EMPLOYER_PAYLOADS = [

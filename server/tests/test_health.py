@@ -191,8 +191,9 @@ class TestErrorHandling:
         assert response.status_code == 422
         data = response.json()
         
-        # Should have error details
-        assert "detail" in data
+        # Should have error response (our custom format uses 'error', not 'detail')
+        assert "error" in data
+        assert data["error"]["type"] == "VALIDATION_ERROR"
 
 
 # =============================================================================
