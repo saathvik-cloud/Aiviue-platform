@@ -325,7 +325,8 @@ class JobService:
             work_type=extracted_data.work_type,
             salary_range_min=extracted_data.salary_range_min,
             salary_range_max=extracted_data.salary_range_max,
-            compensation=extracted_data.compensation,
+            experience_min=extracted_data.experience_min,
+            experience_max=extracted_data.experience_max,
             shift_preferences=extracted_data.shift_preferences,
             openings_count=extracted_data.openings_count or 1,
             idempotency_key=idempotency_key,
@@ -505,7 +506,8 @@ class JobService:
                 state=job.state,
                 work_type=job.work_type,
                 requirements=job.requirements,
-                compensation=job.compensation,
+                experience_min=float(job.experience_min) if job.experience_min else None,
+                experience_max=float(job.experience_max) if job.experience_max else None,
                 openings_count=job.openings_count,
             )
             logger.info(f"Event sent to Screening Agent: job.published")
@@ -549,6 +551,7 @@ class JobService:
             JobStatus.CLOSED,
             version,
             closed_at=datetime.now(timezone.utc),
+            close_reason=reason,
         )
         
         if job is None:
@@ -640,7 +643,9 @@ class JobService:
             "work_type": request.work_type,
             "salary_range_min": request.salary_range_min,
             "salary_range_max": request.salary_range_max,
-            "compensation": sanitize_text(request.compensation) if request.compensation else None,
+            "currency": request.currency,
+            "experience_min": request.experience_min,
+            "experience_max": request.experience_max,
             "shift_preferences": request.shift_preferences,
             "openings_count": request.openings_count,
             "idempotency_key": request.idempotency_key,
@@ -671,8 +676,12 @@ class JobService:
             data["salary_range_min"] = request.salary_range_min
         if request.salary_range_max is not None:
             data["salary_range_max"] = request.salary_range_max
-        if request.compensation is not None:
-            data["compensation"] = sanitize_text(request.compensation)
+        if request.currency is not None:
+            data["currency"] = request.currency
+        if request.experience_min is not None:
+            data["experience_min"] = request.experience_min
+        if request.experience_max is not None:
+            data["experience_max"] = request.experience_max
         if request.shift_preferences is not None:
             data["shift_preferences"] = request.shift_preferences
         if request.openings_count is not None:
@@ -695,8 +704,11 @@ class JobService:
             work_type=job.work_type,
             salary_range_min=float(job.salary_range_min) if job.salary_range_min else None,
             salary_range_max=float(job.salary_range_max) if job.salary_range_max else None,
+            currency=job.currency,
             salary_range=job.salary_range,
-            compensation=job.compensation,
+            experience_min=float(job.experience_min) if job.experience_min else None,
+            experience_max=float(job.experience_max) if job.experience_max else None,
+            experience_range=job.experience_range,
             shift_preferences=job.shift_preferences,
             openings_count=job.openings_count,
             status=job.status,

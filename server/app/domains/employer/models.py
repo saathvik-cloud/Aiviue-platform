@@ -111,6 +111,18 @@ class Employer(Base, FullAuditMixin):
         comment="Country",
     )
     
+    # Company Logo & GST
+    logo_url: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+        comment="URL to company logo in Supabase Storage",
+    )
+    gst_number: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="GST/Tax identification number",
+    )
+    
     # Verification Status
     is_verified: Mapped[bool] = mapped_column(
         Boolean,

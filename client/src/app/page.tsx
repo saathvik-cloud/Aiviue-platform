@@ -34,9 +34,9 @@ export default function HomePage() {
               <Image
                 src="/aiviue-logo.png"
                 alt="AIVIUE"
-                width={140}
-                height={48}
-                className="h-10 sm:h-12 w-auto"
+                width={180}
+                height={60}
+                className="h-12 sm:h-14 md:h-16 w-auto"
                 priority
               />
             </Link>
@@ -52,7 +52,8 @@ export default function HomePage() {
               </Link>
               <Link
                 href={ROUTES.REGISTER}
-                className="btn-gradient px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-medium rounded-xl"
+                className="px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-medium rounded-xl text-white transition-colors hover:opacity-90"
+                style={{ backgroundColor: 'var(--primary)' }}
               >
                 Sign Up
               </Link>

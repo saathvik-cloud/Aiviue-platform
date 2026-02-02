@@ -55,13 +55,23 @@ def build_jd_extraction_prompt(raw_jd: str) -> str:
     "state": "string or null - state/province",
     "country": "string or null - country",
     "work_type": "string or null - one of: remote, hybrid, onsite",
-    "salary_range_min": "number or null - minimum annual salary (USD)",
-    "salary_range_max": "number or null - maximum annual salary (USD)",
-    "compensation": "string or null - full compensation text as stated",
+    "salary_range_min": "number or null - minimum annual salary",
+    "salary_range_max": "number or null - maximum annual salary",
+    "currency": "string or null - salary currency code (e.g., INR, USD). Default to INR if not specified",
+    "experience_min": "number or null - minimum years of experience required (e.g., 3, 3.5, 0 for freshers)",
+    "experience_max": "number or null - maximum years of experience if a range is specified (e.g., 5 for '3-5 years')",
     "shift_preferences": "object or null - shift/schedule info like {{'shifts': ['day', 'night'], 'hours': '9-5'}}",
     "openings_count": "number - count of positions (default 1)",
     "extraction_confidence": "number 0-1 - your confidence in this extraction"
 }}
+
+## Experience Extraction Guidelines
+- Look for phrases like "X years experience", "X+ years", "X-Y years", "minimum X years"
+- For "3+ years" → experience_min: 3, experience_max: null
+- For "3-5 years" → experience_min: 3, experience_max: 5
+- For "at least 2 years" → experience_min: 2, experience_max: null
+- For "fresher" or "entry level" or "0-1 years" → experience_min: 0, experience_max: 1
+- If no experience mentioned, use null for both
 
 Return ONLY the JSON object, no markdown code blocks."""
 
@@ -172,3 +182,145 @@ def build_resume_parse_prompt(resume_text: str) -> str:
 }}
 
 Return ONLY the JSON object."""
+
+
+# ==============================================================================
+# JOB DESCRIPTION GENERATION PROMPT (AIVI Bot)
+# ==============================================================================
+
+JD_GENERATION_SYSTEM_PROMPT = """You are an expert HR copywriter specializing in creating compelling, professional job descriptions. Your task is to generate a well-structured job description from structured input data.
+
+## Guidelines
+
+1. **Be professional**: Use clear, professional language appropriate for job postings.
+2. **Be engaging**: Write in a way that attracts qualified candidates.
+3. **Be accurate**: Only include information provided - never invent or assume details.
+4. **Be structured**: Use clear sections with proper formatting.
+5. **Be concise**: Keep descriptions focused and readable (300-800 words ideal).
+
+## Output Format
+
+Return ONLY valid JSON with the generated content. No markdown code blocks or explanations."""
+
+
+def build_jd_generation_prompt(
+    title: str,
+    requirements: Optional[str] = None,
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    country: Optional[str] = None,
+    work_type: Optional[str] = None,
+    salary_min: Optional[float] = None,
+    salary_max: Optional[float] = None,
+    currency: str = "INR",
+    experience_min: Optional[float] = None,
+    experience_max: Optional[float] = None,
+    shift_preference: Optional[str] = None,
+    openings_count: int = 1,
+    company_name: Optional[str] = None,
+) -> str:
+    """
+    Build prompt for generating a job description from structured data.
+    
+    This is called at the end of the AIVI bot conversation flow.
+    
+    Args:
+        title: Job title (required)
+        requirements: Skills/qualifications the user mentioned
+        city: City name
+        state: State/province
+        country: Country
+        work_type: remote/hybrid/onsite
+        salary_min: Minimum salary
+        salary_max: Maximum salary
+        currency: Currency code (INR, USD, etc.)
+        experience_min: Minimum years of experience
+        experience_max: Maximum years of experience
+        shift_preference: day/night/flexible
+        openings_count: Number of positions
+        company_name: Company name for personalization
+        
+    Returns:
+        Formatted prompt string
+    """
+    # Build location string
+    location_parts = [p for p in [city, state, country] if p]
+    location = ", ".join(location_parts) if location_parts else "Not specified"
+    
+    # Build salary string
+    if salary_min and salary_max:
+        salary = f"{currency} {salary_min:,.0f} - {salary_max:,.0f} per annum"
+    elif salary_min:
+        salary = f"{currency} {salary_min:,.0f}+ per annum"
+    elif salary_max:
+        salary = f"Up to {currency} {salary_max:,.0f} per annum"
+    else:
+        salary = "Competitive"
+    
+    # Build experience string
+    if experience_min is not None and experience_max is not None:
+        experience = f"{experience_min}-{experience_max} years"
+    elif experience_min is not None:
+        experience = f"{experience_min}+ years"
+    elif experience_max is not None:
+        experience = f"Up to {experience_max} years"
+    else:
+        experience = "Open to all experience levels"
+    
+    # Normalize work type display
+    work_type_display = {
+        "remote": "Remote",
+        "hybrid": "Hybrid (Remote + Office)",
+        "onsite": "On-site",
+    }.get(work_type, "Flexible") if work_type else "Flexible"
+    
+    # Normalize shift display
+    shift_display = {
+        "day": "Day Shift",
+        "night": "Night Shift",
+        "flexible": "Flexible Hours",
+        "rotational": "Rotational Shifts",
+    }.get(shift_preference, shift_preference) if shift_preference else "Standard Business Hours"
+    
+    company_context = f"for {company_name}" if company_name else ""
+    
+    return f"""Generate a professional job description {company_context} using the following details.
+
+## Input Data
+
+- **Job Title**: {title}
+- **Location**: {location}
+- **Work Type**: {work_type_display}
+- **Salary Range**: {salary}
+- **Experience Required**: {experience}
+- **Shift Preference**: {shift_display}
+- **Number of Openings**: {openings_count}
+- **Requirements/Skills**: {requirements or "Not specified - create general requirements based on the job title"}
+
+## Required Output Schema (JSON)
+
+{{
+    "description": "string - A well-written job description (2-4 paragraphs) covering role overview, responsibilities, and what success looks like",
+    "requirements": "string - Bullet-pointed list of requirements and qualifications (use newlines and dashes)",
+    "summary": "string - A 1-2 sentence summary for job listings"
+}}
+
+## Writing Guidelines
+
+1. **Description Section**:
+   - Start with an engaging opening about the role
+   - Describe key responsibilities (3-5 main duties)
+   - Mention growth opportunities if applicable
+   - End with a call-to-action to apply
+
+2. **Requirements Section**:
+   - List 5-8 key requirements as bullet points
+   - Include both technical and soft skills
+   - Mention experience requirement
+   - Include education if relevant for the role
+
+3. **Summary Section**:
+   - Keep it under 150 characters
+   - Highlight the most attractive aspect of the role
+
+Return ONLY the JSON object with description, requirements, and summary fields."""

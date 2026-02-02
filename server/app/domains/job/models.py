@@ -125,10 +125,23 @@ class Job(Base, FullAuditMixin):
         nullable=True,
         comment="Maximum salary",
     )
-    compensation: Mapped[str | None] = mapped_column(
-        Text,
+    currency: Mapped[str | None] = mapped_column(
+        String(10),
         nullable=True,
-        comment="Compensation details (text)",
+        default="INR",
+        comment="Salary currency: INR, USD, etc.",
+    )
+    
+    # Experience Required
+    experience_min: Mapped[float | None] = mapped_column(
+        Numeric(4, 1),
+        nullable=True,
+        comment="Minimum years of experience required (e.g., 3, 3.5)",
+    )
+    experience_max: Mapped[float | None] = mapped_column(
+        Numeric(4, 1),
+        nullable=True,
+        comment="Maximum years of experience (for ranges like 3-5 years)",
     )
     
     # Shifts & Preferences
@@ -217,6 +230,21 @@ class Job(Base, FullAuditMixin):
             return f"${self.salary_range_min:,.0f}+"
         elif self.salary_range_max:
             return f"Up to ${self.salary_range_max:,.0f}"
+        return None
+    
+    @property
+    def experience_range(self) -> str | None:
+        """Get formatted experience range."""
+        def format_years(val: float) -> str:
+            # Display as integer if whole number, else with decimal
+            return f"{int(val)}" if val == int(val) else f"{val:.1f}"
+        
+        if self.experience_min and self.experience_max:
+            return f"{format_years(self.experience_min)}-{format_years(self.experience_max)} years"
+        elif self.experience_min:
+            return f"{format_years(self.experience_min)}+ years"
+        elif self.experience_max:
+            return f"Up to {format_years(self.experience_max)} years"
         return None
 
 

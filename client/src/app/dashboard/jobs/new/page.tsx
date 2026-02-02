@@ -79,6 +79,8 @@ export default function NewJobPage() {
         work_type: extraction.extracted_data?.work_type as CreateJobRequest['work_type'],
         salary_range_min: extraction.extracted_data?.salary_range_min,
         salary_range_max: extraction.extracted_data?.salary_range_max,
+        experience_min: extraction.extracted_data?.experience_min,
+        experience_max: extraction.extracted_data?.experience_max,
         openings_count: extraction.extracted_data?.openings_count || 1,
       });
       setStep('review');
@@ -225,15 +227,13 @@ export default function NewJobPage() {
             <button
               onClick={handleSubmitJd}
               disabled={rawJd.length < VALIDATION.MIN_JD_LENGTH || submitExtraction.isPending}
-              className="btn-gradient flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-medium disabled:opacity-50"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-medium text-white disabled:opacity-50 transition-colors hover:opacity-90"
+              style={{ backgroundColor: 'var(--primary)' }}
             >
               {submitExtraction.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <>
-                  Extract Details
-                  <ArrowRight className="w-4 h-4" />
-                </>
+                'Extract Details'
               )}
             </button>
           </div>
@@ -377,6 +377,40 @@ export default function NewJobPage() {
               </div>
             </div>
 
+            {/* Experience */}
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>
+                  Experience Min (years)
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={editedData.experience_min ?? ''}
+                  onChange={(e) => handleFieldChange('experience_min', e.target.value ? Number(e.target.value) : undefined)}
+                  placeholder="e.g., 3"
+                  className={inputStyle}
+                  style={{ borderColor: 'var(--neutral-border)', '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>
+                  Experience Max (years)
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={editedData.experience_max ?? ''}
+                  onChange={(e) => handleFieldChange('experience_max', e.target.value ? Number(e.target.value) : undefined)}
+                  placeholder="e.g., 5"
+                  className={inputStyle}
+                  style={{ borderColor: 'var(--neutral-border)', '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
+                />
+              </div>
+            </div>
+
             {/* Openings */}
             <div className="sm:w-1/2">
               <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>
@@ -406,15 +440,13 @@ export default function NewJobPage() {
             <button
               onClick={handleCreateJob}
               disabled={createJob.isPending || !editedData.title || !editedData.description}
-              className="btn-gradient flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-medium disabled:opacity-50"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-medium text-white disabled:opacity-50 transition-colors hover:opacity-90"
+              style={{ backgroundColor: 'var(--primary)' }}
             >
               {createJob.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <>
-                  <CheckCircle className="w-4 h-4" />
-                  Create Job
-                </>
+                'Create Job'
               )}
             </button>
           </div>

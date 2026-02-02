@@ -10,6 +10,9 @@ export type JobStatus = 'draft' | 'published' | 'closed' | 'paused';
 // Work Type
 export type WorkType = 'onsite' | 'remote' | 'hybrid';
 
+// Currency Type
+export type Currency = 'INR' | 'USD' | 'EUR' | 'GBP' | 'AUD' | 'CAD';
+
 // Job Entity
 export interface Job extends BaseEntity {
   employer_id: string;
@@ -23,8 +26,11 @@ export interface Job extends BaseEntity {
   work_type?: WorkType;
   salary_range_min?: number;
   salary_range_max?: number;
+  currency?: Currency;
   salary_range?: string;
-  compensation?: string;
+  experience_min?: number;
+  experience_max?: number;
+  experience_range?: string;
   shift_preferences?: Record<string, unknown>;
   openings_count: number;
   status: JobStatus;
@@ -48,7 +54,9 @@ export interface CreateJobRequest {
   work_type?: WorkType;
   salary_range_min?: number;
   salary_range_max?: number;
-  compensation?: string;
+  currency?: Currency;
+  experience_min?: number;
+  experience_max?: number;
   shift_preferences?: Record<string, unknown>;
   openings_count?: number;
   idempotency_key?: string;
@@ -66,7 +74,9 @@ export interface UpdateJobRequest {
   work_type?: WorkType;
   salary_range_min?: number;
   salary_range_max?: number;
-  compensation?: string;
+  currency?: Currency;
+  experience_min?: number;
+  experience_max?: number;
   shift_preferences?: Record<string, unknown>;
   openings_count?: number;
   version: number;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -15,10 +15,17 @@ import { getErrorMessage } from '@/lib/api';
  */
 export default function LoginPage() {
   const router = useRouter();
-  const setEmployer = useAuthStore((state) => state.setEmployer);
+  const { isAuthenticated, isLoading: authLoading, setEmployer } = useAuthStore();
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      router.push(ROUTES.DASHBOARD);
+    }
+  }, [isAuthenticated, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,6 +49,20 @@ export default function LoginPage() {
     }
   };
 
+  // Show loading while checking auth state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center gradient-bg">
+        <div className="w-10 h-10 rounded-full border-4 border-t-transparent animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
+      </div>
+    );
+  }
+
+  // Don't render login form if already authenticated (will redirect)
+  if (isAuthenticated) {
+    return null;
+  }
+
   return (
     <main className="min-h-screen gradient-bg flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background decorations */}
@@ -63,9 +84,9 @@ export default function LoginPage() {
             <Image
               src="/aiviue-logo.png"
               alt="AIVIUE"
-              width={180}
-              height={60}
-              className="h-14 sm:h-16 w-auto mx-auto"
+              width={240}
+              height={80}
+              className="h-20 sm:h-24 w-auto mx-auto"
               priority
             />
           </Link>
@@ -110,7 +131,8 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="btn-gradient w-full py-3.5 rounded-xl text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-3.5 rounded-xl text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2 transition-colors hover:opacity-90"
+              style={{ backgroundColor: 'var(--primary)' }}
             >
               {isLoading ? (
                 <>

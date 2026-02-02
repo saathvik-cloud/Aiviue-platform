@@ -73,22 +73,13 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Welcome Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--neutral-dark)' }}>
-            Welcome back, {employer?.name?.split(' ')[0] || 'there'}! 👋
-          </h1>
-          <p className="text-sm sm:text-base mt-1" style={{ color: 'var(--neutral-gray)' }}>
-            Here&apos;s what&apos;s happening with your job postings
-          </p>
-        </div>
-        <Link
-          href={ROUTES.JOB_NEW}
-          className="btn-gradient flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold"
-        >
-          <Plus className="w-5 h-5" />
-          Post a Job
-        </Link>
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--neutral-dark)' }}>
+          Welcome back, {employer?.name?.split(' ')[0] || 'there'}! 👋
+        </h1>
+        <p className="text-sm sm:text-base mt-1" style={{ color: 'var(--neutral-gray)' }}>
+          Here&apos;s what&apos;s happening with your job postings
+        </p>
       </div>
 
       {/* Stats Cards - Nexus Style */}

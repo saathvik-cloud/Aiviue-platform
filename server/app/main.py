@@ -155,9 +155,11 @@ app.include_router(health_router)
 # Domain routes
 from app.domains.employer.api import router as employer_router
 from app.domains.job.api import router as job_router
+from app.domains.chat import chat_router
 
 app.include_router(employer_router)
 app.include_router(job_router)
+app.include_router(chat_router)
 
 
 # ==================== ROOT ENDPOINT ====================

@@ -101,6 +101,19 @@ class EmployerCreateRequest(BaseModel):
         description="Country",
     )
     
+    # Logo & GST
+    logo_url: Optional[str] = Field(
+        None,
+        max_length=500,
+        description="URL to company logo in Supabase Storage",
+    )
+    gst_number: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="GST/Tax identification number",
+        examples=["22AAAAA0000A1Z5"],
+    )
+    
     @field_validator("company_size")
     @classmethod
     def validate_company_size(cls, v: Optional[str]) -> Optional[str]:
@@ -191,6 +204,18 @@ class EmployerUpdateRequest(BaseModel):
         description="Country",
     )
     
+    # Logo & GST
+    logo_url: Optional[str] = Field(
+        None,
+        max_length=500,
+        description="URL to company logo in Supabase Storage",
+    )
+    gst_number: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="GST/Tax identification number",
+    )
+    
     # Version for optimistic locking
     version: int = Field(
         ...,
@@ -237,6 +262,10 @@ class EmployerResponse(BaseModel):
     city: Optional[str] = Field(None, description="City")
     state: Optional[str] = Field(None, description="State/Province")
     country: Optional[str] = Field(None, description="Country")
+    
+    # Logo & GST
+    logo_url: Optional[str] = Field(None, description="URL to company logo")
+    gst_number: Optional[str] = Field(None, description="GST/Tax ID number")
     
     # Verification Status
     is_verified: bool = Field(..., description="Whether employer is verified")
@@ -348,6 +377,8 @@ class EmployerInDB(BaseModel):
     city: Optional[str]
     state: Optional[str]
     country: Optional[str]
+    logo_url: Optional[str]
+    gst_number: Optional[str]
     is_verified: bool
     verified_at: Optional[datetime]
     is_active: bool

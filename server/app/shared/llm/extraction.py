@@ -157,7 +157,7 @@ class JDExtractor:
         # String fields
         string_fields = [
             "title", "description", "requirements", "location",
-            "city", "state", "country", "work_type", "compensation"
+            "city", "state", "country", "work_type"
         ]
         for field in string_fields:
             value = data.get(field)
@@ -178,12 +178,37 @@ class JDExtractor:
             else:
                 cleaned["work_type"] = None
         
-        # Numeric fields
+        # Currency field
+        currency = data.get("currency")
+        if currency and isinstance(currency, str):
+            # Normalize to uppercase, default to INR
+            currency = currency.strip().upper()
+            if currency in ["INR", "USD", "EUR", "GBP", "AUD", "CAD"]:
+                cleaned["currency"] = currency
+            else:
+                cleaned["currency"] = "INR"
+        else:
+            cleaned["currency"] = "INR"
+        
+        # Numeric fields (salary)
         for field in ["salary_range_min", "salary_range_max"]:
             value = data.get(field)
             if value is not None:
                 try:
                     cleaned[field] = float(value)
+                except (ValueError, TypeError):
+                    cleaned[field] = None
+            else:
+                cleaned[field] = None
+        
+        # Experience fields (float for values like 3.5 years)
+        for field in ["experience_min", "experience_max"]:
+            value = data.get(field)
+            if value is not None:
+                try:
+                    exp_value = float(value)
+                    # Clamp to reasonable range (0-99 years)
+                    cleaned[field] = max(0, min(99, exp_value))
                 except (ValueError, TypeError):
                     cleaned[field] = None
             else:

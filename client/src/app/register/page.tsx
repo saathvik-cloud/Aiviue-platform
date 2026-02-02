@@ -1,16 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import { ROUTES } from '@/constants';
-import { useAuthStore } from '@/stores';
-import { createEmployer } from '@/services';
-import { getErrorMessage } from '@/lib/api';
 import { SelectDropdown } from '@/components';
-import { Users, Building, Briefcase, Building2, Landmark } from 'lucide-react';
+import { ROUTES } from '@/constants';
+import { getErrorMessage } from '@/lib/api';
+import { createEmployer } from '@/services';
+import { useAuthStore } from '@/stores';
+import { Briefcase, Building, Building2, Landmark, Users } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 
 // Company size options with icons
 const COMPANY_SIZE_OPTIONS = [
@@ -27,7 +27,7 @@ const COMPANY_SIZE_OPTIONS = [
  */
 export default function RegisterPage() {
   const router = useRouter();
-  const setEmployer = useAuthStore((state) => state.setEmployer);
+  const { isAuthenticated, isLoading: authLoading, setEmployer } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -38,6 +38,13 @@ export default function RegisterPage() {
     company_size: '',
     industry: '',
   });
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      router.push(ROUTES.DASHBOARD);
+    }
+  }, [isAuthenticated, authLoading, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -58,7 +65,7 @@ export default function RegisterPage() {
         company_size: formData.company_size || undefined,
         industry: formData.industry || undefined,
       });
-      
+
       setEmployer(employer);
       toast.success('Account created successfully!');
       router.push(ROUTES.DASHBOARD);
@@ -71,19 +78,33 @@ export default function RegisterPage() {
 
   const inputStyle = "w-full px-4 py-3 rounded-xl border text-sm outline-none transition-all bg-white/50 focus:bg-white focus:ring-2";
 
+  // Show loading while checking auth state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center gradient-bg">
+        <div className="w-10 h-10 rounded-full border-4 border-t-transparent animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
+      </div>
+    );
+  }
+
+  // Don't render register form if already authenticated (will redirect)
+  if (isAuthenticated) {
+    return null;
+  }
+
   return (
     <main className="min-h-screen gradient-bg flex items-center justify-center p-4 py-8 relative overflow-hidden">
       {/* Background decorations */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div 
+        <div
           className="absolute -top-40 -right-40 w-96 h-96 rounded-full opacity-30 blur-3xl"
           style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)' }}
         />
-        <div 
+        <div
           className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full opacity-20 blur-3xl"
           style={{ background: 'linear-gradient(135deg, #EC4899 0%, #7C3AED 100%)' }}
         />
-        <div 
+        <div
           className="absolute top-1/2 left-1/2 w-64 h-64 rounded-full opacity-15 blur-3xl transform -translate-x-1/2 -translate-y-1/2"
           style={{ background: 'linear-gradient(135deg, #14B8A6 0%, #7C3AED 100%)' }}
         />
@@ -96,9 +117,9 @@ export default function RegisterPage() {
             <Image
               src="/aiviue-logo.png"
               alt="AIVIUE"
-              width={180}
-              height={60}
-              className="h-14 sm:h-16 w-auto mx-auto"
+              width={240}
+              height={80}
+              className="h-20 sm:h-24 w-auto mx-auto"
               priority
             />
           </Link>
@@ -109,13 +130,13 @@ export default function RegisterPage() {
           <h1 className="text-2xl font-bold text-center mb-2" style={{ color: 'var(--neutral-dark)' }}>
             Create Your Account
           </h1>
-          <p className="text-sm text-center mb-6" style={{ color: 'var(--neutral-gray)' }}>
+          <p className="text-sm text-center mb-6 text-slate-500" >
             Start hiring smarter with AIVIUE
           </p>
 
           {/* Error Message */}
           {error && (
-            <div 
+            <div
               className="mb-6 p-4 rounded-xl text-sm"
               style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#991B1B' }}
             >
@@ -225,7 +246,8 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="btn-gradient w-full py-3.5 rounded-xl text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2 mt-6"
+              className="w-full py-3.5 rounded-xl text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2 mt-6 transition-colors hover:opacity-90"
+              style={{ backgroundColor: 'var(--primary)' }}
             >
               {isLoading ? (
                 <>

@@ -182,7 +182,8 @@ async def get_extraction(
     **Optional fields:**
     - Location: `location`, `city`, `state`, `country`
     - Work type: `remote`, `hybrid`, `onsite`
-    - Compensation: `salary_range_min`, `salary_range_max`, `compensation`
+    - Compensation: `salary_range_min`, `salary_range_max`
+    - Experience: `experience_min`, `experience_max`
     - Other: `requirements`, `shift_preferences`, `openings_count`
     
     **Idempotency:**

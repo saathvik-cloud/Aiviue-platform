@@ -40,6 +40,8 @@ export default function EditJobPage() {
         work_type: job.work_type,
         salary_range_min: job.salary_range_min,
         salary_range_max: job.salary_range_max,
+        experience_min: job.experience_min,
+        experience_max: job.experience_max,
         openings_count: job.openings_count,
         version: job.version,
       });
@@ -188,6 +190,35 @@ export default function EditJobPage() {
           </div>
         </div>
 
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>Experience Min (years)</label>
+            <input
+              type="number"
+              step="0.5"
+              min="0"
+              value={formData.experience_min ?? ''}
+              onChange={(e) => handleFieldChange('experience_min', e.target.value ? Number(e.target.value) : undefined)}
+              placeholder="e.g., 3"
+              className={inputStyle}
+              style={{ borderColor: 'var(--neutral-border)', '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>Experience Max (years)</label>
+            <input
+              type="number"
+              step="0.5"
+              min="0"
+              value={formData.experience_max ?? ''}
+              onChange={(e) => handleFieldChange('experience_max', e.target.value ? Number(e.target.value) : undefined)}
+              placeholder="e.g., 5"
+              className={inputStyle}
+              style={{ borderColor: 'var(--neutral-border)', '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
+            />
+          </div>
+        </div>
+
         <div className="sm:w-1/2">
           <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>Number of Openings</label>
           <input
@@ -212,15 +243,13 @@ export default function EditJobPage() {
         <button
           onClick={handleSubmit}
           disabled={updateJob.isPending || !formData.title || !formData.description}
-          className="btn-gradient flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-medium disabled:opacity-50"
+          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-medium text-white disabled:opacity-50 transition-colors hover:opacity-90"
+          style={{ backgroundColor: 'var(--primary)' }}
         >
           {updateJob.isPending ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
-            <>
-              <CheckCircle className="w-4 h-4" />
-              Save Changes
-            </>
+            'Save Changes'
           )}
         </button>
       </div>

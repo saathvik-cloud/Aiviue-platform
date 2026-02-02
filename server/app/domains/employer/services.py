@@ -408,6 +408,8 @@ class EmployerService:
             "city": sanitize_text(request.city) if request.city else None,
             "state": sanitize_text(request.state) if request.state else None,
             "country": sanitize_text(request.country) if request.country else None,
+            "logo_url": request.logo_url.strip() if request.logo_url else None,
+            "gst_number": sanitize_text(request.gst_number) if request.gst_number else None,
         }
     
     def _sanitize_update_data(
@@ -439,6 +441,10 @@ class EmployerService:
             data["state"] = sanitize_text(request.state) if request.state else None
         if request.country is not None:
             data["country"] = sanitize_text(request.country) if request.country else None
+        if request.logo_url is not None:
+            data["logo_url"] = request.logo_url.strip() if request.logo_url else None
+        if request.gst_number is not None:
+            data["gst_number"] = sanitize_text(request.gst_number) if request.gst_number else None
         
         return data
     
@@ -476,6 +482,8 @@ class EmployerService:
             city=employer.city,
             state=employer.state,
             country=employer.country,
+            logo_url=employer.logo_url,
+            gst_number=employer.gst_number,
             is_verified=employer.is_verified,
             verified_at=employer.verified_at,
             is_active=employer.is_active,

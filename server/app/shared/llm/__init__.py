@@ -17,6 +17,16 @@ Usage:
     if result.success:
         print(result.data)
     
+    # JD Generation (AIVI Bot)
+    from app.shared.llm import generate_job_description
+    
+    result = await generate_job_description(
+        title="Software Engineer",
+        city="Mumbai",
+        salary_min=1000000,
+        ...
+    )
+    
     # Full client control
     from app.shared.llm import GeminiClient
     
@@ -35,7 +45,9 @@ from app.shared.llm.client import (
 )
 from app.shared.llm.prompts import (
     JD_EXTRACTION_SYSTEM_PROMPT,
+    JD_GENERATION_SYSTEM_PROMPT,
     build_jd_extraction_prompt,
+    build_jd_generation_prompt,
     build_screening_criteria_prompt,
     build_resume_parse_prompt,
 )
@@ -44,6 +56,12 @@ from app.shared.llm.extraction import (
     ExtractionResult,
     get_jd_extractor,
     extract_jd,
+)
+from app.shared.llm.generation import (
+    JDGenerator,
+    GeneratedJobContent,
+    get_jd_generator,
+    generate_job_description,
 )
 
 __all__ = [
@@ -57,7 +75,9 @@ __all__ = [
     "generate_json",
     # Prompts
     "JD_EXTRACTION_SYSTEM_PROMPT",
+    "JD_GENERATION_SYSTEM_PROMPT",
     "build_jd_extraction_prompt",
+    "build_jd_generation_prompt",
     "build_screening_criteria_prompt",
     "build_resume_parse_prompt",
     # Extraction
@@ -65,4 +85,9 @@ __all__ = [
     "ExtractionResult",
     "get_jd_extractor",
     "extract_jd",
+    # Generation
+    "JDGenerator",
+    "GeneratedJobContent",
+    "get_jd_generator",
+    "generate_job_description",
 ]

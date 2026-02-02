@@ -19,7 +19,8 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
-  Clock
+  Clock,
+  Briefcase
 } from 'lucide-react';
 
 /**
@@ -219,6 +220,23 @@ export default function JobDetailsPage() {
               </div>
             )}
 
+            {(job.experience_min !== undefined || job.experience_max !== undefined) && (
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ background: 'rgba(249, 115, 22, 0.1)' }}
+                >
+                  <Briefcase className="w-5 h-5" style={{ color: '#F97316' }} />
+                </div>
+                <div>
+                  <p className="text-xs" style={{ color: 'var(--neutral-gray)' }}>Experience</p>
+                  <p className="text-sm font-medium" style={{ color: 'var(--neutral-dark)' }}>
+                    {job.experience_range || `${job.experience_min || 0}${job.experience_max ? `-${job.experience_max}` : '+'} years`}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-3">
               <div 
                 className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -270,12 +288,6 @@ export default function JobDetailsPage() {
             <p className="text-xs" style={{ color: 'var(--neutral-gray)' }}>Last Updated</p>
             <p className="text-sm font-medium" style={{ color: 'var(--neutral-dark)' }}>{formatDateTime(job.updated_at)}</p>
           </div>
-          {job.compensation && (
-            <div>
-              <p className="text-xs" style={{ color: 'var(--neutral-gray)' }}>Compensation</p>
-              <p className="text-sm font-medium" style={{ color: 'var(--neutral-dark)' }}>{job.compensation}</p>
-            </div>
-          )}
           {job.close_reason && (
             <div>
               <p className="text-xs" style={{ color: 'var(--neutral-gray)' }}>Close Reason</p>

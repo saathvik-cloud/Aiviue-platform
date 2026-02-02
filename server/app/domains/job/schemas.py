@@ -91,10 +91,24 @@ class JobCreateRequest(BaseModel):
         ge=0,
         description="Maximum salary",
     )
-    compensation: Optional[str] = Field(
+    currency: Optional[str] = Field(
+        "INR",
+        max_length=10,
+        description="Salary currency: INR, USD, etc.",
+    )
+    
+    # Experience Required
+    experience_min: Optional[float] = Field(
         None,
-        max_length=1000,
-        description="Compensation details",
+        ge=0,
+        le=99,
+        description="Minimum years of experience required (e.g., 3, 3.5)",
+    )
+    experience_max: Optional[float] = Field(
+        None,
+        ge=0,
+        le=99,
+        description="Maximum years of experience (for ranges like 3-5 years)",
     )
     
     # Shifts
@@ -132,6 +146,15 @@ class JobCreateRequest(BaseModel):
             if min_salary is not None and v < min_salary:
                 raise ValueError("salary_range_max must be >= salary_range_min")
         return v
+    
+    @field_validator("experience_max")
+    @classmethod
+    def validate_experience_range(cls, v: Optional[float], info) -> Optional[float]:
+        if v is not None:
+            min_exp = info.data.get("experience_min")
+            if min_exp is not None and v < min_exp:
+                raise ValueError("experience_max must be >= experience_min")
+        return v
 
 
 class JobUpdateRequest(BaseModel):
@@ -151,7 +174,9 @@ class JobUpdateRequest(BaseModel):
     work_type: Optional[str] = None
     salary_range_min: Optional[float] = Field(None, ge=0)
     salary_range_max: Optional[float] = Field(None, ge=0)
-    compensation: Optional[str] = Field(None, max_length=1000)
+    currency: Optional[str] = Field(None, max_length=10)
+    experience_min: Optional[float] = Field(None, ge=0, le=99)
+    experience_max: Optional[float] = Field(None, ge=0, le=99)
     shift_preferences: Optional[dict] = None
     openings_count: Optional[int] = Field(None, ge=1)
     
@@ -222,8 +247,13 @@ class JobResponse(BaseModel):
     # Compensation
     salary_range_min: Optional[float]
     salary_range_max: Optional[float]
+    currency: Optional[str]
     salary_range: Optional[str] = Field(None, description="Formatted salary range")
-    compensation: Optional[str]
+    
+    # Experience
+    experience_min: Optional[float]
+    experience_max: Optional[float]
+    experience_range: Optional[str] = Field(None, description="Formatted experience range")
     
     # Shifts
     shift_preferences: Optional[dict]
@@ -346,7 +376,11 @@ class ExtractedFields(BaseModel):
     # Compensation
     salary_range_min: Optional[float] = Field(None, description="Min salary")
     salary_range_max: Optional[float] = Field(None, description="Max salary")
-    compensation: Optional[str] = Field(None, description="Compensation text")
+    currency: Optional[str] = Field(None, description="Salary currency: INR, USD, etc.")
+    
+    # Experience
+    experience_min: Optional[float] = Field(None, description="Minimum years of experience required")
+    experience_max: Optional[float] = Field(None, description="Maximum years of experience")
     
     # Other
     shift_preferences: Optional[dict] = Field(None, description="Shift info")

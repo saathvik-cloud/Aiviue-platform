@@ -31,7 +31,9 @@ export interface ExtractedFields {
   work_type?: string;
   salary_range_min?: number;
   salary_range_max?: number;
-  compensation?: string;
+  currency?: string;
+  experience_min?: number;
+  experience_max?: number;
   shift_preferences?: Record<string, unknown>;
   openings_count?: number;
   extraction_confidence?: number;

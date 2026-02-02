@@ -100,7 +100,10 @@ class JobPublishedEvent(JobEventBase):
     # Compensation
     salary_min: Optional[float] = Field(None, description="Minimum salary")
     salary_max: Optional[float] = Field(None, description="Maximum salary")
-    compensation: Optional[str] = Field(None, description="Compensation details")
+    
+    # Experience
+    experience_min: Optional[float] = Field(None, description="Minimum years of experience")
+    experience_max: Optional[float] = Field(None, description="Maximum years of experience")
     
     # Additional
     shift_preferences: Optional[dict] = Field(None, description="Shift preferences")
