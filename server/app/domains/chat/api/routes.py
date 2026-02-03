@@ -30,6 +30,7 @@ from app.domains.chat.schemas import (
     ChatSessionListResponse,
     SendMessageRequest,
     SendMessageResponse,
+    ExtractionCompleteRequest,
     GenerateDescriptionRequest,
     GenerateDescriptionResponse,
 )
@@ -225,6 +226,48 @@ async def send_message(
         content=request.content,
         message_data=request.message_data,
     )
+
+
+@router.post(
+    "/sessions/{session_id}/extraction-complete",
+    response_model=SendMessageResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Handle extraction complete",
+    description="""
+    Notify that JD extraction is complete and continue the conversation.
+    
+    After the frontend extracts job details from a pasted JD using the extraction service,
+    it sends the extracted data to this endpoint. The backend will:
+    
+    1. Check which required fields are still missing
+    2. If fields are missing: return questions to collect them
+    3. If all fields present: proceed to description generation
+    
+    This allows the chat flow to seamlessly fill in any gaps from the extraction.
+    """,
+)
+async def extraction_complete(
+    session_id: UUID,
+    request: ExtractionCompleteRequest,
+    employer_id: UUID = Query(..., description="Employer UUID for authorization"),
+    service: ChatService = Depends(get_service),
+) -> SendMessageResponse:
+    """Handle completion of JD extraction and continue conversation."""
+    logger.info(
+        "Extraction complete for chat session",
+        extra={
+            "session_id": str(session_id),
+            "employer_id": str(employer_id),
+            "extracted_fields": list(request.extracted_data.keys()),
+        },
+    )
+    
+    return await service.handle_extraction_complete(
+        session_id=session_id,
+        employer_id=employer_id,
+        extracted_data=request.extracted_data,
+    )
+
 
 
 # ==================== GENERATION ENDPOINTS ====================

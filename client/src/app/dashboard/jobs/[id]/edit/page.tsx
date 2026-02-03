@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { toast } from 'sonner';
+import { SelectDropdown } from '@/components';
 import { ROUTES } from '@/constants';
 import { useJob, useUpdateJob } from '@/lib/hooks';
-import { SelectDropdown } from '@/components';
 import type { UpdateJobRequest } from '@/types';
-import { ArrowLeft, Loader2, CheckCircle, AlertCircle, Building, Wifi, Home } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Building, Home, Loader2, Wifi } from 'lucide-react';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 // Work type options with icons
 const WORK_TYPE_OPTIONS = [
@@ -18,6 +18,15 @@ const WORK_TYPE_OPTIONS = [
   { value: 'hybrid', label: 'Hybrid', icon: <Home className="w-4 h-4" style={{ color: 'var(--accent)' }} /> },
 ];
 
+// Shift preference options
+const SHIFT_OPTIONS = [
+  { value: '', label: 'Select shift...' },
+  { value: 'day', label: 'Day Shift' },
+  { value: 'night', label: 'Night Shift' },
+  { value: 'rotational', label: 'Rotational' },
+  { value: 'flexible', label: 'Flexible' },
+];
+
 /**
  * Edit Job Page - Glassmorphism design with custom dropdowns
  */
@@ -25,7 +34,7 @@ export default function EditJobPage() {
   const params = useParams();
   const router = useRouter();
   const jobId = params.id as string;
-  
+
   const { data: job, isLoading } = useJob(jobId);
   const updateJob = useUpdateJob();
   const [formData, setFormData] = useState<Partial<UpdateJobRequest>>({});
@@ -37,11 +46,15 @@ export default function EditJobPage() {
         description: job.description,
         requirements: job.requirements || '',
         location: job.location || '',
+        city: job.city || '',
+        state: job.state || '',
+        country: job.country || '',
         work_type: job.work_type,
         salary_range_min: job.salary_range_min,
         salary_range_max: job.salary_range_max,
         experience_min: job.experience_min,
         experience_max: job.experience_max,
+        shift_preferences: job.shift_preferences || {},
         openings_count: job.openings_count,
         version: job.version,
       });
@@ -80,7 +93,7 @@ export default function EditJobPage() {
   if (!job) {
     return (
       <div className="text-center py-16">
-        <div 
+        <div
           className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
           style={{ background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(248, 113, 113, 0.1) 100%)' }}
         >
@@ -152,6 +165,7 @@ export default function EditJobPage() {
               type="text"
               value={formData.location || ''}
               onChange={(e) => handleFieldChange('location', e.target.value)}
+              placeholder="e.g., New York City, NY"
               className={inputStyle}
               style={{ borderColor: 'var(--neutral-border)', '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
             />
@@ -163,6 +177,42 @@ export default function EditJobPage() {
               value={formData.work_type || ''}
               onChange={(val) => handleFieldChange('work_type', val || undefined)}
               placeholder="Select work type..."
+            />
+          </div>
+        </div>
+
+        <div className="grid sm:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>City</label>
+            <input
+              type="text"
+              value={formData.city || ''}
+              onChange={(e) => handleFieldChange('city', e.target.value || undefined)}
+              placeholder="e.g., Mumbai"
+              className={inputStyle}
+              style={{ borderColor: 'var(--neutral-border)', '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>State</label>
+            <input
+              type="text"
+              value={formData.state || ''}
+              onChange={(e) => handleFieldChange('state', e.target.value || undefined)}
+              placeholder="e.g., Maharashtra"
+              className={inputStyle}
+              style={{ borderColor: 'var(--neutral-border)', '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>Country</label>
+            <input
+              type="text"
+              value={formData.country || ''}
+              onChange={(e) => handleFieldChange('country', e.target.value || undefined)}
+              placeholder="e.g., India"
+              className={inputStyle}
+              style={{ borderColor: 'var(--neutral-border)', '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
             />
           </div>
         </div>
@@ -219,16 +269,31 @@ export default function EditJobPage() {
           </div>
         </div>
 
-        <div className="sm:w-1/2">
-          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>Number of Openings</label>
-          <input
-            type="number"
-            value={formData.openings_count || 1}
-            onChange={(e) => handleFieldChange('openings_count', Number(e.target.value) || 1)}
-            min={1}
-            className={inputStyle}
-            style={{ borderColor: 'var(--neutral-border)', '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
-          />
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>Number of Openings</label>
+            <input
+              type="number"
+              value={formData.openings_count || 1}
+              onChange={(e) => handleFieldChange('openings_count', Number(e.target.value) || 1)}
+              min={1}
+              className={inputStyle}
+              style={{ borderColor: 'var(--neutral-border)', '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>Shift Preference</label>
+            <SelectDropdown
+              options={SHIFT_OPTIONS}
+              value={
+                typeof formData.shift_preferences === 'object' && formData.shift_preferences
+                  ? Object.keys(formData.shift_preferences)[0] || ''
+                  : ''
+              }
+              onChange={(val) => handleFieldChange('shift_preferences', val ? { [val]: true } : undefined)}
+              placeholder="Select shift preference..."
+            />
+          </div>
         </div>
       </div>
 

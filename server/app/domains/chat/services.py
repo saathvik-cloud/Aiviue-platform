@@ -261,7 +261,7 @@ class ChatService:
         return [
             {
                 "role": MessageRole.BOT,
-                "content": "Hi! I'm AIVI, your AI recruiting expert! 🚀",
+                "content": "Hi! I'm AIVI, your AI recruiting expert!...",
                 "message_type": MessageType.TEXT,
             },
             {
@@ -426,6 +426,218 @@ class ChatService:
                 },
             },
         ]
+    
+    async def handle_extraction_complete(
+        self,
+        session_id: UUID,
+        employer_id: UUID,
+        extracted_data: dict,
+    ) -> SendMessageResponse:
+        """
+        Handle completion of JD extraction.
+        
+        Takes extracted data, determines which fields are missing,
+        and returns the next question or preview.
+        
+        Args:
+            session_id: Session UUID
+            employer_id: Employer UUID
+            extracted_data: Data extracted from JD by LLM
+            
+        Returns:
+            SendMessageResponse with next question(s)
+        """
+        session = await self.repo.get_session_by_id(session_id, include_messages=True)
+        
+        if session is None or session.employer_id != employer_id:
+            raise NotFoundError(f"Chat session not found: {session_id}")
+        
+        # Map extracted fields to our internal field names
+        collected_data = {
+            "title": extracted_data.get("title"),
+            "requirements": extracted_data.get("requirements"),
+            "description": extracted_data.get("description"),
+            "country": extracted_data.get("country"),
+            "state": extracted_data.get("state"),
+            "city": extracted_data.get("city"),
+            "work_type": extracted_data.get("work_type"),
+            "currency": extracted_data.get("currency", "INR"),  # Default currency
+            "salary_range": self._format_salary_range(
+                extracted_data.get("salary_range_min"),
+                extracted_data.get("salary_range_max")
+            ),
+            "experience_range": self._format_experience_range(
+                extracted_data.get("experience_min"),
+                extracted_data.get("experience_max")
+            ),
+            "shift_preference": extracted_data.get("shift_preferences"),
+            "openings_count": str(extracted_data.get("openings_count", "1")),
+        }
+        
+        # Remove None values
+        collected_data = {k: v for k, v in collected_data.items() if v is not None and v != ""}
+        
+        # Find the first missing required field
+        first_missing_step = self._get_first_missing_step(collected_data)
+        
+        logger.info(
+            f"Extraction complete for session {session_id}. "
+            f"Collected: {list(collected_data.keys())}, First missing: {first_missing_step}"
+        )
+        
+        # Add a confirmation message about extracted fields
+        extracted_summary = self._get_extraction_summary(collected_data)
+        
+        # Create user message (representation of extraction result - hidden from UI)
+        user_message = await self.repo.add_message(
+            session_id=session_id,
+            role=MessageRole.USER,
+            content="",  # Empty content so it won't show in UI
+            message_type=MessageType.TEXT,
+            message_data={"extracted": True, "hidden": True, "fields": list(collected_data.keys())},
+        )
+        
+        # Update session with collected data and next step
+        await self.repo.update_session(
+            session_id=session_id,
+            context_data={
+                "step": first_missing_step,
+                "collected_data": collected_data,
+            },
+            title=f"Job Creation - {collected_data.get('title', 'Untitled')}",
+        )
+        
+        # Build bot responses
+        bot_responses = []
+        
+        # Add summary message
+        bot_responses.append({
+            "content": extracted_summary,
+            "message_type": MessageType.TEXT,
+        })
+        
+        # Add next step question or generate description
+        next_question = self._get_step_question(first_missing_step, collected_data)
+        bot_responses.extend(next_question)
+        
+        # Save bot messages
+        created_bot_messages = []
+        for bot_msg in bot_responses:
+            msg = await self.repo.add_message(
+                session_id=session_id,
+                role=MessageRole.BOT,
+                content=bot_msg["content"],
+                message_type=bot_msg.get("message_type", MessageType.TEXT),
+                message_data=bot_msg.get("message_data"),
+            )
+            created_bot_messages.append(msg)
+        
+        return SendMessageResponse(
+            user_message=self._to_message_response(user_message),
+            bot_responses=[self._to_message_response(m) for m in created_bot_messages],
+        )
+    
+    def _format_salary_range(self, min_val: any, max_val: any) -> Optional[str]:
+        """Format salary range as 'min-max' string."""
+        if min_val is not None and max_val is not None:
+            return f"{min_val}-{max_val}"
+        elif min_val is not None:
+            return f"{min_val}-0"
+        return None
+    
+    def _format_experience_range(self, min_val: any, max_val: any) -> Optional[str]:
+        """Format experience range as 'min-max' string."""
+        if min_val is not None and max_val is not None:
+            return f"{min_val}-{max_val}"
+        elif min_val is not None:
+            return f"{min_val}-0"
+        return None
+    
+    def _get_first_missing_step(self, collected_data: dict) -> str:
+        """
+        Determine the first step with missing required data.
+        
+        Required fields order:
+        1. title (always required)
+        2. requirements (always required)
+        3. country -> state -> city (location)
+        4. work_type
+        5. currency -> salary_range
+        6. experience_range
+        7. shift_preference
+        8. openings_count
+        
+        Returns:
+            Step name for the first missing field, or 'generating' if all complete.
+        """
+        # Define required fields and their corresponding steps
+        field_to_step = [
+            ("title", "job_title"),
+            ("requirements", "job_requirements"),
+            ("country", "job_country"),
+            ("state", "job_state"),
+            ("city", "job_city"),
+            ("work_type", "job_work_type"),
+            ("currency", "job_currency"),
+            ("salary_range", "job_salary"),
+            ("experience_range", "job_experience"),
+            ("shift_preference", "job_shift"),
+            ("openings_count", "job_openings"),
+        ]
+        
+        for field, step in field_to_step:
+            value = collected_data.get(field)
+            if value is None or (isinstance(value, str) and value.strip() == ""):
+                return step
+        
+        # All fields present - go to generating
+        return "generating"
+    
+    def _get_extraction_summary(self, collected_data: dict) -> str:
+        """Generate a summary message of what was extracted."""
+        extracted_items = []
+        
+        if collected_data.get("title"):
+            extracted_items.append(f"📋 Title: {collected_data['title']}")
+        if collected_data.get("country"):
+            location_parts = [
+                collected_data.get("city"),
+                collected_data.get("state"),
+                collected_data.get("country"),
+            ]
+            location = ", ".join(filter(None, location_parts))
+            if location:
+                extracted_items.append(f"📍 Location: {location}")
+        if collected_data.get("work_type"):
+            extracted_items.append(f"🏢 Work Type: {collected_data['work_type']}")
+        if collected_data.get("experience_range"):
+            extracted_items.append(f"⏱️ Experience: {collected_data['experience_range']} years")
+        if collected_data.get("salary_range"):
+            extracted_items.append(f"💰 Salary: {collected_data['salary_range']}")        
+        if extracted_items:
+            summary = "I found the following details from your JD:\n\n" + "\n".join(extracted_items)
+            
+            # Check what's missing
+            missing_fields = []
+            if not collected_data.get("country"):
+                missing_fields.append("location")
+            if not collected_data.get("work_type"):
+                missing_fields.append("work type")
+            if not collected_data.get("salary_range"):
+                missing_fields.append("salary range")
+            if not collected_data.get("shift_preference"):
+                missing_fields.append("shift preference")
+            if not collected_data.get("openings_count") or collected_data.get("openings_count") == "1":
+                missing_fields.append("number of openings")
+            
+            if missing_fields:
+                summary += f"\n\n🔎 I just need a few more details: {', '.join(missing_fields[:3])}..."
+            else:
+                summary += "\n\n✅ All details found! Let me generate your job description."
+            
+            return summary
+        else:
+            return "I couldn't extract many details from the JD. Let me ask you a few questions."
     
     async def _handle_job_creation_step(
         self,

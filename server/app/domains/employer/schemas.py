@@ -101,7 +101,7 @@ class EmployerCreateRequest(BaseModel):
         description="Country",
     )
     
-    # Logo & GST
+    # Logo & Tax Information
     logo_url: Optional[str] = Field(
         None,
         max_length=500,
@@ -112,6 +112,18 @@ class EmployerCreateRequest(BaseModel):
         max_length=50,
         description="GST/Tax identification number",
         examples=["22AAAAA0000A1Z5"],
+    )
+    pan_number: Optional[str] = Field(
+        None,
+        max_length=20,
+        description="PAN (Permanent Account Number)",
+        examples=["ABCDE1234F"],
+    )
+    pin_code: Optional[str] = Field(
+        None,
+        max_length=20,
+        description="Postal/PIN code",
+        examples=["400001"],
     )
     
     @field_validator("company_size")
@@ -204,7 +216,7 @@ class EmployerUpdateRequest(BaseModel):
         description="Country",
     )
     
-    # Logo & GST
+    # Logo & Tax Information
     logo_url: Optional[str] = Field(
         None,
         max_length=500,
@@ -214,6 +226,16 @@ class EmployerUpdateRequest(BaseModel):
         None,
         max_length=50,
         description="GST/Tax identification number",
+    )
+    pan_number: Optional[str] = Field(
+        None,
+        max_length=20,
+        description="PAN (Permanent Account Number)",
+    )
+    pin_code: Optional[str] = Field(
+        None,
+        max_length=20,
+        description="Postal/PIN code",
     )
     
     # Version for optimistic locking
@@ -263,9 +285,11 @@ class EmployerResponse(BaseModel):
     state: Optional[str] = Field(None, description="State/Province")
     country: Optional[str] = Field(None, description="Country")
     
-    # Logo & GST
+    # Logo & Tax Information
     logo_url: Optional[str] = Field(None, description="URL to company logo")
     gst_number: Optional[str] = Field(None, description="GST/Tax ID number")
+    pan_number: Optional[str] = Field(None, description="PAN number")
+    pin_code: Optional[str] = Field(None, description="Postal/PIN code")
     
     # Verification Status
     is_verified: bool = Field(..., description="Whether employer is verified")
@@ -379,6 +403,8 @@ class EmployerInDB(BaseModel):
     country: Optional[str]
     logo_url: Optional[str]
     gst_number: Optional[str]
+    pan_number: Optional[str]
+    pin_code: Optional[str]
     is_verified: bool
     verified_at: Optional[datetime]
     is_active: bool

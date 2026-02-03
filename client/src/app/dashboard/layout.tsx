@@ -1,24 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
-import { ROUTES, NAV_ITEMS } from '@/constants';
-import { useAuthStore } from '@/stores';
+import { NAV_ITEMS, ROUTES } from '@/constants';
 import { getInitials } from '@/lib/utils';
-import { 
-  LayoutDashboard, 
-  Briefcase, 
-  User, 
-  LogOut, 
-  Menu, 
-  X,
-  Plus,
+import { useAuthStore } from '@/stores';
+import {
+  Briefcase,
   ChevronDown,
+  HelpCircle,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Plus,
   Settings,
-  HelpCircle
+  User,
+  X
 } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 const iconMap = {
   LayoutDashboard,
@@ -64,14 +64,14 @@ export default function DashboardLayout({
     <div className="min-h-screen flex gradient-bg">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* White Sidebar */}
-      <aside 
+      <aside
         className={`
           fixed lg:static inset-y-0 left-0 z-50
           w-64 flex flex-col bg-white
@@ -93,7 +93,7 @@ export default function DashboardLayout({
               priority
             />
           </Link>
-          <button 
+          <button
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden p-2 rounded-lg hover:bg-gray-100"
             style={{ color: 'var(--neutral-gray)' }}
@@ -112,12 +112,12 @@ export default function DashboardLayout({
             // Dashboard should only be active on exact match
             // Jobs can match sub-routes (job details, edit, new)
             // Profile should only be active on exact match
-            const isActive = item.href === ROUTES.DASHBOARD 
-              ? pathname === item.href 
-              : item.href === ROUTES.DASHBOARD_PROFILE
+            const isActive = item.href === ROUTES.DASHBOARD
               ? pathname === item.href
-              : pathname === item.href || pathname.startsWith(item.href + '/');
-            
+              : item.href === ROUTES.DASHBOARD_PROFILE
+                ? pathname === item.href
+                : pathname === item.href || pathname.startsWith(item.href + '/');
+
             return (
               <Link
                 key={item.href}
@@ -170,7 +170,7 @@ export default function DashboardLayout({
                 className="w-10 h-10 rounded-full object-cover"
               />
             ) : (
-              <div 
+              <div
                 className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold text-white"
                 style={{ backgroundColor: 'var(--primary)' }}
               >
@@ -191,10 +191,10 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-        {/* Top Header */}
-        <header className="glass-navbar sticky top-0 z-30 px-4 sm:px-6 py-3 flex items-center justify-between">
+        {/* Top Header - Compact */}
+        <header className="glass-navbar sticky top-0 z-30 px-4 sm:px-6 py-2 flex items-center justify-between">
           {/* Mobile Menu Button */}
-          <button 
+          <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden p-2 rounded-xl hover:bg-white/50 transition-colors"
             style={{ color: 'var(--neutral-gray)' }}
@@ -216,7 +216,7 @@ export default function DashboardLayout({
 
           {/* Right side - User Menu */}
           <div className="relative ml-auto">
-            <button 
+            <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
               className="flex items-center gap-2 p-1.5 sm:p-2 rounded-xl hover:bg-white/50 transition-colors"
             >
@@ -227,7 +227,7 @@ export default function DashboardLayout({
                   className="w-9 h-9 rounded-full object-cover"
                 />
               ) : (
-                <div 
+                <div
                   className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold"
                   style={{ backgroundColor: 'var(--primary)' }}
                 >
@@ -243,7 +243,7 @@ export default function DashboardLayout({
             {/* Styled Dropdown Menu */}
             {userMenuOpen && (
               <>
-                <div 
+                <div
                   className="fixed inset-0 z-40"
                   onClick={() => setUserMenuOpen(false)}
                 />
@@ -257,7 +257,7 @@ export default function DashboardLayout({
                       {employer?.email}
                     </p>
                   </div>
-                  
+
                   {/* Menu items */}
                   <div className="py-1">
                     <Link
@@ -287,7 +287,7 @@ export default function DashboardLayout({
                       Help Center
                     </a>
                   </div>
-                  
+
                   {/* Logout */}
                   <div className="border-t py-1" style={{ borderColor: 'var(--neutral-border)' }}>
                     <button

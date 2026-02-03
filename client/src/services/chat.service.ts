@@ -93,3 +93,19 @@ export async function generateJobDescription(
         data
     );
 }
+
+/**
+ * Notify backend that JD extraction is complete.
+ * Sends extracted data and receives next steps (questions for missing fields or generate step).
+ */
+export async function notifyExtractionComplete(
+    sessionId: string,
+    employerId: string,
+    extractedData: Record<string, any>
+): Promise<SendMessageResponse> {
+    const params = buildQueryParams({ employer_id: employerId });
+    return post<SendMessageResponse>(
+        `${API_ENDPOINTS.CHAT.EXTRACTION_COMPLETE(sessionId)}${params}`,
+        { extracted_data: extractedData }
+    );
+}

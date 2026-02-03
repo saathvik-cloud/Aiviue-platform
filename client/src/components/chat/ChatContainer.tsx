@@ -13,8 +13,10 @@ import {
     useCreateChatSession,
     useCreateJob,
     useDeleteChatSession,
+    useExtractJobDescription,
     useGenerateJobDescription,
-    useSendChatMessage,
+    useNotifyExtractionComplete,
+    useSendChatMessage
 } from '@/lib/hooks';
 import { useAuthStore } from '@/stores';
 import type { ChatButton, ChatMessage as ChatMessageType, CreateJobRequest } from '@/types';
@@ -48,6 +50,8 @@ export function ChatContainer() {
     const sendMessage = useSendChatMessage();
     const deleteSession = useDeleteChatSession();
     const generateDescription = useGenerateJobDescription();
+    const extractJD = useExtractJobDescription();
+    const notifyExtractionComplete = useNotifyExtractionComplete();
     const createJob = useCreateJob();
 
     const { data: sessions, isLoading: sessionsLoading, refetch: refetchSessions } = useChatSessions(
@@ -81,7 +85,10 @@ export function ChatContainer() {
     const stepConfig = CONVERSATION_STEPS[currentStep];
 
     // All messages to display (from API + any local optimistic updates)
-    const displayMessages = localMessages;
+    // Filter out hidden or empty messages (like extraction complete system messages)
+    const displayMessages = localMessages.filter(
+        msg => msg.content && msg.content.trim() !== '' && !msg.message_data?.hidden
+    );
 
     // Debug log
     console.log('[ChatContainer] displayMessages:', displayMessages.length, 'sessionLoading:', sessionLoading, 'createSession.isPending:', createSession.isPending);
@@ -171,6 +178,20 @@ export function ChatContainer() {
 
             // Replace optimistic messages with real ones
             let newMessages = [...response.bot_responses];
+
+            // Check if we need to extract JD (LLM call)
+            const extractingResponse = response.bot_responses.find(
+                msg => msg.message_type === 'loading' && msg.message_data?.action === 'extract_jd'
+            );
+
+            if (extractingResponse) {
+                // Trigger JD extraction
+                const rawJd = extractingResponse.message_data?.raw_jd;
+                if (rawJd) {
+                    await handleExtractJD(rawJd);
+                    return; // handleExtractJD will update messages
+                }
+            }
 
             // Check if we need to generate job description (LLM call)
             const generatingResponse = response.bot_responses.find(
@@ -290,6 +311,84 @@ export function ChatContainer() {
                     session_id: currentSessionId!,
                     role: 'bot' as const,
                     content: 'Sorry, I had trouble generating the job description. Please try again.',
+                    message_type: 'error' as const,
+                    created_at: new Date().toISOString(),
+                }];
+            });
+        }
+    };
+
+    // Handle JD extraction from pasted text
+    const handleExtractJD = async (rawJd: string) => {
+        if (!currentSessionId || !employer?.id) {
+            toast.error('Session not ready');
+            return;
+        }
+
+        // Update loading message
+        setLocalMessages(prev => {
+            const filtered = prev.filter(m => !m.id.startsWith('loading-'));
+            return [...filtered, {
+                id: `extracting-${Date.now()}`,
+                session_id: currentSessionId!,
+                role: 'bot' as const,
+                content: 'Extracting job details using AI... 🔍',
+                message_type: 'loading' as const,
+                created_at: new Date().toISOString(),
+            }];
+        });
+
+        try {
+            // Step 1: Extract data from JD using LLM
+            const extractionResult = await extractJD.mutateAsync({
+                rawJd,
+                employerId: employer.id,
+                onStatusUpdate: (status) => {
+                    console.log('[ChatContainer] Extraction status:', status.status);
+                },
+            });
+
+            if (extractionResult.status === 'failed') {
+                throw new Error(extractionResult.error_message || 'Extraction failed');
+            }
+
+            if (extractionResult.status === 'completed' && extractionResult.extracted_data) {
+                // Step 2: Send extracted data to backend to continue conversation
+                // Backend will check for missing fields and return next question or generate step
+                const response = await notifyExtractionComplete.mutateAsync({
+                    sessionId: currentSessionId,
+                    employerId: employer.id,
+                    extractedData: extractionResult.extracted_data,
+                });
+
+                // Step 3: Update local messages with backend response
+                setLocalMessages(prev => {
+                    const filtered = prev.filter(m => !m.id.startsWith('extracting-') && !m.id.startsWith('loading-'));
+                    return [...filtered, ...response.bot_responses];
+                });
+
+                // Check if we need to generate description (all fields complete)
+                const generatingResponse = response.bot_responses.find(
+                    (msg: ChatMessageType) => msg.message_type === 'loading' && msg.message_data?.action === 'generate_description'
+                );
+
+                if (generatingResponse) {
+                    // All fields were extracted, trigger description generation
+                    await handleGenerateDescription();
+                }
+            }
+        } catch (error) {
+            console.error('Failed to extract job description:', error);
+            toast.error('Failed to extract job details. Please try again.');
+
+            // Show error message with retry
+            setLocalMessages(prev => {
+                const filtered = prev.filter(m => !m.id.startsWith('extracting-') && !m.id.startsWith('loading-'));
+                return [...filtered, {
+                    id: `error-${Date.now()}`,
+                    session_id: currentSessionId!,
+                    role: 'bot' as const,
+                    content: 'Sorry, I had trouble extracting the job details. Please try pasting the JD again.',
                     message_type: 'error' as const,
                     created_at: new Date().toISOString(),
                 }];
@@ -507,8 +606,8 @@ export function ChatContainer() {
                             onSend={handleSendMessage}
                             placeholder={inputPlaceholder}
                             inputType={inputType}
-                            disabled={sendMessage.isPending || generateDescription.isPending}
-                            isLoading={sendMessage.isPending || generateDescription.isPending}
+                            disabled={sendMessage.isPending || generateDescription.isPending || extractJD.isPending}
+                            isLoading={sendMessage.isPending || generateDescription.isPending || extractJD.isPending}
                             minLength={inputType === 'textarea' ? 10 : 3}
                         />
                     )}

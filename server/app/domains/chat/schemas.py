@@ -157,6 +157,25 @@ class UpdateSessionContextRequest(BaseModel):
     )
 
 
+class ExtractionCompleteRequest(BaseModel):
+    """Schema for notifying that JD extraction is complete."""
+    
+    extracted_data: dict[str, Any] = Field(
+        ...,
+        description="Data extracted from job description",
+        examples=[{
+            "title": "Software Engineer",
+            "description": "We are looking for...",
+            "requirements": "5+ years experience...",
+            "experience_min": 3,
+            "experience_max": 5,
+            "city": "Mumbai",
+            "state": "Maharashtra",
+            "country": "India",
+        }],
+    )
+
+
 # ==================== GENERATION SCHEMAS ====================
 
 class GenerateDescriptionRequest(BaseModel):

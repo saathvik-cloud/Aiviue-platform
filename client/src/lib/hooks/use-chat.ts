@@ -128,3 +128,29 @@ export function useGenerateJobDescription() {
             chatService.generateJobDescription(data),
     });
 }
+
+/**
+ * Mutation hook to notify backend that extraction is complete.
+ * Sends extracted data and receives next steps (questions for missing fields or generate step).
+ */
+export function useNotifyExtractionComplete() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            sessionId,
+            employerId,
+            extractedData,
+        }: {
+            sessionId: string;
+            employerId: string;
+            extractedData: Record<string, any>;
+        }) => chatService.notifyExtractionComplete(sessionId, employerId, extractedData),
+        onSuccess: (response, { sessionId }) => {
+            // Invalidate session to refetch with new messages
+            queryClient.invalidateQueries({
+                queryKey: chatKeys.session(sessionId),
+            });
+        },
+    });
+}

@@ -20,6 +20,8 @@ export interface Employer extends BaseEntity {
   country?: string;
   logo_url?: string;
   gst_number?: string;
+  pan_number?: string;
+  pin_code?: string;
   is_verified: boolean;
   verified_at?: string;
 }
@@ -40,6 +42,8 @@ export interface CreateEmployerRequest {
   country?: string;
   logo_url?: string;
   gst_number?: string;
+  pan_number?: string;
+  pin_code?: string;
 }
 
 // Update Employer Request
@@ -57,6 +61,8 @@ export interface UpdateEmployerRequest {
   country?: string;
   logo_url?: string;
   gst_number?: string;
+  pan_number?: string;
+  pin_code?: string;
   version: number;
 }
 

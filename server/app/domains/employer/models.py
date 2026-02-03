@@ -111,7 +111,7 @@ class Employer(Base, FullAuditMixin):
         comment="Country",
     )
     
-    # Company Logo & GST
+    # Company Logo & Tax Information
     logo_url: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
@@ -121,6 +121,16 @@ class Employer(Base, FullAuditMixin):
         String(50),
         nullable=True,
         comment="GST/Tax identification number",
+    )
+    pan_number: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="PAN (Permanent Account Number)",
+    )
+    pin_code: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="Postal/PIN code",
     )
     
     # Verification Status

@@ -102,7 +102,6 @@ class Job(Base, FullAuditMixin):
     country: Mapped[str | None] = mapped_column(
         String(100),
         nullable=True,
-        default="USA",
         comment="Country",
     )
     

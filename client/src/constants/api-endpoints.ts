@@ -32,6 +32,7 @@ export const API_ENDPOINTS = {
     SESSIONS: `/api/${API_VERSION}/chat/sessions`,
     SESSION_BY_ID: (id: string) => `/api/${API_VERSION}/chat/sessions/${id}`,
     SESSION_MESSAGES: (id: string) => `/api/${API_VERSION}/chat/sessions/${id}/messages`,
+    EXTRACTION_COMPLETE: (id: string) => `/api/${API_VERSION}/chat/sessions/${id}/extraction-complete`,
     GENERATE_DESCRIPTION: `/api/${API_VERSION}/chat/generate-description`,
   },
 } as const;

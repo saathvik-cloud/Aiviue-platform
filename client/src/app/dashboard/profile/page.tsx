@@ -1,30 +1,30 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { toast } from 'sonner';
-import { useAuthStore } from '@/stores';
+import { SelectDropdown } from '@/components';
 import { useUpdateEmployer } from '@/lib/hooks';
 import { uploadLogo } from '@/lib/supabase';
 import { getInitials } from '@/lib/utils';
-import { SelectDropdown } from '@/components';
+import { useAuthStore } from '@/stores';
 import type { UpdateEmployerRequest } from '@/types';
-import { 
-  Loader2, 
-  User, 
-  Building, 
-  Mail, 
-  Phone, 
-  Globe, 
-  MapPin, 
-  Users, 
-  Briefcase, 
-  Building2, 
-  Landmark,
-  Upload,
-  X,
+import {
+  Briefcase,
+  Building,
+  Building2,
   FileText,
-  Image as ImageIcon
+  Globe,
+  Image as ImageIcon,
+  Landmark,
+  Loader2,
+  Mail,
+  MapPin,
+  Phone,
+  Upload,
+  User,
+  Users,
+  X
 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 // Company size options with icons
 const COMPANY_SIZE_OPTIONS = [
@@ -63,6 +63,8 @@ export default function ProfilePage() {
         state: employer.state || '',
         country: employer.country || '',
         gst_number: employer.gst_number || '',
+        pan_number: employer.pan_number || '',
+        pin_code: employer.pin_code || '',
         logo_url: employer.logo_url || '',
         version: employer.version,
       });
@@ -94,7 +96,7 @@ export default function ProfilePage() {
     }
 
     setLogoFile(file);
-    
+
     // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -137,14 +139,14 @@ export default function ProfilePage() {
       }
 
       // Update employer with all data including logo URL
-      const updated = await updateEmployer.mutateAsync({ 
-        id: employer.id, 
+      const updated = await updateEmployer.mutateAsync({
+        id: employer.id,
         data: {
           ...formData,
           logo_url: logoUrl,
-        } as UpdateEmployerRequest 
+        } as UpdateEmployerRequest
       });
-      
+
       setEmployer(updated);
       // Update formData with new version to prevent 409 conflicts on next save
       setFormData(prev => ({ ...prev, version: updated.version, logo_url: updated.logo_url }));
@@ -175,11 +177,11 @@ export default function ProfilePage() {
       {/* Profile Card with Logo */}
       <div className="glass-card rounded-2xl p-6 mb-6 relative overflow-hidden">
         {/* Background decoration */}
-        <div 
+        <div
           className="absolute top-0 right-0 w-40 h-40 rounded-full opacity-10 blur-3xl"
           style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)' }}
         />
-        
+
         <div className="flex items-center gap-4 relative">
           {/* Logo/Avatar */}
           <div className="relative group">
@@ -190,16 +192,16 @@ export default function ProfilePage() {
                 className="w-20 h-20 rounded-2xl object-cover"
               />
             ) : (
-              <div 
+              <div
                 className="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-2xl font-bold"
                 style={{ backgroundColor: 'var(--primary)' }}
               >
                 {getInitials(employer.name)}
               </div>
             )}
-            
+
             {/* Upload overlay */}
-            <label 
+            <label
               className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
             >
               <input
@@ -247,7 +249,7 @@ export default function ProfilePage() {
       {/* Personal Information */}
       <div className="glass-card rounded-2xl p-6 mb-6">
         <div className="flex items-center gap-2 mb-5">
-          <div 
+          <div
             className="w-8 h-8 rounded-lg flex items-center justify-center"
             style={{ background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%)' }}
           >
@@ -272,7 +274,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>Email</label>
-              <div 
+              <div
                 className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm bg-white/30"
                 style={{ border: '1px solid var(--neutral-border)', color: 'var(--neutral-gray)' }}
               >
@@ -302,7 +304,7 @@ export default function ProfilePage() {
       {/* Company Information */}
       <div className="glass-card rounded-2xl p-6 mb-6">
         <div className="flex items-center gap-2 mb-5">
-          <div 
+          <div
             className="w-8 h-8 rounded-lg flex items-center justify-center"
             style={{ background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(20, 184, 166, 0.1) 100%)' }}
           >
@@ -364,19 +366,35 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>
-              <FileText className="w-4 h-4 inline mr-1" />
-              GST Number
-            </label>
-            <input
-              type="text"
-              value={formData.gst_number || ''}
-              onChange={(e) => handleFieldChange('gst_number', e.target.value)}
-              placeholder="e.g., 22AAAAA0000A1Z5"
-              className={inputStyle}
-              style={{ borderColor: 'var(--neutral-border)', '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
-            />
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>
+                <FileText className="w-4 h-4 inline mr-1" />
+                GST Number
+              </label>
+              <input
+                type="text"
+                value={formData.gst_number || ''}
+                onChange={(e) => handleFieldChange('gst_number', e.target.value)}
+                placeholder="e.g., 22AAAAA0000A1Z5"
+                className={inputStyle}
+                style={{ borderColor: 'var(--neutral-border)', '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>
+                <FileText className="w-4 h-4 inline mr-1" />
+                PAN Number
+              </label>
+              <input
+                type="text"
+                value={formData.pan_number || ''}
+                onChange={(e) => handleFieldChange('pan_number', e.target.value)}
+                placeholder="e.g., ABCDE1234F"
+                className={inputStyle}
+                style={{ borderColor: 'var(--neutral-border)', '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
+              />
+            </div>
           </div>
 
           <div>
@@ -396,7 +414,7 @@ export default function ProfilePage() {
       {/* Location Information */}
       <div className="glass-card rounded-2xl p-6 mb-6">
         <div className="flex items-center gap-2 mb-5">
-          <div 
+          <div
             className="w-8 h-8 rounded-lg flex items-center justify-center"
             style={{ background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.1) 0%, rgba(124, 58, 237, 0.1) 100%)' }}
           >
@@ -406,7 +424,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="space-y-4">
-          <div className="grid sm:grid-cols-3 gap-4">
+          <div className="grid sm:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>City</label>
               <input
@@ -436,6 +454,17 @@ export default function ProfilePage() {
                 value={formData.country || ''}
                 onChange={(e) => handleFieldChange('country', e.target.value)}
                 placeholder="e.g., India"
+                className={inputStyle}
+                style={{ borderColor: 'var(--neutral-border)', '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>PIN Code</label>
+              <input
+                type="text"
+                value={formData.pin_code || ''}
+                onChange={(e) => handleFieldChange('pin_code', e.target.value)}
+                placeholder="e.g., 400001"
                 className={inputStyle}
                 style={{ borderColor: 'var(--neutral-border)', '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
               />
