@@ -1,6 +1,7 @@
 'use client';
 
 import { SelectDropdown } from '@/components';
+import { getErrorMessage } from '@/lib/api';
 import { useUpdateEmployer } from '@/lib/hooks';
 import { uploadLogo } from '@/lib/supabase';
 import { getInitials } from '@/lib/utils';
@@ -152,8 +153,9 @@ export default function ProfilePage() {
       setFormData(prev => ({ ...prev, version: updated.version, logo_url: updated.logo_url }));
       setLogoFile(null); // Clear file after successful upload
       toast.success('Profile updated successfully!');
-    } catch {
-      toast.error('Failed to update profile');
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      toast.error(errorMessage);
     }
   };
 

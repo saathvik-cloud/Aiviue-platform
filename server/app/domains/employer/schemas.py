@@ -41,10 +41,11 @@ class EmployerCreateRequest(BaseModel):
         description="Primary email address",
         examples=["john@acme.com"],
     )
-    phone: Optional[str] = Field(
-        None,
+    phone: str = Field(
+        ...,
+        min_length=10,
         max_length=50,
-        description="Phone number with country code",
+        description="Phone number with country code (required)",
         examples=["+1-555-123-4567"],
     )
     
@@ -138,16 +139,61 @@ class EmployerCreateRequest(BaseModel):
     
     @field_validator("phone")
     @classmethod
-    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+    def validate_phone(cls, v: str) -> str:
         """Basic phone number validation."""
-        if v is not None:
-            # Remove spaces and dashes for validation
-            cleaned = v.replace(" ", "").replace("-", "")
-            if not cleaned.replace("+", "").isdigit():
-                raise ValueError("Phone must contain only digits, +, spaces, and dashes")
-            if len(cleaned) < 10:
-                raise ValueError("Phone number too short")
+        if not v or not v.strip():
+            raise ValueError("Phone number is required")
+        # Remove spaces and dashes for validation
+        cleaned = v.replace(" ", "").replace("-", "")
+        if not cleaned.replace("+", "").isdigit():
+            raise ValueError("Phone must contain only digits, +, spaces, and dashes")
+        if len(cleaned) < 10:
+            raise ValueError("Phone number too short")
         return v
+    
+    @field_validator("gst_number")
+    @classmethod
+    def validate_gst_format(cls, v: Optional[str]) -> Optional[str]:
+        """
+        Validate GST number format (Indian GST).
+        Format: 22AAAAA0000A1Z5 (15 characters)
+        - First 2: State code (01-37)
+        - Next 10: PAN number
+        - Next 1: Entity code (1-9 or A-Z)
+        - Next 1: 'Z' by default
+        - Last 1: Checksum (alphanumeric)
+        """
+        import re
+        if v is not None and v.strip():
+            v = v.strip().upper()
+            # GST pattern: 2 digits + 10 alphanumeric (PAN) + 1 alphanumeric + 1 'Z' + 1 alphanumeric
+            gst_pattern = r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$'
+            if not re.match(gst_pattern, v):
+                raise ValueError(
+                    "Invalid GST number format. Expected format: 22AAAAA0000A1Z5 (15 characters)"
+                )
+        return v.upper() if v else v
+    
+    @field_validator("pan_number")
+    @classmethod
+    def validate_pan_format(cls, v: Optional[str]) -> Optional[str]:
+        """
+        Validate PAN number format (Indian PAN).
+        Format: ABCDE1234F (10 characters)
+        - First 5: Alphabets (4th char indicates entity type: P=Person, C=Company, etc.)
+        - Next 4: Numeric (0001-9999)
+        - Last 1: Alphabet (check letter)
+        """
+        import re
+        if v is not None and v.strip():
+            v = v.strip().upper()
+            # PAN pattern: 5 alphabets + 4 digits + 1 alphabet
+            pan_pattern = r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$'
+            if not re.match(pan_pattern, v):
+                raise ValueError(
+                    "Invalid PAN number format. Expected format: ABCDE1234F (10 characters)"
+                )
+        return v.upper() if v else v
 
 
 class EmployerUpdateRequest(BaseModel):
@@ -253,6 +299,64 @@ class EmployerUpdateRequest(BaseModel):
                 f"company_size must be one of: {', '.join(COMPANY_SIZE_OPTIONS)}"
             )
         return v
+    
+    @field_validator("name")
+    @classmethod
+    def validate_name_not_empty(cls, v: Optional[str]) -> Optional[str]:
+        """Prevent clearing name - it's a required field."""
+        if v is not None and v.strip() == "":
+            raise ValueError("Name is required and cannot be empty")
+        return v
+    
+    @field_validator("phone")
+    @classmethod
+    def validate_phone_not_empty(cls, v: Optional[str]) -> Optional[str]:
+        """Prevent clearing phone - it's a required field."""
+        if v is not None and v.strip() == "":
+            raise ValueError("Phone number is required and cannot be empty")
+        return v
+    
+    @field_validator("company_name")
+    @classmethod
+    def validate_company_name_not_empty(cls, v: Optional[str]) -> Optional[str]:
+        """Prevent clearing company_name - it's a required field."""
+        if v is not None and v.strip() == "":
+            raise ValueError("Company name is required and cannot be empty")
+        return v
+    
+    @field_validator("gst_number")
+    @classmethod
+    def validate_gst_format(cls, v: Optional[str]) -> Optional[str]:
+        """
+        Validate GST number format (Indian GST).
+        Format: 22AAAAA0000A1Z5 (15 characters)
+        """
+        import re
+        if v is not None and v.strip():
+            v = v.strip().upper()
+            gst_pattern = r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$'
+            if not re.match(gst_pattern, v):
+                raise ValueError(
+                    "Invalid GST number format. Expected format: 22AAAAA0000A1Z5 (15 characters)"
+                )
+        return v.upper() if v else v
+    
+    @field_validator("pan_number")
+    @classmethod
+    def validate_pan_format(cls, v: Optional[str]) -> Optional[str]:
+        """
+        Validate PAN number format (Indian PAN).
+        Format: ABCDE1234F (10 characters)
+        """
+        import re
+        if v is not None and v.strip():
+            v = v.strip().upper()
+            pan_pattern = r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$'
+            if not re.match(pan_pattern, v):
+                raise ValueError(
+                    "Invalid PAN number format. Expected format: ABCDE1234F (10 characters)"
+                )
+        return v.upper() if v else v
 
 
 # ==================== RESPONSE SCHEMAS ====================

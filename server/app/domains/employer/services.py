@@ -292,7 +292,33 @@ class EmployerService:
             # No fields to update, just return current
             return await self.get_by_id(employer_id)
         
-        # 2. Check for duplicate phone if changing
+        # 2. Get current employer to check GST/PAN requirement
+        current_employer = await self.repo.get_by_id(employer_id)
+        if current_employer is None:
+            raise NotFoundError(
+                message="Employer not found",
+                error_code="EMPLOYER_NOT_FOUND",
+                context={"employer_id": str(employer_id)},
+            )
+        
+        # 3. Check GST/PAN requirement - at least one must be present after update
+        # Determine final values after update
+        final_gst = update_data.get("gst_number", current_employer.gst_number)
+        final_pan = update_data.get("pan_number", current_employer.pan_number)
+        
+        # If GST or PAN is being explicitly set to empty, check the requirement
+        if "gst_number" in update_data or "pan_number" in update_data:
+            has_valid_gst = final_gst and final_gst.strip()
+            has_valid_pan = final_pan and final_pan.strip()
+            
+            if not has_valid_gst and not has_valid_pan:
+                raise ValidationError(
+                    message="At least one of GST number or PAN number is required",
+                    error_code="GST_OR_PAN_REQUIRED",
+                    context={"gst_number": final_gst, "pan_number": final_pan},
+                )
+        
+        # 4. Check for duplicate phone if changing
         if "phone" in update_data and update_data["phone"]:
             existing = await self.repo.get_by_phone(update_data["phone"])
             if existing and existing.id != employer_id:
@@ -302,7 +328,7 @@ class EmployerService:
                     context={"phone": update_data["phone"]},
                 )
         
-        # 3. Update with optimistic locking
+        # 5. Update with optimistic locking
         employer = await self.repo.update(
             employer_id=employer_id,
             data=update_data,
@@ -326,11 +352,11 @@ class EmployerService:
             },
         )
         
-        # 4. Invalidate cache
+        # 6. Invalidate cache
         if self.cache:
             await self.cache.delete(str(employer_id))
         
-        # 5. Publish event (only if screening events enabled)
+        # 7. Publish event (only if screening events enabled)
         from app.config import settings
         if settings.enable_screening_events and self.publisher:
             await self.publisher.publish(
@@ -410,6 +436,8 @@ class EmployerService:
             "country": sanitize_text(request.country) if request.country else None,
             "logo_url": request.logo_url.strip() if request.logo_url else None,
             "gst_number": sanitize_text(request.gst_number) if request.gst_number else None,
+            "pan_number": sanitize_text(request.pan_number) if request.pan_number else None,
+            "pin_code": sanitize_text(request.pin_code) if request.pin_code else None,
         }
     
     def _sanitize_update_data(
@@ -419,12 +447,33 @@ class EmployerService:
         """Sanitize and prepare data for update (only changed fields)."""
         data = {}
         
+        # Validate mandatory fields cannot be cleared
         if request.name is not None:
-            data["name"] = sanitize_text(request.name)
+            sanitized_name = sanitize_text(request.name)
+            if not sanitized_name or not sanitized_name.strip():
+                raise ValidationError(
+                    message="Name is required and cannot be empty",
+                    error_code="NAME_REQUIRED",
+                )
+            data["name"] = sanitized_name
+        
         if request.phone is not None:
-            data["phone"] = request.phone.strip() if request.phone else None
+            phone_value = request.phone.strip() if request.phone else ""
+            if not phone_value:
+                raise ValidationError(
+                    message="Phone number is required and cannot be empty",
+                    error_code="PHONE_REQUIRED",
+                )
+            data["phone"] = phone_value
+        
         if request.company_name is not None:
-            data["company_name"] = sanitize_text(request.company_name)
+            sanitized_company_name = sanitize_text(request.company_name)
+            if not sanitized_company_name or not sanitized_company_name.strip():
+                raise ValidationError(
+                    message="Company name is required and cannot be empty",
+                    error_code="COMPANY_NAME_REQUIRED",
+                )
+            data["company_name"] = sanitized_company_name
         if request.company_description is not None:
             data["company_description"] = sanitize_text(request.company_description) if request.company_description else None
         if request.company_website is not None:
@@ -445,6 +494,10 @@ class EmployerService:
             data["logo_url"] = request.logo_url.strip() if request.logo_url else None
         if request.gst_number is not None:
             data["gst_number"] = sanitize_text(request.gst_number) if request.gst_number else None
+        if request.pan_number is not None:
+            data["pan_number"] = sanitize_text(request.pan_number) if request.pan_number else None
+        if request.pin_code is not None:
+            data["pin_code"] = sanitize_text(request.pin_code) if request.pin_code else None
         
         return data
     
@@ -484,6 +537,8 @@ class EmployerService:
             country=employer.country,
             logo_url=employer.logo_url,
             gst_number=employer.gst_number,
+            pan_number=employer.pan_number,
+            pin_code=employer.pin_code,
             is_verified=employer.is_verified,
             verified_at=employer.verified_at,
             is_active=employer.is_active,

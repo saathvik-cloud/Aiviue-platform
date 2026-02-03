@@ -29,23 +29,40 @@ export function ChatMessage({
     const isBot = message.role === 'bot';
     const mbClass = showAvatar ? 'mb-4' : 'mb-1 -mt-3';
 
-    // Loading message
+    // Loading message - show progress text if available, otherwise typing dots
     if (message.message_type === 'loading') {
+        // Check if this is a progress message (has meaningful content, not just "thinking...")
+        const isProgressMessage = message.content && 
+            !message.content.toLowerCase().includes('thinking') &&
+            message.content.length > 5;
+
         return (
             <div className={`flex items-start gap-3 ${mbClass} animate-fade-in`}>
                 {showAvatar ? <BotAvatar /> : <div className="w-9" />}
                 <div
-                    className="flex items-center gap-1.5 px-4 py-4 rounded-2xl rounded-tl-md"
+                    className="flex items-center gap-2 px-4 py-3 rounded-2xl rounded-tl-md"
                     style={{
                         background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%)',
                         border: '1px solid rgba(124, 58, 237, 0.1)'
                     }}
                 >
-                    <div className="flex gap-1 px-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500 typing-dot" style={{ animationDelay: '0s' }} />
-                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500 typing-dot" style={{ animationDelay: '0.2s' }} />
-                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500 typing-dot" style={{ animationDelay: '0.4s' }} />
-                    </div>
+                    {isProgressMessage ? (
+                        <>
+                            {/* Animated spinner */}
+                            <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                            {/* Progress text */}
+                            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                                {message.content}
+                            </p>
+                        </>
+                    ) : (
+                        /* Default typing dots */
+                        <div className="flex gap-1 px-1">
+                            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 typing-dot" style={{ animationDelay: '0s' }} />
+                            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 typing-dot" style={{ animationDelay: '0.2s' }} />
+                            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 typing-dot" style={{ animationDelay: '0.4s' }} />
+                        </div>
+                    )}
                 </div>
             </div>
         );

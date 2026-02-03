@@ -2,10 +2,8 @@
 
 import { ROUTES } from '@/constants';
 import {
-    CONVERSATION_STEPS,
     parseExperienceRange,
     parseSalaryRange,
-    type ConversationStep
 } from '@/lib/chat';
 import {
     useChatSession,
@@ -31,6 +29,58 @@ import { ChatMessage } from './ChatMessage';
 type ViewMode = 'chat' | 'history';
 
 /**
+ * Progressive status messages shown during JD generation.
+ * These cycle every 800ms to give sense of progress.
+ */
+const GENERATION_PROGRESS_MESSAGES = [
+    "Analyzing your requirements... 🔍",
+    "Crafting the perfect job description... ✍️",
+    "Adding industry-specific keywords... 💼",
+    "Optimizing for candidate attraction... 🎯",
+    "Polishing the final details... ✨",
+    "Almost there... 🚀",
+];
+
+const EXTRACTION_PROGRESS_MESSAGES = [
+    "Reading your job description... 📖",
+    "Identifying key requirements... 🔍",
+    "Extracting job details... 📋",
+    "Parsing location & salary info... 💰",
+    "Organizing the data... 📊",
+    "Almost done... ✨",
+];
+
+/**
+ * Static welcome messages shown immediately for better UX.
+ * These match the backend welcome messages.
+ */
+const STATIC_WELCOME_MESSAGES: ChatMessageType[] = [
+    {
+        id: 'welcome-1',
+        session_id: '',
+        role: 'bot',
+        content: "Hi! I'm AIVI, your AI recruiting expert! 🎯",
+        message_type: 'text',
+        created_at: new Date().toISOString(),
+    },
+    {
+        id: 'welcome-2',
+        session_id: '',
+        role: 'bot',
+        content: "I'm here to help you create a job posting.\n\nHow would you like to proceed?",
+        message_type: 'buttons',
+        message_data: {
+            buttons: [
+                { id: 'paste_jd', label: '📋 Paste JD', value: 'paste_jd' },
+                { id: 'use_aivi', label: '💬 Use AIVI Bot', value: 'use_aivi' },
+            ],
+            step: 'choose_method',
+        },
+        created_at: new Date().toISOString(),
+    },
+];
+
+/**
  * ChatContainer - Main chat interface component.
  * Manages conversation state, message display, and user interactions.
  */
@@ -42,8 +92,15 @@ export function ChatContainer() {
     // View state
     const [viewMode, setViewMode] = useState<ViewMode>('chat');
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-    const [localMessages, setLocalMessages] = useState<ChatMessageType[]>([]);
+    const [localMessages, setLocalMessages] = useState<ChatMessageType[]>(STATIC_WELCOME_MESSAGES);
     const [historyOffset, setHistoryOffset] = useState(0);
+    const [isInitializing, setIsInitializing] = useState(true);
+    const [isGeneratingJD, setIsGeneratingJD] = useState(false);
+    const [isExtractingJD, setIsExtractingJD] = useState(false);
+    const [progressMsgIndex, setProgressMsgIndex] = useState(0);
+    
+    // Ref to track session ID for async operations
+    const sessionIdRef = useRef<string | null>(null);
 
     // API Hooks
     const createSession = useCreateChatSession();
@@ -72,17 +129,70 @@ export function ChatContainer() {
         }
     }, [localMessages, sessionData?.messages]);
 
-    // Sync session messages to local state
+    // Sync session messages to local state (but avoid replacing static welcome messages)
     useEffect(() => {
         if (sessionData?.messages) {
-            setLocalMessages(sessionData.messages);
+            setLocalMessages(prev => {
+                // Don't replace static welcome messages to avoid visual jump
+                const hasStaticWelcome = prev.some(m => m.id.startsWith('welcome-'));
+                const backendHasOnlyWelcome = sessionData.messages.length <= 2 && 
+                    sessionData.messages.every(m => 
+                        m.message_type === 'text' || m.message_type === 'buttons'
+                    );
+                
+                if (hasStaticWelcome && backendHasOnlyWelcome) {
+                    // Keep static messages, just update session_id
+                    return prev.map(m => ({ ...m, session_id: sessionData.id }));
+                }
+                
+                // For non-welcome messages (e.g., loading history), use backend data
+                return sessionData.messages;
+            });
         }
-    }, [sessionData?.messages]);
+    }, [sessionData?.messages, sessionData?.id]);
 
-    // Get current step from session context
-    const currentStep = (sessionData?.context_data?.step || 'welcome') as ConversationStep;
-    const collectedData = sessionData?.context_data?.collected_data || {};
-    const stepConfig = CONVERSATION_STEPS[currentStep];
+    // Cycle through progress messages during JD generation or extraction
+    useEffect(() => {
+        const isProcessing = isGeneratingJD || isExtractingJD;
+        
+        if (!isProcessing) {
+            setProgressMsgIndex(0);
+            return;
+        }
+
+        const messages = isGeneratingJD ? GENERATION_PROGRESS_MESSAGES : EXTRACTION_PROGRESS_MESSAGES;
+        
+        const interval = setInterval(() => {
+            setProgressMsgIndex(prev => (prev + 1) % messages.length);
+        }, 800); // Change message every 800ms
+
+        return () => clearInterval(interval);
+    }, [isGeneratingJD, isExtractingJD]);
+
+    // Update loading message content when progress message index changes
+    useEffect(() => {
+        if (!isGeneratingJD && !isExtractingJD) return;
+
+        const messages = isGeneratingJD ? GENERATION_PROGRESS_MESSAGES : EXTRACTION_PROGRESS_MESSAGES;
+        const idPrefix = isGeneratingJD ? 'generating-' : 'extracting-';
+
+        setLocalMessages(prev => {
+            // Guard: Check if the loading message still exists before updating
+            const hasLoadingMessage = prev.some(msg => msg.id.startsWith(idPrefix));
+            if (!hasLoadingMessage) return prev; // Don't update if message was already removed
+            
+            return prev.map(msg => 
+                msg.id.startsWith(idPrefix) 
+                    ? { ...msg, content: messages[progressMsgIndex] }
+                    : msg
+            );
+        });
+    }, [progressMsgIndex, isGeneratingJD, isExtractingJD]);
+
+    // Note: Step context is available via sessionData?.context_data if needed
+    // const currentStep = (sessionData?.context_data?.step || 'welcome') as ConversationStep;
+    // const collectedData = sessionData?.context_data?.collected_data || {};
+    // const stepConfig = CONVERSATION_STEPS[currentStep];
 
     // All messages to display (from API + any local optimistic updates)
     // Filter out hidden or empty messages (like extraction complete system messages)
@@ -114,6 +224,11 @@ export function ChatContainer() {
         }
 
         console.log('[ChatContainer] Creating new session for employer:', employer.id);
+        
+        // Show welcome messages immediately (optimistic UI)
+        setLocalMessages(STATIC_WELCOME_MESSAGES);
+        setViewMode('chat');
+        setIsInitializing(true);
 
         try {
             const session = await createSession.mutateAsync({
@@ -126,15 +241,36 @@ export function ChatContainer() {
             console.log('[ChatContainer] Session messages length:', session.messages?.length);
 
             setCurrentSessionId(session.id);
-            setLocalMessages(session.messages || []);
-            setViewMode('chat');
+            sessionIdRef.current = session.id; // Update ref for async operations
+            
+            // Don't replace static welcome messages with backend welcome messages
+            // to avoid visual "jump". Only sync if backend has different/more messages.
+            // The static messages match the backend welcome messages, so we just
+            // update the session_id on them instead of replacing.
+            setLocalMessages(prev => {
+                // If we have static welcome messages (id starts with 'welcome-'),
+                // keep them but update session_id for consistency
+                const hasStaticWelcome = prev.some(m => m.id.startsWith('welcome-'));
+                const backendHasOnlyWelcome = session.messages?.length === 2 && 
+                    session.messages.every(m => m.message_type === 'text' || m.message_type === 'buttons');
+                
+                if (hasStaticWelcome && backendHasOnlyWelcome) {
+                    // Keep static messages, just update session_id
+                    return prev.map(m => ({ ...m, session_id: session.id }));
+                }
+                
+                // If backend has different messages, use those
+                return session.messages || prev;
+            });
+            setIsInitializing(false);
         } catch (error) {
             console.error('[ChatContainer] Failed to create chat session:', error);
             toast.error('Failed to start chat. Please try again.');
+            setIsInitializing(false);
         }
     }, [employer?.id, createSession]);
 
-    // Initialize first session on mount
+    // Initialize first session on mount - show welcome immediately
     useEffect(() => {
         if (!currentSessionId && employer?.id && !createSession.isPending) {
             handleNewChat();
@@ -142,7 +278,7 @@ export function ChatContainer() {
     }, [employer?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Handle sending a message
-    const handleSendMessage = async (content: string, buttonData?: Record<string, any>) => {
+    const handleSendMessage = async (content: string, buttonData?: Record<string, unknown>) => {
         if (!currentSessionId || !employer?.id) return;
 
         // Add optimistic user message
@@ -177,7 +313,7 @@ export function ChatContainer() {
             });
 
             // Replace optimistic messages with real ones
-            let newMessages = [...response.bot_responses];
+            const newMessages = [...response.bot_responses];
 
             // Check if we need to extract JD (LLM call)
             const extractingResponse = response.bot_responses.find(
@@ -226,14 +362,18 @@ export function ChatContainer() {
 
         const data = sessionData.context_data.collected_data;
 
-        // Update loading message
+        // Start progressive loading messages
+        setIsGeneratingJD(true);
+        setProgressMsgIndex(0);
+
+        // Update loading message with first progress message
         setLocalMessages(prev => {
             const filtered = prev.filter(m => !m.id.startsWith('loading-'));
             return [...filtered, {
                 id: `generating-${Date.now()}`,
                 session_id: currentSessionId!,
                 role: 'bot' as const,
-                content: 'Generating your job description with AI... ✨',
+                content: GENERATION_PROGRESS_MESSAGES[0],
                 message_type: 'loading' as const,
                 created_at: new Date().toISOString(),
             }];
@@ -290,20 +430,21 @@ export function ChatContainer() {
                 created_at: new Date().toISOString(),
             };
 
-            // Replace loading with preview
+            // IMPORTANT: Remove loading message FIRST, then stop the flag
+            // This prevents race condition where the cycling effect updates a removed message
             setLocalMessages(prev => {
                 const filtered = prev.filter(m => !m.id.startsWith('generating-') && !m.id.startsWith('loading-'));
                 return [...filtered, previewMessage];
             });
 
-            // Update session context with generated data
-            // (The backend will handle this in a real scenario, but we're updating locally)
+            // Stop progress messages AFTER removing the loading message
+            setIsGeneratingJD(false);
 
         } catch (error) {
             console.error('Failed to generate job description:', error);
             toast.error('Failed to generate job description. Please try again.');
 
-            // Show error message
+            // IMPORTANT: Remove loading message FIRST, then stop the flag
             setLocalMessages(prev => {
                 const filtered = prev.filter(m => !m.id.startsWith('generating-') && !m.id.startsWith('loading-'));
                 return [...filtered, {
@@ -315,6 +456,9 @@ export function ChatContainer() {
                     created_at: new Date().toISOString(),
                 }];
             });
+
+            // Stop progress messages AFTER removing the loading message
+            setIsGeneratingJD(false);
         }
     };
 
@@ -325,14 +469,18 @@ export function ChatContainer() {
             return;
         }
 
-        // Update loading message
+        // Start progressive loading messages for extraction
+        setIsExtractingJD(true);
+        setProgressMsgIndex(0);
+
+        // Update loading message with first progress message
         setLocalMessages(prev => {
             const filtered = prev.filter(m => !m.id.startsWith('loading-'));
             return [...filtered, {
                 id: `extracting-${Date.now()}`,
                 session_id: currentSessionId!,
                 role: 'bot' as const,
-                content: 'Extracting job details using AI... 🔍',
+                content: EXTRACTION_PROGRESS_MESSAGES[0],
                 message_type: 'loading' as const,
                 created_at: new Date().toISOString(),
             }];
@@ -361,11 +509,14 @@ export function ChatContainer() {
                     extractedData: extractionResult.extracted_data,
                 });
 
-                // Step 3: Update local messages with backend response
+                // IMPORTANT: Remove loading message FIRST, then stop the flag
                 setLocalMessages(prev => {
                     const filtered = prev.filter(m => !m.id.startsWith('extracting-') && !m.id.startsWith('loading-'));
                     return [...filtered, ...response.bot_responses];
                 });
+
+                // Stop extraction progress messages AFTER removing loading message
+                setIsExtractingJD(false);
 
                 // Check if we need to generate description (all fields complete)
                 const generatingResponse = response.bot_responses.find(
@@ -381,7 +532,7 @@ export function ChatContainer() {
             console.error('Failed to extract job description:', error);
             toast.error('Failed to extract job details. Please try again.');
 
-            // Show error message with retry
+            // IMPORTANT: Remove loading message FIRST, then stop the flag
             setLocalMessages(prev => {
                 const filtered = prev.filter(m => !m.id.startsWith('extracting-') && !m.id.startsWith('loading-'));
                 return [...filtered, {
@@ -393,11 +544,33 @@ export function ChatContainer() {
                     created_at: new Date().toISOString(),
                 }];
             });
+
+            // Stop extraction progress messages AFTER removing loading message
+            setIsExtractingJD(false);
         }
     };
 
     // Handle button click
-    const handleButtonClick = (button: ChatButton) => {
+    const handleButtonClick = async (button: ChatButton) => {
+        // If session is not ready yet, wait for it (with timeout)
+        if (!sessionIdRef.current && (createSession.isPending || isInitializing)) {
+            // Wait up to 5 seconds for session to be created
+            let waitTime = 0;
+            const checkInterval = 100;
+            const maxWait = 5000;
+            
+            while (!sessionIdRef.current && waitTime < maxWait) {
+                await new Promise(resolve => setTimeout(resolve, checkInterval));
+                waitTime += checkInterval;
+            }
+            
+            // If still no session after waiting, show error
+            if (!sessionIdRef.current) {
+                toast.error('Session not ready. Please try again.');
+                return;
+            }
+        }
+        
         // Handle special "other" button - switch to text input
         if (button.value === 'other') {
             // The backend will handle this - just send the message
@@ -425,7 +598,7 @@ export function ChatContainer() {
     };
 
     // Handle job creation from preview
-    const handleCreateJob = async (previewData?: any) => {
+    const handleCreateJob = async (previewData?: Record<string, unknown>) => {
         // Use previewData if provided, otherwise fallback to session data
         const data = previewData || sessionData?.context_data?.collected_data;
 
@@ -447,6 +620,12 @@ export function ChatContainer() {
             return;
         }
 
+        // Convert shift_preference string to shift_preferences object
+        // e.g., "day" -> { day: true }
+        const shiftPreferences = data.shift_preference 
+            ? { [data.shift_preference]: true } 
+            : undefined;
+
         const jobRequest: CreateJobRequest = {
             employer_id: employer!.id,
             title: data.title,
@@ -459,9 +638,11 @@ export function ChatContainer() {
             work_type: data.work_type as CreateJobRequest['work_type'],
             salary_range_min: data.salary_min || salaryRange.min || undefined,
             salary_range_max: data.salary_max || salaryRange.max || undefined,
+            currency: data.currency || 'INR',
             experience_min: data.experience_min || expRange.min || undefined,
             experience_max: data.experience_max || expRange.max || undefined,
             openings_count: parseInt(data.openings_count) || 1,
+            shift_preferences: shiftPreferences,
         };
 
         try {
@@ -477,6 +658,7 @@ export function ChatContainer() {
     // Handle session selection from history
     const handleSelectSession = (sessionId: string) => {
         setCurrentSessionId(sessionId);
+        sessionIdRef.current = sessionId;
         setViewMode('chat');
     };
 
@@ -541,7 +723,8 @@ export function ChatContainer() {
                 <>
                     {/* Messages Area */}
                     <div className="flex-1 overflow-y-auto p-5 scrollbar-thin">
-                        {(sessionLoading || createSession.isPending) ? (
+                        {/* Only show loading when fetching an existing session, not during creation */}
+                        {(sessionLoading && currentSessionId && !isInitializing) ? (
                             <div className="flex items-center justify-center h-full">
                                 <div className="text-center">
                                     <div
@@ -551,7 +734,7 @@ export function ChatContainer() {
                                         <span className="text-2xl">🤖</span>
                                     </div>
                                     <p className="text-sm" style={{ color: 'var(--neutral-gray)' }}>
-                                        {createSession.isPending ? 'Starting conversation...' : 'Loading conversation...'}
+                                        Loading conversation...
                                     </p>
                                 </div>
                             </div>

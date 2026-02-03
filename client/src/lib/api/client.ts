@@ -89,9 +89,15 @@ const ERROR_MESSAGES: Record<string, string> = {
   EMPLOYER_NOT_FOUND: 'Employer account not found. Please register first.',
   JOB_NOT_FOUND: 'Job not found.',
   EMAIL_ALREADY_EXISTS: 'An account with this email already exists.',
+  PHONE_ALREADY_EXISTS: 'This phone number is already registered.',
   UNAUTHORIZED: 'Please log in to continue.',
   FORBIDDEN: 'You do not have permission to perform this action.',
   INTERNAL_ERROR: 'Something went wrong. Please try again later.',
+  // Validation specific errors
+  GST_OR_PAN_REQUIRED: 'Please provide at least one of GST Number or PAN Number.',
+  NAME_REQUIRED: 'Name is required and cannot be empty.',
+  PHONE_REQUIRED: 'Phone number is required and cannot be empty.',
+  COMPANY_NAME_REQUIRED: 'Company name is required and cannot be empty.',
 };
 
 // Parse validation error details into readable message
