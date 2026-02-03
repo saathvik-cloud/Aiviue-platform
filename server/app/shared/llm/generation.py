@@ -148,13 +148,13 @@ class JDGenerator:
                 
                 response = await self.client.generate(
                     prompt=prompt,
-                    system_prompt=JD_GENERATION_SYSTEM_PROMPT,
+                    system_instruction=JD_GENERATION_SYSTEM_PROMPT,
                     temperature=0.7,  # Some creativity for engaging content
                     max_tokens=2000,
                 )
                 
                 # Parse and validate response
-                result = self._parse_response(response)
+                result = self._parse_response(response.content)
                 if result:
                     logger.info("JD generated successfully", extra={"title": title})
                     return result

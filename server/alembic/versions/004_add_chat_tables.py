@@ -27,7 +27,7 @@ def upgrade() -> None:
     # Create chat_sessions table
     op.create_table(
         'chat_sessions',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column(
             'employer_id',
             postgresql.UUID(as_uuid=True),
@@ -51,7 +51,7 @@ def upgrade() -> None:
     # Create chat_messages table
     op.create_table(
         'chat_messages',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column(
             'session_id',
             postgresql.UUID(as_uuid=True),

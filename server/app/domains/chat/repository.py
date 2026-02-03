@@ -80,6 +80,9 @@ class ChatRepository:
         Returns:
             ChatSession or None
         """
+        # Expire cached objects to ensure fresh data
+        self.db.expire_all()
+        
         query = select(ChatSession).where(ChatSession.id == session_id)
         
         if include_messages:
@@ -119,8 +122,10 @@ class ChatRepository:
         total_count = count_result.scalar() or 0
         
         # Get sessions with pagination, ordered by most recent
+        # Include messages for message_count property
         query = (
             base_query
+            .options(selectinload(ChatSession.messages))
             .order_by(ChatSession.updated_at.desc())
             .offset(offset)
             .limit(limit)
