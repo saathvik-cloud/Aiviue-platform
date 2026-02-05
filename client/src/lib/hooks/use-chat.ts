@@ -70,10 +70,11 @@ export function useCreateChatSession() {
 /**
  * Mutation hook to send a message to a session.
  * Returns user message and bot responses.
+ * 
+ * Note: We don't invalidate the session query here to avoid duplicate messages.
+ * The ChatContainer manages local state optimistically and syncs carefully.
  */
 export function useSendChatMessage() {
-    const queryClient = useQueryClient();
-
     return useMutation({
         mutationFn: ({
             sessionId,
@@ -84,12 +85,8 @@ export function useSendChatMessage() {
             employerId: string;
             data: SendMessageRequest;
         }) => chatService.sendChatMessage(sessionId, employerId, data),
-        onSuccess: (response, { sessionId }) => {
-            // Invalidate session to refetch with new messages
-            queryClient.invalidateQueries({
-                queryKey: chatKeys.session(sessionId),
-            });
-        },
+        // Don't invalidate session - ChatContainer handles message state locally
+        // to prevent duplicate messages from query refetch race conditions
     });
 }
 
@@ -132,10 +129,11 @@ export function useGenerateJobDescription() {
 /**
  * Mutation hook to notify backend that extraction is complete.
  * Sends extracted data and receives next steps (questions for missing fields or generate step).
+ * 
+ * Note: We don't invalidate the session query here to avoid duplicate messages.
+ * The ChatContainer manages local state optimistically.
  */
 export function useNotifyExtractionComplete() {
-    const queryClient = useQueryClient();
-
     return useMutation({
         mutationFn: ({
             sessionId,
@@ -146,11 +144,7 @@ export function useNotifyExtractionComplete() {
             employerId: string;
             extractedData: Record<string, any>;
         }) => chatService.notifyExtractionComplete(sessionId, employerId, extractedData),
-        onSuccess: (response, { sessionId }) => {
-            // Invalidate session to refetch with new messages
-            queryClient.invalidateQueries({
-                queryKey: chatKeys.session(sessionId),
-            });
-        },
+        // Don't invalidate session - ChatContainer handles message state locally
+        // to prevent duplicate messages from query refetch race conditions
     });
 }

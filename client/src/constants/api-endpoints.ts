@@ -8,16 +8,16 @@ export const API_ENDPOINTS = {
   // Health Check
   HEALTH: '/health',
 
-  // Employer Endpoints
+  // Employer Endpoints (trailing slashes to avoid 307 redirects)
   EMPLOYERS: {
-    BASE: `/api/${API_VERSION}/employers`,
+    BASE: `/api/${API_VERSION}/employers/`,
     BY_ID: (id: string) => `/api/${API_VERSION}/employers/${id}`,
     BY_EMAIL: (email: string) => `/api/${API_VERSION}/employers/email/${email}`,
   },
 
-  // Job Endpoints
+  // Job Endpoints (trailing slashes to avoid 307 redirects)
   JOBS: {
-    BASE: `/api/${API_VERSION}/jobs`,
+    BASE: `/api/${API_VERSION}/jobs/`,
     BY_ID: (id: string) => `/api/${API_VERSION}/jobs/${id}`,
     PUBLISH: (id: string) => `/api/${API_VERSION}/jobs/${id}/publish`,
     CLOSE: (id: string) => `/api/${API_VERSION}/jobs/${id}/close`,
