@@ -16,6 +16,7 @@ import {
     useNotifyExtractionComplete,
     useSendChatMessage
 } from '@/lib/hooks';
+import * as chatService from '@/services/chat.service';
 import { useAuthStore } from '@/stores';
 import type { ChatButton, ChatMessage as ChatMessageType, CreateJobRequest } from '@/types';
 import { useRouter } from 'next/navigation';
@@ -355,12 +356,23 @@ export function ChatContainer() {
 
     // Handle LLM job description generation
     const handleGenerateDescription = async () => {
-        if (!sessionData?.context_data?.collected_data || !currentSessionId || !employer?.id) {
-            toast.error('No job data available');
+        if (!currentSessionId || !employer?.id) {
+            toast.error('No session available');
             return;
         }
 
-        const data = sessionData.context_data.collected_data;
+        // Fetch fresh session data to get the latest collected_data
+        // (sessionData from React Query might be stale)
+        let data: Record<string, any>;
+        try {
+            const freshSession = await chatService.getChatSession(currentSessionId, employer.id);
+            data = freshSession.context_data?.collected_data || {};
+            console.log('[handleGenerateDescription] Fresh session data:', data);
+        } catch (error) {
+            console.error('[handleGenerateDescription] Failed to fetch session:', error);
+            // Fallback to cached data
+            data = sessionData?.context_data?.collected_data || {};
+        }
 
         // Validate required fields
         if (!data.title || data.title.trim() === '') {
