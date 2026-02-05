@@ -3,12 +3,20 @@
 # =============================================================================
 # Background worker for processing extraction jobs.
 #
-# Build: docker build -t aiviue-worker -f docker/Dockerfile.worker .
-# Run:   docker run --env-file .env aiviue-worker
+# LOCAL DEVELOPMENT:
+#   Build: docker build -t aiviue-worker -f docker/Dockerfile.worker .
+#   Run:   docker run --env-file .env aiviue-worker
+#
+# RAILWAY DEPLOYMENT:
+#   - Set Root Directory: server
+#   - Set Dockerfile Path: docker/Dockerfile.worker
+#   - No PORT needed (worker is not a web server)
+#   - No public domain needed
+#
 # =============================================================================
 
 # ===================== BUILD STAGE =====================
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
@@ -49,6 +57,9 @@ COPY --chown=appuser:appuser . .
 
 # Switch to non-root user
 USER appuser
+
+# Set Python to run unbuffered (important for logging in containers)
+ENV PYTHONUNBUFFERED=1
 
 # Run worker
 CMD ["python", "-m", "app.workers.extraction_worker"]

@@ -3,12 +3,20 @@
 # =============================================================================
 # Multi-stage build for production-ready FastAPI application.
 #
-# Build: docker build -t aiviue-api -f docker/Dockerfile .
-# Run:   docker run -p 8000:8000 --env-file .env aiviue-api
+# LOCAL DEVELOPMENT:
+#   Build: docker build -t aiviue-api -f docker/Dockerfile .
+#   Run:   docker run -p 8000:8000 --env-file .env aiviue-api
+#
+# RAILWAY DEPLOYMENT:
+#   - Set Root Directory: server
+#   - Set Dockerfile Path: docker/Dockerfile
+#   - Railway automatically injects PORT env variable
+#   - No custom start command needed (uses CMD below)
+#
 # =============================================================================
 
 # ===================== BUILD STAGE =====================
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
@@ -51,12 +59,17 @@ COPY --chown=appuser:appuser . .
 # Switch to non-root user
 USER appuser
 
-# Expose port
+# Default port (Railway overrides via PORT env variable)
+ENV PORT=8000
+
+# Expose port (documentation only, Railway ignores this)
 EXPOSE 8000
 
-# Health check
+# Health check (uses default port for local, Railway handles health differently)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Run application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run application with dynamic port support
+# Uses shell form to allow $PORT environment variable expansion
+# Railway injects PORT, locally defaults to 8000
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT}

@@ -210,7 +210,7 @@ def setup_logging(
     Call once at application startup:
         setup_logging()
     """
-    log_level = level or settings.log_level
+    log_level = (level or settings.log_level).upper()  # Convert to uppercase (INFO, not info)
     use_json = json_format if json_format is not None else settings.is_production
     
     # Get root logger
@@ -222,7 +222,7 @@ def setup_logging(
     
     # Create handler
     handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(log_level)
+    handler.setLevel(log_level)  # log_level is already uppercase from above
     
     # Set formatter based on environment
     if use_json:
