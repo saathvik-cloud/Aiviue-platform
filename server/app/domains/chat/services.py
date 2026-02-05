@@ -728,6 +728,18 @@ class ChatService:
     def _get_step_question(self, step: str, collected_data: dict) -> List[dict]:
         """Get the question and buttons for a specific step."""
         
+        # ==================== JOB TITLE ====================
+        if step == "job_title":
+            return [{
+                "content": "I couldn't find the job title in your JD. What position are you hiring for?",
+                "message_type": MessageType.INPUT_TEXT,
+                "message_data": {
+                    "placeholder": "e.g., Plumber, Software Engineer, Data Analyst",
+                    "field": "title",
+                    "step": "job_title",
+                },
+            }]
+        
         # ==================== REQUIREMENTS ====================
         if step == "job_requirements":
             return [{

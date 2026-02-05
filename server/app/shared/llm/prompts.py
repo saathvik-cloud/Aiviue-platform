@@ -47,7 +47,7 @@ def build_jd_extraction_prompt(raw_jd: str) -> str:
 
 ## Required Output Schema (JSON)
 {{
-    "title": "string or null - the job title",
+    "title": "string (REQUIRED) - the job title. If not explicitly stated, infer from the job content (e.g., 'Plumber', 'Software Engineer', 'Data Analyst'). NEVER return null for title - always infer a reasonable job title from the responsibilities and requirements.",
     "description": "string or null - cleaned job description (remove boilerplate)",
     "requirements": "string or null - skills, qualifications, experience requirements",
     "location": "string or null - full location as stated",

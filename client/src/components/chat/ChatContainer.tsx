@@ -362,6 +362,14 @@ export function ChatContainer() {
 
         const data = sessionData.context_data.collected_data;
 
+        // Validate required fields
+        if (!data.title || data.title.trim() === '') {
+            toast.error('Job title is missing. Please provide a job title to continue.');
+            // Remove any loading messages
+            setLocalMessages(prev => prev.filter(m => !m.id.startsWith('loading-') && !m.id.startsWith('generating-')));
+            return;
+        }
+
         // Start progressive loading messages
         setIsGeneratingJD(true);
         setProgressMsgIndex(0);
