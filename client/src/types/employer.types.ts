@@ -30,7 +30,7 @@ export interface Employer extends BaseEntity {
 export interface CreateEmployerRequest {
   name: string;
   email: string;
-  phone: string;  // Required field
+  phone?: string;  // Optional field
   company_name: string;
   company_description?: string;
   company_website?: string;
