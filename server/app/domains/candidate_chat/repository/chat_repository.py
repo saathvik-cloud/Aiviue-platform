@@ -1,8 +1,8 @@
 """
-Candidate Chat Domain Repository for Aiviue Platform.
+Candidate Chat Repository for Aiviue Platform.
 
 Database operations for candidate chat sessions and messages.
-Mirrors the employer chat repository pattern with candidate-specific logic.
+Follows repository pattern - handles ONLY database operations, no business logic.
 """
 
 from datetime import datetime
@@ -13,7 +13,7 @@ from sqlalchemy import select, update, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.domains.candidate_chat.models import (
+from app.domains.candidate_chat.models.db_models import (
     CandidateChatSession,
     CandidateChatMessage,
     CandidateSessionStatus,
@@ -29,10 +29,10 @@ class CandidateChatRepository:
     Repository for candidate chat database operations.
 
     Handles CRUD operations for candidate chat sessions and messages.
+    All methods are atomic — callers manage transaction boundaries.
     """
 
     def __init__(self, db: AsyncSession) -> None:
-        """Initialize repository with database session."""
         self.db = db
 
     # ==================== SESSION OPERATIONS ====================
@@ -44,18 +44,7 @@ class CandidateChatRepository:
         title: Optional[str] = None,
         context_data: Optional[dict] = None,
     ) -> CandidateChatSession:
-        """
-        Create a new candidate chat session.
-
-        Args:
-            candidate_id: Candidate UUID
-            session_type: Type of session
-            title: Optional session title
-            context_data: Optional context data
-
-        Returns:
-            Created CandidateChatSession
-        """
+        """Create a new candidate chat session."""
         session = CandidateChatSession(
             candidate_id=candidate_id,
             session_type=session_type,
@@ -68,7 +57,10 @@ class CandidateChatRepository:
         await self.db.commit()
         await self.db.refresh(session)
 
-        logger.info(f"Created candidate chat session: {session.id} for candidate: {candidate_id}")
+        logger.info(
+            f"Created candidate chat session: {session.id}",
+            extra={"session_id": str(session.id), "candidate_id": str(candidate_id)},
+        )
         return session
 
     async def get_session_by_id(
@@ -94,12 +86,7 @@ class CandidateChatRepository:
         offset: int = 0,
         active_only: bool = True,
     ) -> tuple[List[CandidateChatSession], int]:
-        """
-        Get chat sessions for a candidate (for history).
-
-        Returns:
-            Tuple of (sessions list, total count)
-        """
+        """Get chat sessions for a candidate (for history sidebar)."""
         base_query = select(CandidateChatSession).where(
             CandidateChatSession.candidate_id == candidate_id
         )
@@ -131,15 +118,15 @@ class CandidateChatRepository:
         candidate_id: UUID,
     ) -> Optional[CandidateChatSession]:
         """
-        Get the most recent active resume creation session for a candidate.
-        Used for "resume from where you left off" feature.
+        Get the most recent active resume creation session.
+        Used for idempotency check and "resume from where you left off".
         """
         query = (
             select(CandidateChatSession)
             .where(
                 and_(
                     CandidateChatSession.candidate_id == candidate_id,
-                    CandidateChatSession.session_type == "resume_creation",
+                    CandidateChatSession.session_type.in_(["resume_creation", "resume_upload"]),
                     CandidateChatSession.session_status == CandidateSessionStatus.ACTIVE,
                     CandidateChatSession.is_active == True,
                 )
@@ -204,7 +191,7 @@ class CandidateChatRepository:
         message_type: str = "text",
         message_data: Optional[dict] = None,
     ) -> CandidateChatMessage:
-        """Add a message to a candidate chat session."""
+        """Add a single message to a chat session."""
         message = CandidateChatMessage(
             session_id=session_id,
             role=role,
@@ -232,7 +219,7 @@ class CandidateChatRepository:
         session_id: UUID,
         messages: List[dict],
     ) -> List[CandidateChatMessage]:
-        """Add multiple messages to a session at once."""
+        """Add multiple messages to a session atomically."""
         created_messages = []
 
         for msg_data in messages:

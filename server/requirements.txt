@@ -33,6 +33,9 @@ structlog
 python-jose[cryptography]
 passlib[bcrypt]
 
+# PDF PARSING (Resume Extraction)
+PyMuPDF
+
 # UTILITIES
 python-dateutil
 

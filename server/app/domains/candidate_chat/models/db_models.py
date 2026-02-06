@@ -1,5 +1,5 @@
 """
-Candidate Chat Domain Models for Aiviue Platform.
+Candidate Chat Domain DB Models for Aiviue Platform.
 
 SQLAlchemy models for candidate chat sessions and messages.
 Separate from employer chat to maintain clean domain boundaries.
@@ -68,6 +68,23 @@ class CandidateSessionStatus:
     ABANDONED = "abandoned"
 
 
+class ChatStep:
+    """
+    Constants for conversation step tracking.
+
+    These define the flow stages in the resume builder conversation.
+    Used by CandidateChatService for dictionary dispatch routing.
+    """
+    WELCOME = "welcome"
+    CHOOSE_METHOD = "choose_method"
+    UPLOAD_RESUME = "upload_resume"
+    EXTRACTION_PROCESSING = "extraction_processing"
+    MISSING_FIELDS = "missing_fields"
+    ASKING_QUESTIONS = "asking_questions"
+    RESUME_PREVIEW = "resume_preview"
+    COMPLETED = "completed"
+
+
 # ==================== MODELS ====================
 
 class CandidateChatSession(Base):
@@ -76,17 +93,6 @@ class CandidateChatSession(Base):
 
     Represents a conversation session between a candidate and AIVI bot
     for resume creation or general queries.
-
-    Attributes:
-        id: Unique session identifier
-        candidate_id: Reference to the candidate
-        title: Auto-generated title
-        session_type: Type of session (resume_creation, resume_upload, general)
-        session_status: Current status (active, completed, abandoned)
-        context_data: JSON data for session context (collected_data, current_step, etc.)
-        resume_id: FK to created resume (if resume creation completed)
-        is_active: Soft delete flag
-        messages: List of messages in this session
     """
 
     __tablename__ = "candidate_chat_sessions"
@@ -185,15 +191,27 @@ class CandidateChatSession(Base):
 
     @property
     def message_count(self) -> int:
-        """Get number of messages in session."""
         return len(self.messages) if self.messages else 0
 
     @property
     def last_message_at(self) -> datetime | None:
-        """Get timestamp of last message."""
         if self.messages:
             return self.messages[-1].created_at
         return self.created_at
+
+    @property
+    def current_step(self) -> str:
+        """Get current conversation step from context_data."""
+        if self.context_data:
+            return self.context_data.get("step", ChatStep.WELCOME)
+        return ChatStep.WELCOME
+
+    @property
+    def collected_data(self) -> dict:
+        """Get collected data from context_data."""
+        if self.context_data:
+            return self.context_data.get("collected_data", {})
+        return {}
 
 
 class CandidateChatMessage(Base):
@@ -201,14 +219,6 @@ class CandidateChatMessage(Base):
     Candidate Chat Message model.
 
     Represents a single message in a candidate chat session.
-
-    Attributes:
-        id: Unique message identifier
-        session_id: Reference to the chat session
-        role: Who sent the message (bot or user)
-        content: Text content
-        message_type: Type for UI rendering
-        message_data: Additional data (options, validation, etc.)
     """
 
     __tablename__ = "candidate_chat_messages"

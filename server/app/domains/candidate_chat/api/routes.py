@@ -9,7 +9,7 @@ Endpoints:
 - GET   /api/v1/candidate-chat/sessions?candidate_id=...    List sessions (history)
 - GET   /api/v1/candidate-chat/sessions/{id}                 Get session with messages
 - GET   /api/v1/candidate-chat/sessions/{id}/messages        Get messages for session
-- POST  /api/v1/candidate-chat/sessions/{id}/messages        Send message
+- POST  /api/v1/candidate-chat/sessions/{id}/messages        Send message (with bot response)
 - DELETE /api/v1/candidate-chat/sessions/{id}                Delete session (soft)
 - GET   /api/v1/candidate-chat/sessions/active/{candidate_id}  Get active resume session
 """
@@ -21,8 +21,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import API_V1_PREFIX
-from app.domains.candidate_chat.repository import CandidateChatRepository
-from app.domains.candidate_chat.schemas import (
+from app.domains.candidate_chat.models.schemas import (
     CandidateChatMessageResponse,
     CandidateChatSessionCreate,
     CandidateChatSessionListResponse,
@@ -30,6 +29,11 @@ from app.domains.candidate_chat.schemas import (
     CandidateChatSessionWithMessagesResponse,
     CandidateSendMessageRequest,
     CandidateSendMessageResponse,
+)
+from app.domains.candidate_chat.repository.chat_repository import CandidateChatRepository
+from app.domains.candidate_chat.services.chat_service import (
+    CandidateChatService,
+    get_candidate_chat_service,
 )
 from app.shared.database import get_db
 from app.shared.exceptions import NotFoundError
@@ -52,10 +56,17 @@ router = APIRouter(
 
 # ==================== DEPENDENCIES ====================
 
+async def get_service(
+    session: AsyncSession = Depends(get_db),
+) -> CandidateChatService:
+    """Dependency to get CandidateChatService."""
+    return get_candidate_chat_service(session)
+
+
 async def get_repository(
     session: AsyncSession = Depends(get_db),
 ) -> CandidateChatRepository:
-    """Dependency to get CandidateChatRepository."""
+    """Dependency to get CandidateChatRepository (for read-only ops)."""
     return CandidateChatRepository(session)
 
 
@@ -63,29 +74,30 @@ async def get_repository(
 
 @router.post(
     "/sessions",
-    response_model=CandidateChatSessionResponse,
+    response_model=CandidateChatSessionWithMessagesResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create new chat session",
     description="""
     Create a new chat session for a candidate.
     
+    **Idempotent**: If an active resume session already exists, returns it
+    instead of creating a duplicate (resume-from-where-you-left-off).
+    
     Session types:
     - `resume_creation`: Interactive resume building with AIVI bot
     - `resume_upload`: Resume PDF upload and extraction
-    - `general`: General queries
     """,
 )
 async def create_session(
     request: CandidateChatSessionCreate,
-    repo: CandidateChatRepository = Depends(get_repository),
-) -> CandidateChatSessionResponse:
-    """Create a new candidate chat session."""
-    session = await repo.create_session(
+    service: CandidateChatService = Depends(get_service),
+) -> CandidateChatSessionWithMessagesResponse:
+    """Create a new candidate chat session with welcome messages."""
+    session, welcome_msgs = await service.create_session(
         candidate_id=request.candidate_id,
         session_type=request.session_type,
-        title=request.title,
     )
-    return CandidateChatSessionResponse.model_validate(session)
+    return CandidateChatSessionWithMessagesResponse.model_validate(session)
 
 
 @router.get(
@@ -94,7 +106,6 @@ async def create_session(
     summary="List chat sessions (history)",
     description="""
     Get chat session history for a candidate.
-    
     Returns paginated list of sessions ordered by most recent.
     Supports the history sidebar (similar to employer module).
     """,
@@ -137,7 +148,7 @@ async def get_active_resume_session(
     candidate_id: UUID,
     repo: CandidateChatRepository = Depends(get_repository),
 ) -> CandidateChatSessionWithMessagesResponse:
-    """Get active resume creation session for resume-from-where-left-off."""
+    """Get active resume creation session."""
     session = await repo.get_active_resume_session(candidate_id)
     if not session:
         raise NotFoundError(
@@ -151,7 +162,6 @@ async def get_active_resume_session(
     "/sessions/{session_id}",
     response_model=CandidateChatSessionWithMessagesResponse,
     summary="Get session with messages",
-    description="Get a specific chat session with all its messages.",
 )
 async def get_session(
     session_id: UUID,
@@ -184,47 +194,38 @@ async def get_messages(
 
 @router.post(
     "/sessions/{session_id}/messages",
-    response_model=CandidateChatMessageResponse,
+    response_model=CandidateSendMessageResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Send message",
+    summary="Send message (with bot response)",
     description="""
     Send a message in a candidate chat session.
     
-    Note: In Phase 1, this only stores the user message.
-    Bot response logic will be implemented in Phase 2 (service layer).
+    The service processes the message based on the current conversation step
+    and returns bot response(s) using dictionary dispatch routing.
+    
+    For button clicks, include `button_id` in `message_data`.
+    For question answers, include `question_key` and `value` in `message_data`.
+    For file uploads, include `file_url` in `message_data`.
     """,
 )
 async def send_message(
     session_id: UUID,
     request: CandidateSendMessageRequest,
-    repo: CandidateChatRepository = Depends(get_repository),
-) -> CandidateChatMessageResponse:
-    """Send a message in a chat session."""
-    # Verify session exists
-    session = await repo.get_session_by_id(session_id, include_messages=False)
-    if not session:
-        raise NotFoundError(
-            message="Chat session not found",
-            error_code="SESSION_NOT_FOUND",
-        )
-
-    # Store user message
-    message = await repo.add_message(
+    service: CandidateChatService = Depends(get_service),
+) -> CandidateSendMessageResponse:
+    """Send a message and get bot response."""
+    return await service.send_message(
         session_id=session_id,
-        role="user",
         content=request.content,
         message_type=request.message_type,
         message_data=request.message_data,
     )
-
-    return CandidateChatMessageResponse.model_validate(message)
 
 
 @router.delete(
     "/sessions/{session_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete chat session",
-    description="Soft delete a chat session.",
 )
 async def delete_session(
     session_id: UUID,

@@ -179,59 +179,120 @@ Return ONLY the JSON object."""
 
 
 # ==============================================================================
-# RESUME PARSING (Future)
+# RESUME PARSING - Role-Aware Extraction
 # ==============================================================================
 
-RESUME_PARSE_SYSTEM_PROMPT = """You are an expert resume parser. Extract structured information from resumes accurately."""
+RESUME_PARSE_SYSTEM_PROMPT = """You are an expert resume parser for the AIVIUE hiring platform. Your task is to extract structured information from resumes accurately and map it to specific question keys used by the platform.
+
+## Guidelines
+
+1. **Be precise**: Only extract information explicitly stated. Do not infer or assume.
+2. **Handle ambiguity**: If information is unclear or missing, use null.
+3. **Map to question keys**: The output MUST use the exact question_key names provided.
+4. **Normalize data**:
+   - Dates should be in YYYY-MM-DD format
+   - Salary should be monthly in INR (convert if yearly/hourly)
+   - Experience in years (decimal allowed, e.g., 1.5)
+   - Skills as list of strings
+   - Boolean fields as true/false
+
+## Output Format
+
+Return ONLY valid JSON matching the exact schema. No markdown, no explanation."""
 
 
-def build_resume_parse_prompt(resume_text: str) -> str:
+def build_resume_parse_prompt(
+    resume_text: str,
+    target_question_keys: Optional[list[str]] = None,
+    role_name: Optional[str] = None,
+    job_type: Optional[str] = None,
+) -> str:
     """
-    Build prompt for resume parsing (future use).
-    
+    Build role-aware prompt for resume parsing.
+
+    Extracts data aligned to the platform's question_keys so the output
+    can be directly compared with question templates to identify missing fields.
+
     Args:
-        resume_text: Raw resume text
-        
+        resume_text: Raw resume text extracted from PDF
+        target_question_keys: Specific question_keys to extract for (from role templates)
+        role_name: Target job role name (e.g., "Delivery Boy", "Software Developer")
+        job_type: "blue_collar" or "white_collar"
+
     Returns:
         Formatted prompt string
     """
-    return f"""Parse this resume into structured fields.
+    # Build role context
+    role_context = ""
+    if role_name:
+        role_context = f"\n- **Target Role**: {role_name}"
+    if job_type:
+        type_label = "Blue Collar" if job_type == "blue_collar" else "White Collar"
+        role_context += f"\n- **Job Type**: {type_label}"
 
-## Resume
+    # Build target keys section
+    target_keys_section = ""
+    if target_question_keys:
+        keys_list = ", ".join(f'"{k}"' for k in target_question_keys)
+        target_keys_section = f"""
+## Target Question Keys (IMPORTANT)
+You MUST try to extract values for these specific keys:
+[{keys_list}]
+
+Map resume information to these exact keys. Use null if not found in the resume."""
+
+    return f"""Parse this resume and extract structured data aligned to the platform's question keys.
+{role_context}
+
+## Resume Text
 ```
 {resume_text}
 ```
+{target_keys_section}
 
 ## Required Output Schema (JSON)
+
+Return a JSON object with two top-level keys:
+
 {{
-    "name": "string",
-    "email": "string or null",
-    "phone": "string or null",
-    "location": "string or null",
-    "summary": "string or null - professional summary",
-    "total_experience_years": "number or null",
-    "skills": ["list of skills"],
-    "experience": [
-        {{
-            "title": "job title",
-            "company": "company name",
-            "start_date": "YYYY-MM or null",
-            "end_date": "YYYY-MM or 'Present' or null",
-            "description": "brief description"
-        }}
-    ],
-    "education": [
-        {{
-            "degree": "degree name",
-            "field": "field of study",
-            "institution": "school name",
-            "year": "graduation year or null"
-        }}
-    ],
-    "certifications": ["list of certifications"]
+    "extracted_data": {{
+        "full_name": "string or null - candidate's full name",
+        "date_of_birth": "string (YYYY-MM-DD) or null - date of birth",
+        "email": "string or null - email address",
+        "phone": "string or null - phone number",
+        "preferred_location": "string or null - preferred work location or current city",
+        "languages_known": ["list of languages"] or null,
+        "education": "string or null - highest education (e.g., 'Bachelor\\'s Degree', 'High School')",
+        "skills": ["list of technical/professional skills"] or null,
+        "experience_years": "number or null - total years of experience (decimal ok, e.g., 2.5)",
+        "experience_details": "string or null - brief description of most recent role",
+        "salary_expectation": "number or null - expected monthly salary in INR",
+        "has_driving_license": "boolean or null - true if resume mentions driving license",
+        "owns_vehicle": "boolean or null - true if resume mentions vehicle ownership",
+        "vehicle_type": "string or null - type of vehicle if mentioned",
+        "portfolio_url": "string or null - portfolio, GitHub, LinkedIn, or personal website URL",
+        "about": "string or null - professional summary or objective from the resume",
+        "preferred_work_type": "string or null - Remote/Onsite/Hybrid if mentioned",
+        "preferred_shift": "string or null - Day Shift/Night Shift/Flexible if mentioned",
+        "computer_skills": "boolean or null - true if mentions basic computer skills",
+        "physical_fitness": "boolean or null - true if mentions physical fitness"
+    }},
+    "extraction_confidence": "number 0-1 - overall confidence in the extraction",
+    "extracted_keys": ["list of question_keys that were successfully extracted (non-null)"],
+    "resume_quality": "string - one of: 'detailed', 'moderate', 'minimal' - how much info the resume contains"
 }}
 
-Return ONLY the JSON object."""
+## Extraction Rules
+
+1. For **experience_years**: Calculate total from work history if not explicitly stated
+2. For **salary_expectation**: Convert to monthly INR. If yearly, divide by 12. If in USD, convert approximately (1 USD ≈ 83 INR)
+3. For **skills**: Include both technical and soft skills mentioned
+4. For **education**: Use the highest degree mentioned
+5. For **languages_known**: Include all languages mentioned, even in "Languages" section
+6. For **about**: Use the professional summary/objective section if present
+7. Only include keys in "extracted_keys" if the value is non-null and meaningful
+
+Return ONLY the JSON object, no markdown code blocks."""
 
 
 # ==============================================================================
