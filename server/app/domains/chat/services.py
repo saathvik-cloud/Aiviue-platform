@@ -659,24 +659,28 @@ class ChatService:
         if value == "other" or (message_data and message_data.get("action") == "show_input"):
             return self._get_other_input_prompt(current_step)
         
-        # Store the current value and get next step
-        field_mapping = {
-            "job_title": ("title", "job_requirements"),
-            "job_requirements": ("requirements", "job_country"),
-            "job_country": ("country", "job_state"),
-            "job_state": ("state", "job_city"),
-            "job_city": ("city", "job_work_type"),
-            "job_work_type": ("work_type", "job_currency"),
-            "job_currency": ("currency", "job_salary"),
-            "job_salary": ("salary_range", "job_experience"),
-            "job_experience": ("experience_range", "job_shift"),
-            "job_shift": ("shift_preference", "job_openings"),
-            "job_openings": ("openings_count", "generating"),
+        # Map current step to field name (no hardcoded next_step!)
+        step_to_field = {
+            "job_title": "title",
+            "job_requirements": "requirements",
+            "job_country": "country",
+            "job_state": "state",
+            "job_city": "city",
+            "job_work_type": "work_type",
+            "job_currency": "currency",
+            "job_salary": "salary_range",
+            "job_experience": "experience_range",
+            "job_shift": "shift_preference",
+            "job_openings": "openings_count",
         }
         
-        if current_step in field_mapping:
-            field_name, next_step = field_mapping[current_step]
+        if current_step in step_to_field:
+            # Store the user's answer
+            field_name = step_to_field[current_step]
             collected_data[field_name] = value
+            
+            # DYNAMICALLY find the next missing step (skips already-extracted fields!)
+            next_step = self._get_first_missing_step(collected_data)
             
             # Update session with new data and next step
             await self.repo.update_session(
@@ -687,7 +691,7 @@ class ChatService:
                 },
             )
             
-            # Return the next question
+            # Return the next question (or generate if all complete)
             return self._get_step_question(next_step, collected_data)
         
         # Fallback

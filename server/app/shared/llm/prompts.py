@@ -65,6 +65,28 @@ def build_jd_extraction_prompt(raw_jd: str) -> str:
     "extraction_confidence": "number 0-1 - your confidence in this extraction"
 }}
 
+## Salary Extraction Guidelines (IMPORTANT - Read Carefully!)
+- **ALWAYS preserve the original unit (monthly/yearly/hourly) when converting**
+- **Ask yourself: Is this salary monthly or yearly? Look for context clues like "per month", "p.m.", "per annum", "p.a.", "CTC", "LPA"**
+
+### Common Indian Salary Formats:
+- "18k-20k" or "18,000-20,000" → Usually MONTHLY. Convert: 18000*12=216000, 20000*12=240000
+- "18-20k per month" → MONTHLY. Convert: 18000*12=216000, 20000*12=240000
+- "2.5 LPA - 3 LPA" → YEARLY (LPA = Lakhs Per Annum). Convert: 250000, 300000
+- "25,000-30,000 per month" → MONTHLY. Convert: 300000, 360000
+- "Competitive salary" → null, null
+
+### Common US/International Formats:
+- "$50,000 - $70,000" → Usually YEARLY (annual salary)
+- "$25/hour" → HOURLY. Convert: 25*2080=52000
+- "$5000/month" → MONTHLY. Convert: 5000*12=60000
+
+### Rules:
+1. If "k" is used (like 18k, 20k) without "LPA", assume MONTHLY in India
+2. If "LPA" or "per annum" or "p.a." or "yearly" is mentioned, it's already annual
+3. If no unit specified and number is small (< 100), it's likely in thousands (e.g., "18-20" means 18k-20k)
+4. If salary seems unrealistically low/high after conversion, reconsider the unit
+
 ## Experience Extraction Guidelines
 - Look for phrases like "X years experience", "X+ years", "X-Y years", "minimum X years"
 - For "3+ years" → experience_min: 3, experience_max: null
@@ -72,6 +94,7 @@ def build_jd_extraction_prompt(raw_jd: str) -> str:
 - For "at least 2 years" → experience_min: 2, experience_max: null
 - For "fresher" or "entry level" or "0-1 years" → experience_min: 0, experience_max: 1
 - If no experience mentioned, use null for both
+- Experience is ALWAYS in years (never convert to months)
 
 Return ONLY the JSON object, no markdown code blocks."""
 
