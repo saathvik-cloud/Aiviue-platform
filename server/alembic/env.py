@@ -27,6 +27,7 @@ from app.shared.database.base_model import Base
 # This avoids importing routes/schemas which have additional dependencies
 from app.domains.employer.models import Employer
 from app.domains.job.models import Job, Extraction
+from app.domains.chat.models import ChatSession, ChatMessage
 
 # Candidate module models
 from app.domains.job_master.models import (

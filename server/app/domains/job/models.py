@@ -66,6 +66,22 @@ class Job(Base, FullAuditMixin):
         comment="Idempotency key to prevent duplicate job creation",
     )
     
+    # Master Data Links
+    category_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("job_categories.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Reference to job category",
+    )
+    role_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("job_roles.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Reference to specific job role",
+    )
+    
     # Basic Info
     title: Mapped[str] = mapped_column(
         String(255),
@@ -187,6 +203,14 @@ class Job(Base, FullAuditMixin):
     # Relationships
     employer: Mapped["Employer"] = relationship(
         "Employer",
+        lazy="selectin",
+    )
+    category: Mapped["JobCategory"] = relationship(
+        "JobCategory", 
+        lazy="selectin",
+    )
+    role: Mapped["JobRole"] = relationship(
+        "JobRole",
         lazy="selectin",
     )
     
@@ -367,3 +391,4 @@ class ExtractionStatus:
 
 # Import Employer for relationship (avoid circular import)
 from app.domains.employer.models import Employer
+from app.domains.job_master.models import JobCategory, JobRole

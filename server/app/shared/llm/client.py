@@ -312,6 +312,7 @@ class GeminiClient:
                         "model": self.model,
                         "prompt_tokens": prompt_tokens,
                         "completion_tokens": completion_tokens,
+                        "finish_reason": finish_reason,
                         "attempt": attempt + 1,
                     }
                 )

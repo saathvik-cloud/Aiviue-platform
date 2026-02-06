@@ -6,8 +6,8 @@ class Settings(BaseSettings):
     """
     Application settings loaded from environment variables.
     """
-    
-    # App Settings
+ 
+    # App Settings 
     app_name: str = "aiviue-backend"
     app_env: str = "development"
     debug: bool = True

@@ -13,8 +13,40 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
 
-// Storage bucket name
+// Storage bucket names
 export const LOGO_BUCKET = 'aiviue-logos';
+export const RESUME_BUCKET = 'resumes';
+
+/**
+ * Upload resume PDF to Supabase Storage
+ * @param file - The PDF file
+ * @param sessionId - The chat session ID
+ * @returns The public URL of the uploaded file
+ */
+export async function uploadResume(file: File, sessionId: string): Promise<string> {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${sessionId}-${Date.now()}.${fileExt}`;
+  // Simple path for resumes
+  const filePath = fileName;
+
+  const { error: uploadError } = await supabase.storage
+    .from(RESUME_BUCKET)
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: true,
+    });
+
+  if (uploadError) {
+    console.error('Upload error:', uploadError);
+    throw new Error(`Failed to upload resume: ${uploadError.message}`);
+  }
+
+  const { data: { publicUrl } } = supabase.storage
+    .from(RESUME_BUCKET)
+    .getPublicUrl(filePath);
+
+  return publicUrl;
+}
 
 /**
  * Upload company logo to Supabase Storage

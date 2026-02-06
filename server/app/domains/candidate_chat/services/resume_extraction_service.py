@@ -211,6 +211,9 @@ class PDFTextExtractor:
         doc.close()
 
         full_text = "\n\n".join(text_parts)
+        
+        # Sanitize text to prevent interference with LLM prompt structure
+        full_text = full_text.replace("```", "''")
 
         if not full_text.strip():
             raise ValueError(

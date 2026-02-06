@@ -171,6 +171,12 @@ class JobRepository:
         
         if filters.state:
             conditions.append(Job.state.ilike(f"%{filters.state}%"))
+
+        if filters.category_id:
+            conditions.append(Job.category_id == filters.category_id)
+            
+        if filters.role_id:
+            conditions.append(Job.role_id == filters.role_id)
         
         if filters.search:
             search_term = f"%{filters.search}%"

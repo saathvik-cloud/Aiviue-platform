@@ -329,6 +329,8 @@ class JobService:
             experience_max=extracted_data.experience_max,
             shift_preferences=extracted_data.shift_preferences,
             openings_count=extracted_data.openings_count or 1,
+            category_id=extracted_data.category_id,
+            role_id=extracted_data.role_id,
             idempotency_key=idempotency_key,
         )
         
@@ -648,6 +650,8 @@ class JobService:
             "experience_max": request.experience_max,
             "shift_preferences": request.shift_preferences,
             "openings_count": request.openings_count,
+            "category_id": request.category_id,
+            "role_id": request.role_id,
             "idempotency_key": request.idempotency_key,
             "status": JobStatus.DRAFT,
         }
@@ -686,6 +690,10 @@ class JobService:
             data["shift_preferences"] = request.shift_preferences
         if request.openings_count is not None:
             data["openings_count"] = request.openings_count
+        if request.category_id is not None:
+            data["category_id"] = request.category_id
+        if request.role_id is not None:
+            data["role_id"] = request.role_id
         
         return data
     
@@ -711,6 +719,8 @@ class JobService:
             experience_range=job.experience_range,
             shift_preferences=job.shift_preferences,
             openings_count=job.openings_count,
+            category_id=job.category_id,
+            role_id=job.role_id,
             status=job.status,
             is_published=job.is_published,
             is_draft=job.is_draft,
