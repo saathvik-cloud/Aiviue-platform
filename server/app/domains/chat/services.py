@@ -470,7 +470,9 @@ class ChatService:
                 extracted_data.get("experience_min"),
                 extracted_data.get("experience_max")
             ),
-            "shift_preference": extracted_data.get("shift_preferences"),
+            "shift_preference": self._format_shift_preference(
+                extracted_data.get("shift_preferences")
+            ),
             "openings_count": str(extracted_data.get("openings_count", "1")),
         }
         
@@ -552,6 +554,54 @@ class ChatService:
         elif min_val is not None:
             return f"{min_val}-0"
         return None
+    
+    def _format_shift_preference(self, shift_data: any) -> Optional[str]:
+        """
+        Convert shift_preferences (object or string) to a simple string.
+        
+        LLM may return:
+        - {'shifts': ['day', 'night'], 'hours': '9-5'}
+        - {'hours': '8-10 hours per day'}
+        - 'day shift'
+        - None
+        
+        We need to convert to a simple string like 'day', 'night', 'flexible', etc.
+        """
+        if shift_data is None:
+            return None
+        
+        # Already a string - return as is
+        if isinstance(shift_data, str):
+            return shift_data
+        
+        # It's a dict - extract meaningful info
+        if isinstance(shift_data, dict):
+            parts = []
+            
+            # Check for 'shifts' array
+            shifts = shift_data.get("shifts")
+            if shifts and isinstance(shifts, list):
+                parts.extend(shifts)
+            
+            # Check for 'hours'
+            hours = shift_data.get("hours")
+            if hours:
+                parts.append(str(hours))
+            
+            # Check for 'shift' (singular)
+            shift = shift_data.get("shift")
+            if shift:
+                parts.append(str(shift))
+            
+            # If we got something, join it
+            if parts:
+                return ", ".join(parts)
+            
+            # Fallback: convert entire dict to string
+            return str(shift_data)
+        
+        # Fallback for any other type
+        return str(shift_data) if shift_data else None
     
     def _get_first_missing_step(self, collected_data: dict) -> str:
         """
