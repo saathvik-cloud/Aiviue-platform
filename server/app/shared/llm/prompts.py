@@ -87,14 +87,41 @@ def build_jd_extraction_prompt(raw_jd: str) -> str:
 3. If no unit specified and number is small (< 100), it's likely in thousands (e.g., "18-20" means 18k-20k)
 4. If salary seems unrealistically low/high after conversion, reconsider the unit
 
-## Experience Extraction Guidelines
+## Experience Extraction Guidelines (IMPORTANT!)
+- **ALWAYS return experience in YEARS (decimal allowed)**
 - Look for phrases like "X years experience", "X+ years", "X-Y years", "minimum X years"
-- For "3+ years" → experience_min: 3, experience_max: null
-- For "3-5 years" → experience_min: 3, experience_max: 5
-- For "at least 2 years" → experience_min: 2, experience_max: null
-- For "fresher" or "entry level" or "0-1 years" → experience_min: 0, experience_max: 1
-- If no experience mentioned, use null for both
-- Experience is ALWAYS in years (never convert to months)
+
+### Experience Format Examples:
+- "3+ years" → experience_min: 3, experience_max: null
+- "3-5 years" → experience_min: 3, experience_max: 5
+- "at least 2 years" → experience_min: 2, experience_max: null
+- "fresher" or "entry level" → experience_min: 0, experience_max: 1
+- "0-5 years" → experience_min: 0, experience_max: 5
+
+### Experience in MONTHS (Convert to Years!):
+- "6 months" → experience_min: 0.5, experience_max: null
+- "6-12 months" → experience_min: 0.5, experience_max: 1
+- "18 months" → experience_min: 1.5, experience_max: null
+- "1-2 years or 12-24 months" → experience_min: 1, experience_max: 2
+
+### Rules:
+1. Convert months to years: months ÷ 12 (e.g., 6 months = 0.5 years)
+2. If no experience mentioned, use null for both
+3. For freshers/entry-level with no specific range, use 0-1
+
+## Shift Preferences Guidelines
+- Extract shift information as an object with any available details
+- Look for: timing, hours, shift type, flexibility
+
+### Shift Format Examples:
+- "Day shift" → {{"shift": "day"}}
+- "Night shift 10PM-6AM" → {{"shift": "night", "hours": "10PM-6AM"}}
+- "8-10 hours per day" → {{"hours": "8-10 hours per day"}}
+- "9 AM to 5 PM" or "9-5" → {{"hours": "9AM-5PM"}}
+- "Rotational shifts" → {{"shift": "rotational"}}
+- "Flexible timing" → {{"shift": "flexible"}}
+- "Morning/Evening shifts" → {{"shifts": ["morning", "evening"]}}
+- If no shift info mentioned → null
 
 Return ONLY the JSON object, no markdown code blocks."""
 

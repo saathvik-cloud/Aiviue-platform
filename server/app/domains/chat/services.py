@@ -476,8 +476,12 @@ class ChatService:
             "openings_count": str(extracted_data.get("openings_count", "1")),
         }
         
-        # Remove None values
+        # Remove None values first
         collected_data = {k: v for k, v in collected_data.items() if v is not None and v != ""}
+        
+        # Normalize all extracted data to ensure proper string formats
+        # This is ONLY for extraction flow - manual flow bypasses this
+        collected_data = self._normalize_extracted_data(collected_data)
         
         # Find the first missing required field
         first_missing_step = self._get_first_missing_step(collected_data)
@@ -603,6 +607,112 @@ class ChatService:
         # Fallback for any other type
         return str(shift_data) if shift_data else None
     
+    def _normalize_extracted_data(self, collected_data: dict) -> dict:
+        """
+        Normalize and validate all extracted data to ensure proper string formats.
+        
+        This is ONLY called for extraction flow, NOT for manual flow.
+        Manual flow values come from buttons and are already in correct format.
+        
+        Ensures:
+        - All values are strings (not dicts, lists, or other types)
+        - Empty/None values are handled properly
+        - Numbers are converted to strings where needed
+        """
+        normalized = {}
+        
+        for key, value in collected_data.items():
+            if value is None:
+                continue
+            
+            # Handle each field type
+            if key == "title":
+                normalized[key] = self._safe_string(value)
+            
+            elif key == "requirements":
+                normalized[key] = self._safe_string(value)
+            
+            elif key in ("country", "state", "city"):
+                normalized[key] = self._safe_string(value)
+            
+            elif key == "work_type":
+                # Ensure it's one of: remote, hybrid, onsite
+                val = self._safe_string(value).lower()
+                if val in ("remote", "hybrid", "onsite"):
+                    normalized[key] = val
+                else:
+                    # Try to infer from text
+                    if "remote" in val:
+                        normalized[key] = "remote"
+                    elif "hybrid" in val:
+                        normalized[key] = "hybrid"
+                    elif "onsite" in val or "office" in val or "on-site" in val:
+                        normalized[key] = "onsite"
+                    else:
+                        normalized[key] = val  # Keep as-is
+            
+            elif key == "currency":
+                normalized[key] = self._safe_string(value).upper()
+            
+            elif key == "salary_range":
+                # Should already be formatted as "min-max" string
+                normalized[key] = self._safe_string(value)
+            
+            elif key == "experience_range":
+                # Should already be formatted as "min-max" string
+                normalized[key] = self._safe_string(value)
+            
+            elif key == "shift_preference":
+                # Should already be converted to string by _format_shift_preference
+                normalized[key] = self._safe_string(value)
+            
+            elif key == "openings_count":
+                # Ensure it's a string number
+                normalized[key] = self._safe_string(value, default="1")
+            
+            else:
+                # Unknown field - convert to string
+                normalized[key] = self._safe_string(value)
+        
+        return normalized
+    
+    def _safe_string(self, value: any, default: str = "") -> Optional[str]:
+        """
+        Safely convert any value to a string.
+        
+        Handles:
+        - None → returns None (or default if provided)
+        - str → returns as-is (stripped)
+        - dict → converts to readable string
+        - list → joins with comma
+        - number → converts to string
+        """
+        if value is None:
+            return default if default else None
+        
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped if stripped else (default if default else None)
+        
+        if isinstance(value, dict):
+            # Try to extract meaningful info from dict
+            if not value:
+                return default if default else None
+            # Convert dict to readable format
+            parts = []
+            for k, v in value.items():
+                if v:
+                    parts.append(str(v))
+            return ", ".join(parts) if parts else (default if default else None)
+        
+        if isinstance(value, list):
+            # Join list items
+            str_items = [str(item) for item in value if item]
+            return ", ".join(str_items) if str_items else (default if default else None)
+        
+        # Numbers, booleans, etc.
+        return str(value)
+    
     def _get_first_missing_step(self, collected_data: dict) -> str:
         """
         Determine the first step with missing required data.
@@ -725,9 +835,12 @@ class ChatService:
         }
         
         if current_step in step_to_field:
-            # Store the user's answer
+            # Store the user's answer (ensure it's a string for safety)
             field_name = step_to_field[current_step]
-            collected_data[field_name] = value
+            # Safety: Convert value to string (manual flow values should already be strings)
+            safe_value = self._safe_string(value) if value else None
+            if safe_value:
+                collected_data[field_name] = safe_value
             
             # DYNAMICALLY find the next missing step (skips already-extracted fields!)
             next_step = self._get_first_missing_step(collected_data)
