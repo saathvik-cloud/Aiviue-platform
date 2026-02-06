@@ -28,6 +28,13 @@ from app.shared.database.base_model import Base
 from app.domains.employer.models import Employer
 from app.domains.job.models import Job, Extraction
 
+# Candidate module models
+from app.domains.job_master.models import (
+    JobCategory, JobRole, RoleQuestionTemplate, job_category_role_association
+)
+from app.domains.candidate.models import Candidate, CandidateResume
+from app.domains.candidate_chat.models import CandidateChatSession, CandidateChatMessage
+
 
 # Alembic Config object
 config = context.config
