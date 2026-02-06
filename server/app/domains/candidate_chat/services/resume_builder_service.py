@@ -177,7 +177,7 @@ class ResumeBuilderService:
             "source": source,
             "status": ResumeStatus.COMPLETED,
             "version_number": new_version,
-            "chat_session_id": str(chat_session_id) if chat_session_id else None,
+            "chat_session_id": chat_session_id,  # UUID or None (no str conversion needed)
         })
 
         # Step 5: Commit the transaction

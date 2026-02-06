@@ -39,6 +39,7 @@ from app.domains.candidate_chat.services.chat_service import (
 )
 from app.domains.candidate_chat.services.question_engine import QuestionEngine
 from app.domains.candidate_chat.api.routes import router as candidate_chat_router
+from app.domains.candidate_chat.api.websocket import ws_router as candidate_chat_ws_router
 
 __all__ = [
     # Models
@@ -62,6 +63,7 @@ __all__ = [
     "CandidateChatService",
     "get_candidate_chat_service",
     "QuestionEngine",
-    # Router
+    # Routers
     "candidate_chat_router",
+    "candidate_chat_ws_router",
 ]

@@ -635,7 +635,7 @@ class CandidateChatService:
 
         if not is_valid:
             # Re-ask the same question with error
-            template = engine._get_template_by_key(question_key)
+            template = engine.get_template_by_key(question_key)
             if template:
                 msg = engine.build_question_message(template)
                 error_prefix = {

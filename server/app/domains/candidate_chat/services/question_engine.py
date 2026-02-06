@@ -388,9 +388,12 @@ class QuestionEngine:
         actual_value = self._collected_data[depends_on]
         return actual_value == expected_value
 
-    def _get_template_by_key(self, question_key: str) -> Optional[RoleQuestionTemplate]:
+    def get_template_by_key(self, question_key: str) -> Optional[RoleQuestionTemplate]:
         """Find a template by its question_key."""
         for template in self._templates:
             if template.question_key == question_key:
                 return template
         return None
+
+    # Backward compatibility alias
+    _get_template_by_key = get_template_by_key

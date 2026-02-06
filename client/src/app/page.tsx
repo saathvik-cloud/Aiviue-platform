@@ -1,6 +1,6 @@
-import Link from 'next/link';
-import Image from 'next/image';
 import { ROUTES } from '@/constants';
+import Image from 'next/image';
+import Link from 'next/link';
 
 /**
  * Home Page - Landing page with glassmorphism design
@@ -41,8 +41,19 @@ export default function HomePage() {
               />
             </Link>
 
-            {/* Auth Buttons */}
+            {/* Nav Buttons */}
             <div className="flex items-center gap-2 sm:gap-3">
+              <Link
+                href={ROUTES.CANDIDATE_HOME}
+                className="px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-medium rounded-xl transition-all border"
+                style={{ 
+                  color: 'var(--secondary-teal)',
+                  borderColor: 'rgba(20, 184, 166, 0.3)',
+                  background: 'rgba(20, 184, 166, 0.05)',
+                }}
+              >
+                <span className="hidden sm:inline">For </span>Candidates
+              </Link>
               <Link
                 href={ROUTES.LOGIN}
                 className="btn-glass px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-medium rounded-xl transition-all"
