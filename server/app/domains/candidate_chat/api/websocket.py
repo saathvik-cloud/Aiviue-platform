@@ -92,6 +92,8 @@ class ConnectionManager:
     def __init__(self) -> None:
         # session_id → WebSocket mapping
         self._active_connections: Dict[str, WebSocket] = {}
+        # session_id → candidate_id (for cleanup on send failure)
+        self._session_to_candidate: Dict[str, str] = {}
         # candidate_id → set of session_ids (for multi-session tracking)
         self._candidate_sessions: Dict[str, Set[str]] = {}
 
@@ -104,8 +106,9 @@ class ConnectionManager:
         """Accept and register a WebSocket connection."""
         await websocket.accept()
 
-        # Track connection
+        # Track connection and session → candidate for cleanup
         self._active_connections[session_id] = websocket
+        self._session_to_candidate[session_id] = candidate_id
 
         # Track candidate's sessions
         if candidate_id not in self._candidate_sessions:
@@ -124,6 +127,7 @@ class ConnectionManager:
     def disconnect(self, session_id: str, candidate_id: str) -> None:
         """Remove a WebSocket connection."""
         self._active_connections.pop(session_id, None)
+        self._session_to_candidate.pop(session_id, None)
 
         if candidate_id in self._candidate_sessions:
             self._candidate_sessions[candidate_id].discard(session_id)
@@ -143,17 +147,30 @@ class ConnectionManager:
         """
         Send JSON data to a specific session's WebSocket.
 
-        Returns True if sent successfully, False if connection not found.
+        Returns True if sent successfully, False if connection not found or closed.
+        On closed-connection errors, removes the connection so we don't send again.
         """
         ws = self._active_connections.get(session_id)
-        if ws:
-            try:
-                await ws.send_json(data)
-                return True
-            except Exception as e:
+        if not ws:
+            return False
+        try:
+            await ws.send_json(data)
+            return True
+        except Exception as e:
+            # Client may have closed or refreshed; avoid sending again and clean up
+            err_msg = str(e).lower()
+            if "close" in err_msg or "not connected" in err_msg or "accept" in err_msg:
+                # Only remove if this is still the same connection (not replaced by reconnect)
+                if self._active_connections.get(session_id) is ws:
+                    candidate_id = self._session_to_candidate.get(session_id, "")
+                    self.disconnect(session_id, candidate_id)
+                logger.debug(
+                    f"Send failed (connection closed): {session_id}",
+                    extra={"session_id": session_id, "error": str(e)},
+                )
+            else:
                 logger.warning(f"Failed to send to {session_id}: {e}")
-                return False
-        return False
+            return False
 
     async def send_bot_message(
         self,
@@ -254,7 +271,7 @@ async def websocket_chat(
     # Accept connection
     await manager.connect(websocket, session_id, candidate_id)
 
-    # Send connection acknowledgment
+    # Send connection acknowledgment (client may already have closed, e.g. refresh)
     await manager.send_json(session_id, {
         "type": "connected",
         "session_id": session_id,
