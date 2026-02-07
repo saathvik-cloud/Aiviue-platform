@@ -243,6 +243,21 @@ class CandidateRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def list_resumes(
+        self,
+        candidate_id: UUID,
+        limit: int = 100,
+    ) -> List[CandidateResume]:
+        """List all resumes for a candidate, newest first."""
+        query = (
+            select(CandidateResume)
+            .where(CandidateResume.candidate_id == candidate_id)
+            .order_by(CandidateResume.created_at.desc())
+            .limit(limit)
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
     async def get_resume_by_id(self, resume_id: UUID) -> Optional[CandidateResume]:
         """Get a resume by ID."""
         query = select(CandidateResume).where(CandidateResume.id == resume_id)

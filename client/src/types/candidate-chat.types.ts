@@ -108,6 +108,8 @@ export interface CandidateChatSession {
 export interface CreateCandidateChatSessionRequest {
   candidate_id: string;
   session_type?: CandidateSessionType;
+  /** When true, always create a new session (e.g. "+ New Resume"); otherwise return existing active if any */
+  force_new?: boolean;
 }
 
 export interface CandidateSendMessageRequest {

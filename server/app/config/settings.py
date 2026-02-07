@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     debug: bool = True
     api_version: str = "v1"
     secret_key: str = "change-me-in-production"
+    # Optional: dedicated key for Aadhaar/PAN encryption (defaults to secret_key)
+    encryption_key: str | None = None
     
     # Server
     host: str = "0.0.0.0"

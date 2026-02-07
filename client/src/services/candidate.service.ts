@@ -89,6 +89,23 @@ export async function getLatestResume(candidateId: string): Promise<CandidateRes
   return get<CandidateResume>(API_ENDPOINTS.CANDIDATES.RESUME(candidateId));
 }
 
+/**
+ * List all resumes for a candidate (newest first).
+ */
+export async function getResumes(candidateId: string): Promise<CandidateResume[]> {
+  return get<CandidateResume[]>(API_ENDPOINTS.CANDIDATES.RESUMES(candidateId));
+}
+
+/**
+ * Get a specific resume by ID (must belong to candidate).
+ */
+export async function getResumeById(
+  candidateId: string,
+  resumeId: string
+): Promise<CandidateResume> {
+  return get<CandidateResume>(API_ENDPOINTS.CANDIDATES.RESUME_BY_ID(candidateId, resumeId));
+}
+
 // ==================== JOB MASTER ====================
 
 /**

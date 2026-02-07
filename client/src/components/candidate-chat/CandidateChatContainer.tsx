@@ -131,26 +131,30 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
         }
     }, [localMessages, isTyping]);
 
-    // Sync session messages to local state
+    // Sync session messages to local state (only for the current session so "+ New Resume" isn't overwritten by stale data)
     useEffect(() => {
-        if (sessionData?.messages && sessionData.messages.length > 0) {
-            setLocalMessages((prev) => {
-                // Don't replace static welcome messages during initialization
-                const hasStaticWelcome = prev.some((m) => m.id.startsWith('welcome-'));
-                const backendHasOnlyWelcome =
-                    sessionData.messages.length <= 2 &&
-                    sessionData.messages.every(
-                        (m) => m.message_type === 'text' || m.message_type === 'buttons'
-                    );
-
-                if (hasStaticWelcome && backendHasOnlyWelcome) {
-                    return prev.map((m) => ({ ...m, session_id: sessionData.id }));
-                }
-
-                return sessionData.messages;
-            });
+        if (
+            !sessionData?.messages?.length ||
+            !sessionData?.id ||
+            sessionData.id !== currentSessionId
+        ) {
+            return;
         }
-    }, [sessionData?.messages, sessionData?.id]);
+        setLocalMessages((prev) => {
+            const hasStaticWelcome = prev.some((m) => m.id.startsWith('welcome-'));
+            const backendHasOnlyWelcome =
+                sessionData.messages.length <= 2 &&
+                sessionData.messages.every(
+                    (m) => m.message_type === 'text' || m.message_type === 'buttons'
+                );
+
+            if (hasStaticWelcome && backendHasOnlyWelcome) {
+                return prev.map((m) => ({ ...m, session_id: sessionData.id }));
+            }
+
+            return sessionData.messages;
+        });
+    }, [sessionData?.messages, sessionData?.id, currentSessionId]);
 
     // Cycle through progress messages
     useEffect(() => {
@@ -202,7 +206,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
             onReconnecting: (attempt, max) => {
                 console.log(`[CandidateChat] Reconnecting ${attempt}/${max}`);
                 setConnectionStatus('reconnecting');
-                toast.info(`Reconnecting... (${attempt}/${max})`);
+                // Reconnecting state shown in chat header only; no global toast so it doesn't appear on other pages.
             },
             onTyping: (typing) => {
                 setIsTyping(typing);
@@ -252,14 +256,17 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
 
     // ==================== HANDLERS ====================
 
-    // Create a new chat session
-    const handleNewChat = useCallback(async () => {
+    // Create a new chat session (on mount for first session, or when user clicks "+ New Resume" with force_new)
+    const handleNewChat = useCallback(async (forceNew: boolean = false) => {
         if (!candidate?.id) {
             toast.error('Please login first');
             return;
         }
 
-        console.log('[CandidateChat] Creating new session for candidate:', candidate.id);
+        console.log('[CandidateChat] Creating session for candidate:', candidate.id, 'force_new:', forceNew);
+
+        // Reset so a new session truly starts from welcome (e.g. after "+ New Resume")
+        initialFlowSentRef.current = false;
 
         // Show welcome messages immediately (optimistic UI)
         setLocalMessages(STATIC_WELCOME_MESSAGES);
@@ -275,6 +282,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
             const session = await createSession.mutateAsync({
                 candidate_id: candidate.id,
                 session_type: 'resume_creation',
+                force_new: forceNew,
             });
 
             console.log('[CandidateChat] Session created:', session.id);
@@ -547,7 +555,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
             <CandidateChatHeader
                 title="AIVI Resume Builder"
                 connectionStatus={connectionStatus}
-                onNewChat={handleNewChat}
+                onNewChat={() => handleNewChat(true)}
                 onToggleHistory={() => setViewMode(viewMode === 'chat' ? 'history' : 'chat')}
                 showHistoryButton={true}
             />

@@ -96,6 +96,7 @@ async def create_session(
     session, welcome_msgs = await service.create_session(
         candidate_id=request.candidate_id,
         session_type=request.session_type,
+        force_new=request.force_new,
     )
     return CandidateChatSessionWithMessagesResponse.model_validate(session)
 

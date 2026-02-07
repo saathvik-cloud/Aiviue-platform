@@ -46,6 +46,9 @@ export const API_ENDPOINTS = {
     BASIC_PROFILE: (id: string) => `/api/${API_VERSION}/candidates/${id}/basic-profile`,
     PROFILE: (id: string) => `/api/${API_VERSION}/candidates/${id}/profile`,
     RESUME: (id: string) => `/api/${API_VERSION}/candidates/${id}/resume`,
+    RESUMES: (id: string) => `/api/${API_VERSION}/candidates/${id}/resumes`,
+    RESUME_BY_ID: (candidateId: string, resumeId: string) =>
+      `/api/${API_VERSION}/candidates/${candidateId}/resume/${resumeId}`,
   },
 
   // Candidate Chat Endpoints (REST)

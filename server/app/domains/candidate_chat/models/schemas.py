@@ -21,6 +21,10 @@ class CandidateChatSessionCreate(BaseModel):
         description="Session type: resume_creation, resume_upload, general",
     )
     title: Optional[str] = Field(None, description="Optional session title")
+    force_new: bool = Field(
+        default=False,
+        description="If True, always create a new session (e.g. '+ New Resume'); otherwise return existing active session if any.",
+    )
 
 
 class CandidateSendMessageRequest(BaseModel):

@@ -181,6 +181,20 @@ async def get_latest_resume(
 
 
 @router.get(
+    "/{candidate_id}/resumes",
+    response_model=list[CandidateResumeResponse],
+    summary="List all resumes",
+    description="List all resumes for a candidate (newest first).",
+)
+async def list_resumes(
+    candidate_id: UUID,
+    service: CandidateService = Depends(get_service),
+) -> list[CandidateResumeResponse]:
+    """List all resumes for the candidate."""
+    return await service.list_resumes(candidate_id)
+
+
+@router.get(
     "/{candidate_id}/resume/{resume_id}",
     response_model=CandidateResumeResponse,
     summary="Get specific resume",
@@ -190,8 +204,8 @@ async def get_resume(
     resume_id: UUID,
     service: CandidateService = Depends(get_service),
 ) -> CandidateResumeResponse:
-    """Get a specific resume by ID."""
-    return await service.get_resume_by_id(resume_id)
+    """Get a specific resume by ID (must belong to candidate)."""
+    return await service.get_resume_by_id(candidate_id, resume_id)
 
 
 # ==================== LOOKUP ENDPOINTS ====================

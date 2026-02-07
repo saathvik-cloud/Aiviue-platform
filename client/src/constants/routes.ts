@@ -28,6 +28,9 @@ export const ROUTES = {
   CANDIDATE_DASHBOARD_COMPLETE_PROFILE: '/candidate/dashboard/complete-profile',
   CANDIDATE_DASHBOARD_RESUME: '/candidate/dashboard/resume',
   CANDIDATE_DASHBOARD_RESUME_NEW: '/candidate/dashboard/resume/new',
+  CANDIDATE_DASHBOARD_RESUME_HISTORY: '/candidate/dashboard/resume/history',
+  CANDIDATE_DASHBOARD_RESUME_VIEW: (resumeId: string) =>
+    `/candidate/dashboard/resume/history/${resumeId}`,
   CANDIDATE_DASHBOARD_PROFILE: '/candidate/dashboard/profile',
   CANDIDATE_DASHBOARD_JOBS: '/candidate/dashboard/jobs',
 } as const;

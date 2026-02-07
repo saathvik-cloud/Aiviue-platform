@@ -251,18 +251,23 @@ class GeminiClient:
         
         for attempt in range(self.max_retries):
             try:
-                # Build generation config
-                config = {
-                    "temperature": temperature,
-                }
-                if max_tokens:
-                    config["max_output_tokens"] = max_tokens
-                
+                # Build generation config (use SDK types so max_output_tokens is applied; SDK may ignore dict keys)
+                try:
+                    from google.genai import types as genai_types
+                    config = genai_types.GenerateContentConfig(
+                        temperature=temperature,
+                        max_output_tokens=max_tokens or 8192,
+                    )
+                except (ImportError, AttributeError):
+                    config = {
+                        "temperature": temperature,
+                        "max_output_tokens": max_tokens or 8192,
+                    }
+
                 # Build contents
                 contents = self._build_contents(prompt, system_instruction)
-                
+
                 # Execute with timeout using the new SDK
-                # The new SDK uses client.models.generate_content()
                 response = await asyncio.wait_for(
                     asyncio.to_thread(
                         self._client.models.generate_content,

@@ -4,8 +4,7 @@
  * Candidate Jobs Page - Job Recommendations
  *
  * Lists published jobs with optional matching by candidate's preferred
- * category and location. Glassmorphism cards, same UI principles as employer module.
- * "Explore more jobs" when no filters or no matches.
+ * category and location. Gradient + glass cards aligned with employer module.
  */
 
 import { ROUTES } from '@/constants';
@@ -25,6 +24,31 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
 const RECOMMENDED_LIMIT = 12;
+
+// Gradient card styles (rotate per card for variety, employer-style)
+const CARD_GRADIENTS = [
+  {
+    bg: 'linear-gradient(145deg, rgba(250, 245, 255, 0.98) 0%, rgba(243, 232, 255, 0.9) 50%, rgba(237, 233, 254, 0.85) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.7)',
+    shadow: '0 8px 32px rgba(124, 58, 237, 0.1), inset 0 1px 0 rgba(255,255,255,0.6)',
+    accent: '#7C3AED',
+    iconBg: 'linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, rgba(236, 72, 153, 0.12) 100%)',
+  },
+  {
+    bg: 'linear-gradient(145deg, rgba(240, 253, 250, 0.98) 0%, rgba(220, 245, 238, 0.9) 50%, rgba(204, 251, 241, 0.85) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.6)',
+    shadow: '0 8px 32px rgba(20, 184, 166, 0.1), inset 0 1px 0 rgba(255,255,255,0.5)',
+    accent: '#14B8A6',
+    iconBg: 'linear-gradient(135deg, rgba(20, 184, 166, 0.15) 0%, rgba(45, 212, 191, 0.12) 100%)',
+  },
+  {
+    bg: 'linear-gradient(145deg, rgba(255, 251, 243, 0.98) 0%, rgba(254, 243, 219, 0.9) 50%, rgba(253, 230, 198, 0.85) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.6)',
+    shadow: '0 8px 32px rgba(245, 158, 11, 0.08), inset 0 1px 0 rgba(255,255,255,0.5)',
+    accent: '#D97706',
+    iconBg: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(251, 191, 36, 0.12) 100%)',
+  },
+] as const;
 
 export default function CandidateJobsPage() {
   const candidate = useCandidateAuthStore((state) => state.candidate);
@@ -50,11 +74,11 @@ export default function CandidateJobsPage() {
   const hasFilters = !!(candidate?.preferred_job_category_id || candidate?.preferred_job_location);
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 space-y-5 sm:space-y-6 pb-8">
       {/* Page Header */}
       <div>
         <h1
-          className="text-2xl sm:text-3xl font-bold"
+          className="text-xl sm:text-2xl lg:text-3xl font-bold"
           style={{ color: 'var(--neutral-dark)' }}
         >
           Job Recommendations
@@ -68,14 +92,14 @@ export default function CandidateJobsPage() {
         </p>
       </div>
 
-      {/* Explore / Show recommended toggle */}
+      {/* Tabs: For You / Explore All Jobs */}
       {hasFilters && (
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={() => setShowAll(false)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-              !showAll ? 'text-white' : 'btn-glass'
+            className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              !showAll ? 'text-white shadow-md' : 'btn-glass'
             }`}
             style={
               !showAll
@@ -88,8 +112,8 @@ export default function CandidateJobsPage() {
           <button
             type="button"
             onClick={() => setShowAll(true)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-              showAll ? 'text-white' : 'btn-glass'
+            className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              showAll ? 'text-white shadow-md' : 'btn-glass'
             }`}
             style={
               showAll
@@ -102,31 +126,40 @@ export default function CandidateJobsPage() {
         </div>
       )}
 
-      {/* Job List */}
+      {/* Job cards grid */}
       {isLoading ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div
               key={i}
-              className="glass-card rounded-2xl p-5 animate-pulse"
+              className="rounded-2xl p-5 animate-pulse relative overflow-hidden"
+              style={{
+                background: CARD_GRADIENTS[i % 3].bg,
+                border: CARD_GRADIENTS[i % 3].border,
+                boxShadow: CARD_GRADIENTS[i % 3].shadow,
+                backdropFilter: 'blur(16px)',
+              }}
             >
-              <div className="h-5 rounded w-3/4 mb-3" style={{ background: 'var(--neutral-light)' }} />
-              <div className="h-4 rounded w-1/2 mb-2" style={{ background: 'var(--neutral-light)' }} />
-              <div className="h-4 rounded w-1/3" style={{ background: 'var(--neutral-light)' }} />
+              <div className="h-5 rounded w-3/4 mb-3" style={{ background: 'rgba(124, 58, 237, 0.1)' }} />
+              <div className="h-4 rounded w-1/2 mb-2" style={{ background: 'rgba(124, 58, 237, 0.08)' }} />
+              <div className="h-4 rounded w-1/3" style={{ background: 'rgba(124, 58, 237, 0.08)' }} />
             </div>
           ))}
         </div>
       ) : !hasMatches ? (
-        <div className="glass-card rounded-2xl p-10 text-center">
+        <div
+          className="glass-card rounded-2xl p-8 sm:p-10 text-center"
+          style={{ maxWidth: '28rem', margin: '0 auto' }}
+        >
           <div
             className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-4"
             style={{
-              background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(20, 184, 166, 0.1) 100%)',
+              background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, rgba(20, 184, 166, 0.15) 100%)',
             }}
           >
             <Briefcase className="w-10 h-10" style={{ color: 'var(--primary)' }} />
           </div>
-          <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--neutral-dark)' }}>
+          <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--neutral-dark)' }}>
             {showAll ? 'No jobs published yet' : 'No matching jobs right now'}
           </h3>
           <p className="text-sm mb-6" style={{ color: 'var(--neutral-gray)' }}>
@@ -138,8 +171,7 @@ export default function CandidateJobsPage() {
             <button
               type="button"
               onClick={() => setShowAll(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white"
-              style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #14B8A6 100%)' }}
+              className="btn-gradient inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold"
             >
               <Sparkles className="w-4 h-4" />
               Explore All Jobs
@@ -147,64 +179,71 @@ export default function CandidateJobsPage() {
           )}
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {items.map((job) => (
-            <div
-              key={job.id}
-              className="glass-card rounded-2xl p-5 transition-all hover:shadow-lg hover:scale-[1.02] flex flex-col"
-            >
-              <div className="flex items-start gap-3 mb-3">
-                <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(20, 184, 166, 0.1) 100%)',
-                  }}
-                >
-                  <Briefcase className="w-6 h-6" style={{ color: 'var(--primary)' }} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+          {items.map((job, index) => {
+            const style = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
+            return (
+              <div
+                key={job.id}
+                className="rounded-2xl p-5 relative overflow-hidden flex flex-col transition-all hover:scale-[1.02] hover:shadow-xl"
+                style={{
+                  background: style.bg,
+                  border: style.border,
+                  boxShadow: style.shadow,
+                  backdropFilter: 'blur(16px)',
+                }}
+              >
+                <div className="flex items-start gap-3 mb-3">
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: style.iconBg }}
+                  >
+                    <Briefcase className="w-6 h-6" style={{ color: style.accent }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-bold truncate" style={{ color: '#374151' }}>
+                      {job.title}
+                    </h3>
+                    <p className="text-xs mt-0.5 flex items-center gap-1 truncate font-medium" style={{ color: '#6B7280' }}>
+                      <Building2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: style.accent }} />
+                      {job.employer_name ?? 'Company'}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-base font-semibold truncate" style={{ color: 'var(--neutral-dark)' }}>
-                    {job.title}
-                  </h3>
-                  <p className="text-xs mt-0.5 flex items-center gap-1 truncate" style={{ color: 'var(--neutral-gray)' }}>
-                    <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
-                    {job.employer_name ?? 'Company'}
+
+                <div className="space-y-2 mt-2 flex-1">
+                  {job.location && (
+                    <p className="flex items-center gap-2 text-sm font-medium" style={{ color: '#4B5563' }}>
+                      <MapPin className="w-4 h-4 flex-shrink-0" style={{ color: style.accent }} />
+                      <span className="truncate">{job.location}</span>
+                    </p>
+                  )}
+                  {job.salary_range && (
+                    <p className="flex items-center gap-2 text-sm font-medium" style={{ color: '#4B5563' }}>
+                      <DollarSign className="w-4 h-4 flex-shrink-0" style={{ color: style.accent }} />
+                      {job.salary_range}
+                    </p>
+                  )}
+                  <p className="flex items-center gap-2 text-xs font-medium" style={{ color: '#6B7280' }}>
+                    <Clock className="w-3.5 h-3.5" style={{ color: style.accent }} />
+                    {formatDate(job.created_at)}
+                    {job.openings_count > 1 && ` · ${job.openings_count} openings`}
                   </p>
                 </div>
-              </div>
 
-              <div className="space-y-2 mt-2 flex-1">
-                {job.location && (
-                  <p className="flex items-center gap-2 text-sm" style={{ color: 'var(--neutral-gray)' }}>
-                    <MapPin className="w-4 h-4 flex-shrink-0" />
-                    <span className="truncate">{job.location}</span>
-                  </p>
-                )}
-                {job.salary_range && (
-                  <p className="flex items-center gap-2 text-sm" style={{ color: 'var(--neutral-gray)' }}>
-                    <DollarSign className="w-4 h-4 flex-shrink-0" />
-                    {job.salary_range}
-                  </p>
-                )}
-                <p className="flex items-center gap-2 text-xs" style={{ color: 'var(--neutral-muted)' }}>
-                  <Clock className="w-3.5 h-3.5" />
-                  {formatDate(job.created_at)}
-                  {job.openings_count > 1 && ` · ${job.openings_count} openings`}
-                </p>
+                <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(124, 58, 237, 0.15)' }}>
+                  <Link
+                    href={`/candidate/dashboard/jobs/${job.id}`}
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold transition-all hover:opacity-90"
+                    style={{ color: style.accent }}
+                  >
+                    View details
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
               </div>
-
-              <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--neutral-border)' }}>
-                <Link
-                  href={`/candidate/dashboard/jobs/${job.id}`}
-                  className="inline-flex items-center gap-1.5 text-sm font-medium transition-colors hover:opacity-90"
-                  style={{ color: 'var(--primary)' }}
-                >
-                  View details
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

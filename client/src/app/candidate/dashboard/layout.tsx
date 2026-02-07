@@ -121,19 +121,24 @@ export default function CandidateDashboardLayout({
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar – violet / pink gradient */}
       <aside
         className={`
           fixed lg:static inset-y-0 left-0 z-50
-          w-64 flex flex-col bg-white
+          w-64 flex flex-col
           transform transition-transform duration-300 ease-out
           lg:transform-none shadow-xl
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
-        style={{ borderRight: '1px solid var(--neutral-border)' }}
+        style={{
+          background:
+            'linear-gradient(180deg, #FDF2F8 0%, #FCE7F3 25%, #FBCFE8 50%, #F5D0FE 75%, #EDE9FE 100%)',
+          borderRight: '1px solid rgba(236, 72, 153, 0.15)',
+          boxShadow: '4px 0 24px rgba(124, 58, 237, 0.06)',
+        }}
       >
         {/* Logo + Candidate Badge */}
-        <div className="p-5 flex items-center justify-between">
+        <div className="p-4 sm:p-5 flex items-center justify-between">
           <Link href={ROUTES.CANDIDATE_DASHBOARD} className="flex items-center gap-2">
             <Image
               src="/aiviue-logo.png"
@@ -154,21 +159,21 @@ export default function CandidateDashboardLayout({
         </div>
 
         {/* Candidate Portal Badge */}
-        <div className="px-5 pb-3">
+        <div className="px-4 sm:px-5 pb-3">
           <span
             className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider"
             style={{
-              background: 'rgba(20, 184, 166, 0.1)',
-              color: 'var(--secondary-teal)',
-              border: '1px solid rgba(20, 184, 166, 0.2)',
+              background: 'rgba(236, 72, 153, 0.15)',
+              color: '#BE185D',
+              border: '1px solid rgba(236, 72, 153, 0.25)',
             }}
           >
             Candidate
           </span>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        {/* Navigation – active: light pink/violet */}
+        <nav className="flex-1 px-2 sm:px-3 py-4 space-y-0.5">
           <p
             className="px-3 text-xs font-semibold uppercase tracking-wider mb-3"
             style={{ color: 'var(--neutral-muted)' }}
@@ -177,7 +182,6 @@ export default function CandidateDashboardLayout({
           </p>
           {CANDIDATE_NAV_ITEMS.map((item) => {
             const Icon = iconMap[item.icon];
-            // Dashboard: exact match only. Others: prefix match for sub-routes.
             const isActive =
               item.href === ROUTES.CANDIDATE_DASHBOARD
                 ? pathname === item.href
@@ -190,12 +194,12 @@ export default function CandidateDashboardLayout({
                 onClick={() => setSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
                 style={{
-                  backgroundColor: isActive ? 'var(--primary-50)' : 'transparent',
-                  color: isActive ? 'var(--primary)' : 'var(--neutral-gray)',
+                  backgroundColor: isActive ? 'rgba(236, 72, 153, 0.12)' : 'transparent',
+                  color: isActive ? '#9D174D' : 'var(--neutral-gray)',
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
-                    e.currentTarget.style.backgroundColor = 'var(--neutral-light)';
+                    e.currentTarget.style.backgroundColor = 'rgba(236, 72, 153, 0.06)';
                   }
                 }}
                 onMouseLeave={(e) => {
@@ -204,8 +208,8 @@ export default function CandidateDashboardLayout({
                   }
                 }}
               >
-                {Icon && <Icon className="w-5 h-5" />}
-                {item.label}
+                {Icon && <Icon className="w-5 h-5 shrink-0" />}
+                <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
@@ -259,8 +263,16 @@ export default function CandidateDashboardLayout({
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-        {/* Top Header */}
-        <header className="glass-navbar sticky top-0 z-30 px-4 sm:px-6 py-2 flex items-center justify-between">
+        {/* Top Header – light pink/violet tint to match sidebar */}
+        <header
+          className="sticky top-0 z-30 px-4 sm:px-6 py-2 flex items-center justify-between min-h-[56px]"
+          style={{
+            background: 'linear-gradient(90deg, rgba(253, 242, 248, 0.95) 0%, rgba(252, 231, 243, 0.9) 50%, rgba(255, 255, 255, 0.95) 100%)',
+            backdropFilter: 'blur(12px)',
+            borderBottom: '1px solid rgba(236, 72, 153, 0.1)',
+            boxShadow: '0 2px 12px rgba(124, 58, 237, 0.04)',
+          }}
+        >
           {/* Mobile Menu Button */}
           <button
             onClick={() => setSidebarOpen(true)}

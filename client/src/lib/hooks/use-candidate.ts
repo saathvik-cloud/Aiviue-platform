@@ -19,6 +19,9 @@ export const candidateKeys = {
   byId: (id: string) => [...candidateKeys.all, 'byId', id] as const,
   byMobile: (mobile: string) => [...candidateKeys.all, 'byMobile', mobile] as const,
   resume: (candidateId: string) => [...candidateKeys.all, 'resume', candidateId] as const,
+  resumes: (candidateId: string) => [...candidateKeys.all, 'resumes', candidateId] as const,
+  resumeById: (candidateId: string, resumeId: string) =>
+    [...candidateKeys.all, 'resume', candidateId, resumeId] as const,
   categories: ['jobCategories'] as const,
   roles: (categoryId?: string) => ['jobRoles', categoryId] as const,
   allRoles: (jobType?: string) => ['jobRoles', 'all', jobType] as const,
@@ -59,6 +62,31 @@ export function useCandidateResume(candidateId: string | undefined) {
     queryFn: () => candidateService.getLatestResume(candidateId!),
     enabled: !!candidateId,
     retry: false,
+  });
+}
+
+/**
+ * List all resumes for a candidate (resume history).
+ */
+export function useCandidateResumes(candidateId: string | undefined) {
+  return useQuery({
+    queryKey: candidateKeys.resumes(candidateId || ''),
+    queryFn: () => candidateService.getResumes(candidateId!),
+    enabled: !!candidateId,
+  });
+}
+
+/**
+ * Get a specific resume by ID.
+ */
+export function useCandidateResumeById(
+  candidateId: string | undefined,
+  resumeId: string | undefined
+) {
+  return useQuery({
+    queryKey: candidateKeys.resumeById(candidateId || '', resumeId || ''),
+    queryFn: () => candidateService.getResumeById(candidateId!, resumeId!),
+    enabled: !!candidateId && !!resumeId,
   });
 }
 

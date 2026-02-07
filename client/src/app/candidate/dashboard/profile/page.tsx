@@ -20,6 +20,7 @@
 import { CANDIDATE_VALIDATION } from '@/constants';
 import { useJobCategories, useRolesByCategory, useUpdateCandidate } from '@/lib/hooks';
 import { uploadProfilePhoto } from '@/lib/supabase';
+import { getInitials } from '@/lib/utils';
 import { useCandidateAuthStore } from '@/stores';
 import type { CandidateUpdateRequest, JobCategory, JobRole } from '@/types';
 import {
@@ -133,6 +134,8 @@ export default function CandidateProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize form from candidate data
@@ -154,6 +157,19 @@ export default function CandidateProfilePage() {
       });
       setSelectedCategoryId(candidate.preferred_job_category_id || '');
     }
+  }, [candidate]);
+
+  // Sync photo preview from store (on load or when candidate/photo URL changes). Don't overwrite when user has a pending file.
+  useEffect(() => {
+    if (!candidate) {
+      setPhotoPreview(null);
+      setPhotoFile(null);
+      return;
+    }
+    setPhotoPreview((prev) => {
+      if (prev?.startsWith('blob:')) return prev; // keep local preview when photoFile is set
+      return candidate.profile_photo_url || null;
+    });
   }, [candidate]);
 
   // ==================== HANDLERS ====================
@@ -248,6 +264,24 @@ export default function CandidateProfilePage() {
     setIsSaving(true);
 
     try {
+      let profilePhotoUrl: string | undefined = candidate.profile_photo_url ?? undefined;
+
+      // Upload new photo to Supabase if user selected one (employer-style: save on Submit)
+      if (photoFile) {
+        setIsUploadingPhoto(true);
+        try {
+          profilePhotoUrl = await uploadProfilePhoto(photoFile, candidate.id);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Photo upload failed';
+          setPhotoError(msg);
+          toast.error(msg);
+          setIsUploadingPhoto(false);
+          setIsSaving(false);
+          return;
+        }
+        setIsUploadingPhoto(false);
+      }
+
       const updateData: CandidateUpdateRequest = {
         name: formData.name,
         email: formData.email || undefined,
@@ -261,9 +295,9 @@ export default function CandidateProfilePage() {
         current_monthly_salary: formData.current_monthly_salary
           ? parseFloat(formData.current_monthly_salary)
           : undefined,
-        // Only send if user entered new values
         aadhaar_number: formData.aadhaar_number || undefined,
         pan_number: formData.pan_number?.toUpperCase() || undefined,
+        profile_photo_url: profilePhotoUrl,
         version: candidate.version,
       };
 
@@ -272,8 +306,12 @@ export default function CandidateProfilePage() {
         data: updateData,
       });
 
-      // Update store
+      // Update store and local photo state so profile box shows saved image (like employer)
       setCandidate(updatedCandidate);
+      setPhotoPreview(updatedCandidate.profile_photo_url || null);
+      if (photoPreview?.startsWith('blob:')) URL.revokeObjectURL(photoPreview);
+      setPhotoFile(null);
+      setPhotoError(null);
       setIsDirty(false);
 
       // Clear sensitive fields after save
@@ -284,12 +322,12 @@ export default function CandidateProfilePage() {
       }));
 
       toast.success('Profile updated successfully! ✅');
-    } catch (error: any) {
+    } catch (error) {
       console.error('[Profile] Update failed:', error);
-      if (error?.status === 409) {
+      if ((error as { status?: number })?.status === 409) {
         toast.error('Profile was updated elsewhere. Please refresh and try again.');
       } else {
-        toast.error(error?.message || 'Failed to update profile');
+        toast.error(error instanceof Error ? error.message : 'Failed to update profile');
       }
     } finally {
       setIsSaving(false);
@@ -448,7 +486,7 @@ export default function CandidateProfilePage() {
 
         <button
           onClick={handleSubmit}
-          disabled={!isDirty || isSaving}
+          disabled={!isDirty || isSaving || isUploadingPhoto}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
           style={{
             background: isDirty
@@ -456,7 +494,12 @@ export default function CandidateProfilePage() {
               : 'var(--neutral-gray)',
           }}
         >
-          {isSaving ? (
+          {isUploadingPhoto ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Uploading photo...
+            </>
+          ) : isSaving ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
               Saving...
@@ -494,7 +537,7 @@ export default function CandidateProfilePage() {
             type="file"
             accept="image/jpeg,image/png,image/webp"
             className="hidden"
-            onChange={async (e) => {
+            onChange={(e) => {
               const file = e.target.files?.[0];
               e.target.value = '';
               if (!file || !candidate) return;
@@ -505,25 +548,18 @@ export default function CandidateProfilePage() {
                 toast.error(`File too large. Max ${CANDIDATE_VALIDATION.PROFILE_PHOTO_MAX_SIZE_MB}MB.`);
                 return;
               }
-              setIsUploadingPhoto(true);
-              try {
-                const url = await uploadProfilePhoto(file, candidate.id);
-                const updated = await updateCandidateMutation.mutateAsync({
-                  id: candidate.id,
-                  data: { profile_photo_url: url, version: candidate.version },
-                });
-                setCandidate(updated);
-                toast.success('Profile photo updated');
-              } catch (err) {
-                const msg = err instanceof Error ? err.message : 'Upload failed';
-                setPhotoError(msg);
-                toast.error(msg);
-              } finally {
-                setIsUploadingPhoto(false);
-              }
+              // Revoke previous blob if any (like employer module: store file, show preview, activate Save)
+              setPhotoPreview((prev) => {
+                if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+                return null;
+              });
+              const blobUrl = URL.createObjectURL(file);
+              setPhotoPreview(blobUrl);
+              setPhotoFile(file);
+              setIsDirty(true);
             }}
           />
-          {/* Photo Preview */}
+          {/* Photo Preview: pending file → blob; else use store URL so profile box stays in sync after save (like header/sidebar) */}
           <div className="relative">
             <div
               className="w-24 h-24 rounded-2xl overflow-hidden flex items-center justify-center"
@@ -532,17 +568,26 @@ export default function CandidateProfilePage() {
                 border: '2px solid var(--neutral-border)',
               }}
             >
-              {candidate.profile_photo_url ? (
-                <Image
-                  src={candidate.profile_photo_url}
-                  alt={candidate.name}
-                  width={96}
-                  height={96}
-                  className="object-cover w-full h-full"
-                />
-              ) : (
-                <User className="w-10 h-10 text-neutral-400" />
-              )}
+              {(() => {
+                const displayUrl = photoFile ? photoPreview : (candidate.profile_photo_url ?? photoPreview);
+                return displayUrl ? (
+                  <Image
+                    src={displayUrl}
+                    alt={candidate.name}
+                    width={96}
+                    height={96}
+                    className="object-cover w-full h-full"
+                    unoptimized={displayUrl.startsWith('blob:')}
+                  />
+                ) : (
+                <div
+                  className="w-full h-full flex items-center justify-center text-white text-2xl font-bold"
+                  style={{ backgroundColor: 'var(--primary)' }}
+                >
+                  {getInitials(candidate.name || '')}
+                </div>
+              );
+            })()}
             </div>
             <button
               type="button"
@@ -840,7 +885,7 @@ export default function CandidateProfilePage() {
       <div className="flex justify-end pt-4">
         <button
           onClick={handleSubmit}
-          disabled={!isDirty || isSaving}
+          disabled={!isDirty || isSaving || isUploadingPhoto}
           className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
           style={{
             background: isDirty
@@ -848,7 +893,12 @@ export default function CandidateProfilePage() {
               : 'var(--neutral-gray)',
           }}
         >
-          {isSaving ? (
+          {isUploadingPhoto ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Uploading photo...
+            </>
+          ) : isSaving ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
               Saving...

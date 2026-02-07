@@ -139,12 +139,14 @@ class CandidateChatService:
         self,
         candidate_id: UUID,
         session_type: str = "resume_creation",
+        force_new: bool = False,
     ) -> Tuple[CandidateChatSession, List[dict]]:
         """
         Create a new chat session with idempotency.
 
-        If an active resume session already exists, returns it instead of
-        creating a duplicate (resume-from-where-left-off).
+        If force_new is False and an active resume session already exists,
+        returns it (resume-from-where-left-off). If force_new is True (e.g. "+ New Resume"),
+        always creates a new session.
 
         Returns:
             Tuple of (session, welcome_messages)
@@ -158,8 +160,8 @@ class CandidateChatService:
             )
 
         # ==================== IDEMPOTENCY CHECK ====================
-        # If there's an active resume session, return it instead of creating new
-        existing_session = await self._chat_repo.get_active_resume_session(candidate_id)
+        # If there's an active resume session and not force_new, return it
+        existing_session = None if force_new else await self._chat_repo.get_active_resume_session(candidate_id)
         if existing_session:
             logger.info(
                 f"Returning existing active session: {existing_session.id}",

@@ -299,7 +299,7 @@ class ResumeExtractionService:
         self,
         llm_client: Optional[GeminiClient] = None,
         temperature: float = 0.0,
-        max_tokens: int = 3000,
+        max_tokens: int = 8192,
     ) -> None:
         self._client = llm_client or get_gemini_client()
         self._temperature = temperature

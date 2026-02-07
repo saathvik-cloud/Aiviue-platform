@@ -5,7 +5,6 @@ Business logic for candidate management, authentication, and profile operations.
 """
 
 import base64
-import os
 from typing import Optional
 from uuid import UUID
 
@@ -14,6 +13,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config.settings import get_settings
 from app.domains.candidate.models import (
     Candidate,
     CandidateResume,
@@ -45,20 +45,25 @@ _FERNET_KDF_SALT = b"aiviue_aadhaar_pan_salt_v1"
 
 
 def _get_fernet() -> Optional[Fernet]:
-    """Build Fernet (AES) instance from env secret. Returns None if not configured."""
-    secret = os.environ.get("ENCRYPTION_KEY") or os.environ.get("SECRET_KEY")
-    if not secret:
-        return None
+    """Build Fernet (AES) instance from app settings (loads from .env). Returns None if not configured."""
     try:
+        settings = get_settings()
+        secret = settings.encryption_key or settings.secret_key
+        if not secret or secret == "change-me-in-production":
+            logger.warning(
+                "Encryption not configured: set ENCRYPTION_KEY or SECRET_KEY in .env; Aadhaar/PAN will not be stored"
+            )
+            return None
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=_FERNET_KDF_SALT,
             iterations=480_000,
         )
-        key = base64.urlsafe_b64encode(kdf.derive(secret.encode()))
+        key = base64.urlsafe_b64encode(kdf.derive(secret.encode("utf-8")))
         return Fernet(key)
-    except Exception:
+    except Exception as e:
+        logger.warning("Fernet init failed: %s; Aadhaar/PAN will not be stored", e)
         return None
 
 
@@ -328,10 +333,22 @@ class CandidateService:
             return CandidateResumeResponse.model_validate(resume)
         return None
 
-    async def get_resume_by_id(self, resume_id: UUID) -> CandidateResumeResponse:
-        """Get a specific resume by ID."""
+    async def list_resumes(self, candidate_id: UUID) -> list[CandidateResumeResponse]:
+        """List all resumes for a candidate (newest first)."""
+        resumes = await self.repository.list_resumes(candidate_id)
+        return [CandidateResumeResponse.model_validate(r) for r in resumes]
+
+    async def get_resume_by_id(
+        self, candidate_id: UUID, resume_id: UUID
+    ) -> CandidateResumeResponse:
+        """Get a specific resume by ID; ensure it belongs to the candidate."""
         resume = await self.repository.get_resume_by_id(resume_id)
         if not resume:
+            raise NotFoundError(
+                message="Resume not found",
+                error_code="RESUME_NOT_FOUND",
+            )
+        if resume.candidate_id != candidate_id:
             raise NotFoundError(
                 message="Resume not found",
                 error_code="RESUME_NOT_FOUND",
