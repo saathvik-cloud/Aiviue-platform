@@ -311,6 +311,7 @@ class JobSummaryResponse(BaseModel):
     location: Optional[str]
     work_type: Optional[str]
     salary_range: Optional[str]
+    currency: Optional[str] = None  # Salary currency: INR, USD, GBP, etc. for correct symbol in UI
     status: str
     openings_count: int
     created_at: datetime

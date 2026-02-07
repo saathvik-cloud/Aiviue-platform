@@ -890,7 +890,10 @@ async def add_backend_developer_templates_if_missing() -> None:
 
 # Allow running directly
 if __name__ == "__main__":
+    async def main() -> None:
+        await seed_job_master_data()
+        # Add backend-developer templates if DB was already seeded without them (single event loop)
+        await add_backend_developer_templates_if_missing()
+
     setup_logging()
-    asyncio.run(seed_job_master_data())
-    # Also add backend-developer templates if DB was already seeded without them
-    asyncio.run(add_backend_developer_templates_if_missing())
+    asyncio.run(main())

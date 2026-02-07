@@ -1,18 +1,21 @@
 'use client';
 
+import { ROUTES } from '@/constants';
 import { CandidateChatContainer } from '@/components/candidate-chat';
+import { History } from 'lucide-react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
 /**
- * Candidate Resume Page – taglines + AIVI chatbot only.
- * Resume history is in Dashboard Quick Actions → /candidate/dashboard/resume/history.
+ * Candidate Resume Page – tagline, Resume History button, and AIVI chatbot.
+ * Resume history is also linked from Dashboard Quick Actions.
  */
 export default function CandidateResumePage() {
   const searchParams = useSearchParams();
   const flowUpload = searchParams.get('flow') === 'upload';
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-4 sm:space-y-5 pb-8">
       {/* Tagline – gradient background + colorful heading */}
       <div
         className="rounded-2xl p-5 sm:p-6 relative overflow-hidden"
@@ -37,11 +40,27 @@ export default function CandidateResumePage() {
         </p>
       </div>
 
+      {/* Resume History – right-aligned between tagline and chatbot (same as Dashboard quick action) */}
+      <div className="flex justify-end">
+        <Link
+          href={ROUTES.CANDIDATE_DASHBOARD_RESUME_HISTORY}
+          className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98]"
+          style={{
+            background:
+              'linear-gradient(135deg, rgba(255, 247, 237, 0.9) 0%, rgba(254, 215, 170, 0.4) 50%, rgba(251, 191, 36, 0.2) 100%)',
+            border: '1px solid rgba(249, 115, 22, 0.15)',
+            color: 'var(--neutral-dark)',
+          }}
+        >
+          <History className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" style={{ color: '#EA580C' }} />
+          <span>Resume History</span>
+        </Link>
+      </div>
+
       {/* Chatbot – directly visible, no extra click */}
       <div className="rounded-2xl overflow-hidden border border-[var(--neutral-border)] bg-white/90 backdrop-blur-sm">
         <CandidateChatContainer initialFlow={flowUpload ? 'upload' : undefined} />
       </div>
-
     </div>
   );
 }

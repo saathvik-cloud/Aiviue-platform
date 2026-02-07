@@ -10,7 +10,7 @@
 import { ROUTES } from '@/constants';
 import { useJobs } from '@/lib/hooks';
 import { useCandidateAuthStore } from '@/stores';
-import { formatDate } from '@/lib/utils';
+import { formatDate, getCurrencySymbol } from '@/lib/utils';
 import {
   Briefcase,
   MapPin,
@@ -221,7 +221,7 @@ export default function CandidateJobsPage() {
                   {job.salary_range && (
                     <p className="flex items-center gap-2 text-sm font-medium" style={{ color: '#4B5563' }}>
                       <DollarSign className="w-4 h-4 flex-shrink-0" style={{ color: style.accent }} />
-                      {job.salary_range}
+                      {getCurrencySymbol(job.currency)} {job.salary_range}
                     </p>
                   )}
                   <p className="flex items-center gap-2 text-xs font-medium" style={{ color: '#6B7280' }}>

@@ -969,7 +969,7 @@ class CandidateChatService:
         if is_confirm:
             ctx = self._copy_context(session)
             collected_data = ctx.get("collected_data", {})
-            role_name = ctx.get("role_name", "Unknown")
+            role_name = (ctx.get("role_name") or "").strip()  # Avoid "Unknown" in PDF title when role not set
             job_type = ctx.get("job_type", "")
             method = ctx.get("method", "aivi_bot")
 

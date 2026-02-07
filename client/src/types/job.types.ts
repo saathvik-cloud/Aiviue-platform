@@ -115,6 +115,7 @@ export interface JobSummary {
   location?: string;
   work_type?: WorkType;
   salary_range?: string;
+  currency?: Currency | string | null; // Salary currency for symbol in UI (INR → ₹, GBP → £, etc.)
   status: JobStatus;
   openings_count: number;
   created_at: string;

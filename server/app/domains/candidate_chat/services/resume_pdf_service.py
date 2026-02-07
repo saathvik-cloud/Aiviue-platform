@@ -74,10 +74,11 @@ def build_resume_pdf(resume_data: dict) -> bytes:
         spaceAfter=6,
     )
     meta = resume_data.get("meta", {})
-    role_name = meta.get("role_name", "")
+    raw_role = (meta.get("role_name") or "").strip()
+    role_name = raw_role if raw_role and raw_role.lower() != "unknown" else ""
     sections = resume_data.get("sections", {})
 
-    # Title: full name + role
+    # Title: full name + role (only show role when set and not "Unknown")
     personal = sections.get("personal_info", {})
     full_name = personal.get("full_name", "Resume")
     title_text = full_name

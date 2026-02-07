@@ -746,6 +746,7 @@ class JobService:
             location=job.location,
             work_type=job.work_type,
             salary_range=job.salary_range,
+            currency=job.currency,
             status=job.status,
             openings_count=job.openings_count,
             created_at=job.created_at,
