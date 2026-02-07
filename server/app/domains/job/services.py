@@ -329,6 +329,8 @@ class JobService:
             experience_max=extracted_data.experience_max,
             shift_preferences=extracted_data.shift_preferences,
             openings_count=extracted_data.openings_count or 1,
+            category_id=extracted_data.category_id,
+            role_id=extracted_data.role_id,
             idempotency_key=idempotency_key,
         )
         
@@ -648,6 +650,8 @@ class JobService:
             "experience_max": request.experience_max,
             "shift_preferences": request.shift_preferences,
             "openings_count": request.openings_count,
+            "category_id": request.category_id,
+            "role_id": request.role_id,
             "idempotency_key": request.idempotency_key,
             "status": JobStatus.DRAFT,
         }
@@ -686,14 +690,20 @@ class JobService:
             data["shift_preferences"] = request.shift_preferences
         if request.openings_count is not None:
             data["openings_count"] = request.openings_count
+        if request.category_id is not None:
+            data["category_id"] = request.category_id
+        if request.role_id is not None:
+            data["role_id"] = request.role_id
         
         return data
     
     def _to_response(self, job: Job) -> JobResponse:
-        """Convert Job model to response."""
+        """Convert Job model to response (includes employer name when loaded)."""
+        employer_name = job.employer.company_name if job.employer else None
         return JobResponse(
             id=job.id,
             employer_id=job.employer_id,
+            employer_name=employer_name,
             title=job.title,
             description=job.description,
             requirements=job.requirements,
@@ -711,6 +721,8 @@ class JobService:
             experience_range=job.experience_range,
             shift_preferences=job.shift_preferences,
             openings_count=job.openings_count,
+            category_id=job.category_id,
+            role_id=job.role_id,
             status=job.status,
             is_published=job.is_published,
             is_draft=job.is_draft,
@@ -724,14 +736,17 @@ class JobService:
         )
     
     def _to_summary_response(self, job: Job) -> JobSummaryResponse:
-        """Convert Job model to summary response."""
+        """Convert Job model to summary response (includes employer/company name for candidate cards)."""
+        employer_name = job.employer.company_name if job.employer else None
         return JobSummaryResponse(
             id=job.id,
             employer_id=job.employer_id,
+            employer_name=employer_name,
             title=job.title,
             location=job.location,
             work_type=job.work_type,
             salary_range=job.salary_range,
+            currency=job.currency,
             status=job.status,
             openings_count=job.openings_count,
             created_at=job.created_at,

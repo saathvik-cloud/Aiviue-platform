@@ -2,8 +2,8 @@
  * Constants Index
  */
 
-export * from './routes';
 export * from './api-endpoints';
+export * from './routes';
 
 // App-wide constants
 export const APP_NAME = 'AIVIUE';
@@ -57,4 +57,56 @@ export const EXTRACTION_STATUS = {
   PROCESSING: 'processing',
   COMPLETED: 'completed',
   FAILED: 'failed',
+} as const;
+
+// ==================== CANDIDATE CONSTANTS ====================
+
+// Candidate mobile validation
+export const CANDIDATE_VALIDATION = {
+  MOBILE_REGEX: /^[6-9]\d{9}$/,  // Indian mobile number (10 digits, starts with 6-9)
+  MOBILE_MIN_LENGTH: 10,
+  MOBILE_MAX_LENGTH: 10,
+  NAME_MIN_LENGTH: 2,
+  NAME_MAX_LENGTH: 100,
+  ABOUT_MAX_LENGTH: 500,
+  PROFILE_PHOTO_MAX_SIZE_MB: 2,
+  RESUME_PDF_MAX_SIZE_MB: 2,
+} as const;
+
+// Profile statuses
+export const PROFILE_STATUS = {
+  BASIC: 'basic',
+  COMPLETE: 'complete',
+} as const;
+
+// Resume statuses
+export const RESUME_STATUS = {
+  IN_PROGRESS: 'in_progress',
+  COMPLETED: 'completed',
+  INVALIDATED: 'invalidated',
+} as const;
+
+// Resume sources
+export const RESUME_SOURCE = {
+  AIVI_BOT: 'aivi_bot',
+  PDF_UPLOAD: 'pdf_upload',
+} as const;
+
+// Candidate chat steps (mirrors backend ChatStep)
+export const CHAT_STEP = {
+  WELCOME: 'welcome',
+  CHOOSE_METHOD: 'choose_method',
+  UPLOAD_RESUME: 'upload_resume',
+  EXTRACTION_PROCESSING: 'extraction_processing',
+  MISSING_FIELDS: 'missing_fields',
+  ASKING_QUESTIONS: 'asking_questions',
+  RESUME_PREVIEW: 'resume_preview',
+  COMPLETED: 'completed',
+} as const;
+
+// WebSocket reconnect settings
+export const WS_CONFIG = {
+  RECONNECT_DELAY_MS: 2000,
+  MAX_RECONNECT_ATTEMPTS: 5,
+  PING_INTERVAL_MS: 30000,
 } as const;

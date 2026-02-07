@@ -46,6 +46,7 @@ from app.shared.llm.client import (
 from app.shared.llm.prompts import (
     JD_EXTRACTION_SYSTEM_PROMPT,
     JD_GENERATION_SYSTEM_PROMPT,
+    RESUME_PARSE_SYSTEM_PROMPT,
     build_jd_extraction_prompt,
     build_jd_generation_prompt,
     build_screening_criteria_prompt,
@@ -76,6 +77,7 @@ __all__ = [
     # Prompts
     "JD_EXTRACTION_SYSTEM_PROMPT",
     "JD_GENERATION_SYSTEM_PROMPT",
+    "RESUME_PARSE_SYSTEM_PROMPT",
     "build_jd_extraction_prompt",
     "build_jd_generation_prompt",
     "build_screening_criteria_prompt",

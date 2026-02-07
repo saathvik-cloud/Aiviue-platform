@@ -16,6 +16,7 @@ export type Currency = 'INR' | 'USD' | 'EUR' | 'GBP' | 'AUD' | 'CAD';
 // Job Entity
 export interface Job extends BaseEntity {
   employer_id: string;
+  employer_name?: string | null; // Company/employer name for job detail
   title: string;
   description: string;
   requirements?: string;
@@ -99,16 +100,22 @@ export interface JobFilters {
   work_type?: WorkType;
   search?: string;
   is_active?: boolean;
+  category_id?: string;
+  role_id?: string;
+  city?: string;
+  state?: string;
 }
 
 // Job Summary (for lists)
 export interface JobSummary {
   id: string;
   employer_id: string;
+  employer_name?: string | null; // Company/employer name for job cards
   title: string;
   location?: string;
   work_type?: WorkType;
   salary_range?: string;
+  currency?: Currency | string | null; // Salary currency for symbol in UI (INR → ₹, GBP → £, etc.)
   status: JobStatus;
   openings_count: number;
   created_at: string;

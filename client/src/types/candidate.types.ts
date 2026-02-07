@@ -1,0 +1,157 @@
+/**
+ * Candidate Types
+ *
+ * TypeScript types for the candidate module.
+ * Mirrors backend Pydantic schemas (candidate domain).
+ */
+
+import type { BaseEntity } from './api.types';
+
+// ==================== CONSTANTS ====================
+
+export type ProfileStatus = 'basic' | 'complete';
+export type ResumeStatus = 'in_progress' | 'completed' | 'invalidated';
+export type ResumeSource = 'aivi_bot' | 'pdf_upload';
+
+// ==================== CANDIDATE ENTITY ====================
+
+export interface Candidate extends BaseEntity {
+  mobile: string;
+  name: string;
+  email?: string;
+  profile_photo_url?: string;
+  date_of_birth?: string;
+  preferred_job_category_id?: string;
+  preferred_job_role_id?: string;
+  current_location?: string;
+  preferred_job_location?: string;
+  languages_known?: string[];
+  about?: string;
+  current_monthly_salary?: number;
+  aadhaar_number_encrypted?: string;
+  pan_number_encrypted?: string;
+  profile_status: ProfileStatus;
+}
+
+// ==================== CANDIDATE RESUME ====================
+
+export interface CandidateResume {
+  id: string;
+  candidate_id: string;
+  resume_data?: Record<string, any>;
+  pdf_url?: string;
+  source: ResumeSource;
+  status: ResumeStatus;
+  version_number: number;
+  chat_session_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ==================== REQUEST TYPES ====================
+
+export interface CandidateSignupRequest {
+  mobile: string;
+  name: string;
+  current_location?: string;
+  preferred_job_category_id?: string;
+  preferred_job_role_id?: string;
+  preferred_job_location?: string;
+}
+
+export interface CandidateLoginRequest {
+  mobile: string;
+}
+
+export interface CandidateBasicProfileRequest {
+  name: string;
+  current_location?: string;
+  preferred_job_category_id?: string;
+  preferred_job_role_id?: string;
+  preferred_job_location?: string;
+}
+
+export interface CandidateUpdateRequest {
+  name?: string;
+  email?: string;
+  profile_photo_url?: string;
+  date_of_birth?: string;
+  current_location?: string;
+  preferred_job_category_id?: string;
+  preferred_job_role_id?: string;
+  preferred_job_location?: string;
+  languages_known?: string[];
+  about?: string;
+  current_monthly_salary?: number;
+  aadhaar_number?: string;
+  pan_number?: string;
+  version: number;
+}
+
+// ==================== RESPONSE TYPES ====================
+
+export interface CandidateAuthResponse {
+  candidate: Candidate;
+  is_new: boolean;
+  message: string;
+}
+
+export interface CandidateSummaryResponse {
+  id: string;
+  name: string;
+  mobile: string;
+  profile_status: ProfileStatus;
+  has_resume: boolean;
+  latest_resume_version?: number;
+}
+
+// ==================== JOB MASTER TYPES ====================
+
+export interface JobCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  display_order: number;
+  is_active: boolean;
+  roles?: JobRole[];
+}
+
+export interface JobRole {
+  id: string;
+  name: string;
+  slug: string;
+  job_type: 'blue_collar' | 'white_collar';
+  description?: string;
+  is_active: boolean;
+  categories?: JobCategory[];
+}
+
+export interface RoleQuestionTemplate {
+  id: string;
+  role_id: string;
+  question_key: string;
+  question_text: string;
+  question_type: string;
+  is_required: boolean;
+  display_order: number;
+  options?: any;
+  validation_rules?: Record<string, any>;
+  condition?: Record<string, any>;
+  is_active: boolean;
+}
+
+// ==================== JOB RECOMMENDATION ====================
+
+export interface JobRecommendation {
+  id: string;
+  title: string;
+  company_name: string;
+  location?: string;
+  salary_min?: number;
+  salary_max?: number;
+  work_type?: string;
+  match_score?: number;
+  posted_at: string;
+}

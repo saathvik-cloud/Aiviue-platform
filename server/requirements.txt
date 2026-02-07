@@ -33,6 +33,15 @@ structlog
 python-jose[cryptography]
 passlib[bcrypt]
 
+# PDF PARSING (Resume Extraction)
+PyMuPDF
+
+# PDF GENERATION (Resume download)
+reportlab
+
+# STORAGE (Resume PDF upload - optional)
+supabase
+
 # UTILITIES
 python-dateutil
 

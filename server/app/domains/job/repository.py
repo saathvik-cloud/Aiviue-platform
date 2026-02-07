@@ -14,6 +14,7 @@ from uuid import UUID
 
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.config.constants import JobStatus
 from app.domains.job.models import Extraction, ExtractionStatus, Job
@@ -104,8 +105,8 @@ class JobRepository:
         cursor: Optional[str] = None,
         limit: int = 20,
     ) -> list[Job]:
-        """List jobs with filters and pagination."""
-        query = select(Job)
+        """List jobs with filters and pagination. Loads employer for company name."""
+        query = select(Job).options(selectinload(Job.employer))
         
         # Apply filters
         if filters:
@@ -171,6 +172,12 @@ class JobRepository:
         
         if filters.state:
             conditions.append(Job.state.ilike(f"%{filters.state}%"))
+
+        if filters.category_id:
+            conditions.append(Job.category_id == filters.category_id)
+            
+        if filters.role_id:
+            conditions.append(Job.role_id == filters.role_id)
         
         if filters.search:
             search_term = f"%{filters.search}%"

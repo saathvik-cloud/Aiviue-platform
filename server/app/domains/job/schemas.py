@@ -130,6 +130,16 @@ class JobCreateRequest(BaseModel):
         max_length=255,
         description="Idempotency key to prevent duplicates",
     )
+
+    # Categorization
+    category_id: Optional[UUID] = Field(
+        None,
+        description="Reference to job category",
+    )
+    role_id: Optional[UUID] = Field(
+        None,
+        description="Reference to specific job role",
+    )
     
     @field_validator("work_type")
     @classmethod
@@ -180,6 +190,10 @@ class JobUpdateRequest(BaseModel):
     shift_preferences: Optional[dict] = None
     openings_count: Optional[int] = Field(None, ge=1)
     
+    # Categorization
+    category_id: Optional[UUID] = None
+    role_id: Optional[UUID] = None
+    
     # Version for optimistic locking
     version: int = Field(
         ...,
@@ -229,7 +243,8 @@ class JobResponse(BaseModel):
     
     id: UUID
     employer_id: UUID
-    
+    employer_name: Optional[str] = None  # Company/employer name for candidate job detail
+
     # Basic Info
     title: str
     description: str
@@ -261,6 +276,10 @@ class JobResponse(BaseModel):
     # Openings
     openings_count: int
     
+    # Categorization
+    category_id: Optional[UUID]
+    role_id: Optional[UUID]
+    
     # Status
     status: str
     is_published: bool
@@ -287,10 +306,12 @@ class JobSummaryResponse(BaseModel):
     
     id: UUID
     employer_id: UUID
+    employer_name: Optional[str] = None  # Company/employer name for candidate job cards
     title: str
     location: Optional[str]
     work_type: Optional[str]
     salary_range: Optional[str]
+    currency: Optional[str] = None  # Salary currency: INR, USD, GBP, etc. for correct symbol in UI
     status: str
     openings_count: int
     created_at: datetime
@@ -321,6 +342,8 @@ class JobFilters(BaseModel):
     work_type: Optional[str] = Field(None, description="Filter by work type")
     city: Optional[str] = Field(None, description="Filter by city")
     state: Optional[str] = Field(None, description="Filter by state")
+    category_id: Optional[UUID] = Field(None, description="Filter by category")
+    role_id: Optional[UUID] = Field(None, description="Filter by role")
     search: Optional[str] = Field(None, description="Search in title/description")
     is_active: Optional[bool] = Field(True, description="Filter by active status")
 
@@ -385,6 +408,8 @@ class ExtractedFields(BaseModel):
     # Other
     shift_preferences: Optional[dict] = Field(None, description="Shift info")
     openings_count: Optional[int] = Field(1, description="Number of openings")
+    category_id: Optional[UUID] = Field(None, description="Detected category ID")
+    role_id: Optional[UUID] = Field(None, description="Detected role ID")
     
     # Confidence
     extraction_confidence: Optional[float] = Field(

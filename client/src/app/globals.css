@@ -188,11 +188,23 @@ select:focus {
 }
 
 .glass-navbar {
-  background: rgba(255, 255, 255, 0.75);
+  background: linear-gradient(135deg, rgba(245, 243, 255, 0.92) 0%, rgba(253, 242, 248, 0.9) 50%, rgba(255, 255, 255, 0.88) 100%);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 4px 30px rgba(124, 58, 237, 0.05);
+  border-bottom: 1px solid rgba(236, 72, 153, 0.08);
+  box-shadow: 0 4px 30px rgba(124, 58, 237, 0.06);
+}
+
+/* Navbar "For Candidates" / "For Employers" – same size & shape, violet-pink gradient */
+.nav-link-gradient {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%);
+  border: 1px solid rgba(124, 58, 237, 0.35);
+  color: #6D28D9;
+}
+.nav-link-gradient:hover {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.18) 0%, rgba(236, 72, 153, 0.18) 100%);
+  border-color: rgba(236, 72, 153, 0.4);
+  color: #5B21B6;
 }
 
 .glass-dropdown {

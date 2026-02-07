@@ -1,6 +1,6 @@
-import Link from 'next/link';
-import Image from 'next/image';
 import { ROUTES } from '@/constants';
+import Image from 'next/image';
+import Link from 'next/link';
 
 /**
  * Home Page - Landing page with glassmorphism design
@@ -41,8 +41,20 @@ export default function HomePage() {
               />
             </Link>
 
-            {/* Auth Buttons */}
+            {/* Nav Buttons – match candidate module: For Candidates, For Employers (violet-pink gradient), Login, Sign Up */}
             <div className="flex items-center gap-2 sm:gap-3">
+              <Link
+                href={ROUTES.CANDIDATE_HOME}
+                className="nav-link-gradient px-3 sm:px-4 py-2 sm:py-2.5 text-sm font-medium rounded-xl transition-all hidden sm:inline-flex"
+              >
+                For Candidates
+              </Link>
+              <Link
+                href={ROUTES.HOME}
+                className="nav-link-gradient px-3 sm:px-4 py-2 sm:py-2.5 text-sm font-medium rounded-xl transition-all hidden sm:inline-flex"
+              >
+                For Employers
+              </Link>
               <Link
                 href={ROUTES.LOGIN}
                 className="btn-glass px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-medium rounded-xl transition-all"
@@ -53,7 +65,7 @@ export default function HomePage() {
               <Link
                 href={ROUTES.REGISTER}
                 className="px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-medium rounded-xl text-white transition-colors hover:opacity-90"
-                style={{ backgroundColor: 'var(--primary)' }}
+                style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)' }}
               >
                 Sign Up
               </Link>

@@ -6,13 +6,15 @@ class Settings(BaseSettings):
     """
     Application settings loaded from environment variables.
     """
-    
-    # App Settings
+ 
+    # App Settings 
     app_name: str = "aiviue-backend"
     app_env: str = "development"
     debug: bool = True
     api_version: str = "v1"
     secret_key: str = "change-me-in-production"
+    # Optional: dedicated key for Aadhaar/PAN encryption (defaults to secret_key)
+    encryption_key: str | None = None
     
     # Server
     host: str = "0.0.0.0"
@@ -36,7 +38,12 @@ class Settings(BaseSettings):
     
     # Feature Flags
     enable_screening_events: bool = False  # Set True when Screening Agent is ready
-    
+
+    # Storage (optional - for resume PDF upload)
+    supabase_url: str | None = None
+    supabase_service_role_key: str | None = None
+    supabase_resume_bucket: str = "resumes"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -58,24 +58,49 @@ export function formatRelativeTime(date: string | Date): string {
 }
 
 /**
+ * Currency code to symbol (for job cards / salary display).
+ * Matches backend job.currency: INR, USD, GBP, EUR, AUD, CAD, etc.
+ */
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  INR: '₹',
+  USD: '$',
+  GBP: '£',
+  EUR: '€',
+  AUD: 'A$',
+  CAD: 'C$',
+};
+
+export function getCurrencySymbol(currency: string | undefined | null): string {
+  if (!currency) return '$';
+  const code = currency.toUpperCase();
+  return CURRENCY_SYMBOLS[code] ?? currency;
+}
+
+/**
  * Format currency
  */
 export function formatCurrency(amount: number, currency = 'USD'): string {
+  const code = currency && CURRENCY_SYMBOLS[currency.toUpperCase()] ? currency : 'USD';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency,
+    currency: code,
     maximumFractionDigits: 0,
   }).format(amount);
 }
 
 /**
- * Format salary range
+ * Format salary range with optional currency (default USD).
  */
-export function formatSalaryRange(min?: number, max?: number): string {
+export function formatSalaryRange(
+  min?: number,
+  max?: number,
+  currency?: string | null
+): string {
+  const code = currency || 'USD';
   if (!min && !max) return 'Not specified';
-  if (min && !max) return `${formatCurrency(min)}+`;
-  if (!min && max) return `Up to ${formatCurrency(max)}`;
-  return `${formatCurrency(min!)} - ${formatCurrency(max!)}`;
+  if (min && !max) return `${formatCurrency(min, code)}+`;
+  if (!min && max) return `Up to ${formatCurrency(max, code)}`;
+  return `${formatCurrency(min!, code)} - ${formatCurrency(max!, code)}`;
 }
 
 /**

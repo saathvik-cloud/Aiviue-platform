@@ -44,7 +44,13 @@ apiClient.interceptors.response.use(
   },
   (error: AxiosError<ApiError>) => {
     if (process.env.NEXT_PUBLIC_DEBUG_MODE === 'true') {
-      console.error(`[API Error] ${error.response?.status}`, error.response?.data);
+      const status = error.response?.status;
+      const data = error.response?.data;
+      const message = error.message || 'Network error or no response';
+      console.error(
+        `[API Error] ${status ?? 'no status'} ${message}`,
+        data ?? '(no response body)'
+      );
     }
     
     // Handle 401 - redirect to login
