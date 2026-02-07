@@ -46,22 +46,17 @@ export default function CandidateLandingPage() {
               
             </div>
 
-            {/* Auth Buttons */}
+            {/* Auth Buttons: For Candidates & For Employers (same style, violet-pink gradient) then Login, Sign Up */}
             <div className="flex items-center gap-2 sm:gap-3">
-            <span
-                className="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold"
-                style={{
-                  background: 'rgba(20, 184, 166, 0.1)',
-                  color: 'var(--secondary-teal)',
-                  border: '1px solid rgba(20, 184, 166, 0.3)',
-                }}
+              <Link
+                href="/candidate"
+                className="nav-link-gradient px-3 sm:px-4 py-2 sm:py-2.5 text-sm font-medium rounded-xl transition-all hidden sm:inline-flex"
               >
                 For Candidates
-              </span>
+              </Link>
               <Link
                 href={ROUTES.HOME}
-                className="btn-glass px-3 sm:px-4 py-2 sm:py-2.5 text-sm font-medium rounded-xl transition-all hidden sm:inline-flex"
-                style={{ color: 'var(--neutral-gray)' }}
+                className="nav-link-gradient px-3 sm:px-4 py-2 sm:py-2.5 text-sm font-medium rounded-xl transition-all hidden sm:inline-flex"
               >
                 For Employers
               </Link>
@@ -75,7 +70,7 @@ export default function CandidateLandingPage() {
               <Link
                 href={ROUTES.CANDIDATE_REGISTER}
                 className="px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-medium rounded-xl text-white transition-colors hover:opacity-90"
-                style={{ backgroundColor: 'var(--primary)' }}
+                style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)' }}
               >
                 Sign Up
               </Link>

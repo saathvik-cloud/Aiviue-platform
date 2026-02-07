@@ -41,18 +41,19 @@ export default function HomePage() {
               />
             </Link>
 
-            {/* Nav Buttons */}
+            {/* Nav Buttons – match candidate module: For Candidates, For Employers (violet-pink gradient), Login, Sign Up */}
             <div className="flex items-center gap-2 sm:gap-3">
               <Link
                 href={ROUTES.CANDIDATE_HOME}
-                className="px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-medium rounded-xl transition-all border"
-                style={{ 
-                  color: 'var(--secondary-teal)',
-                  borderColor: 'rgba(20, 184, 166, 0.3)',
-                  background: 'rgba(20, 184, 166, 0.05)',
-                }}
+                className="nav-link-gradient px-3 sm:px-4 py-2 sm:py-2.5 text-sm font-medium rounded-xl transition-all hidden sm:inline-flex"
               >
-                <span className="hidden sm:inline">For </span>Candidates
+                For Candidates
+              </Link>
+              <Link
+                href={ROUTES.HOME}
+                className="nav-link-gradient px-3 sm:px-4 py-2 sm:py-2.5 text-sm font-medium rounded-xl transition-all hidden sm:inline-flex"
+              >
+                For Employers
               </Link>
               <Link
                 href={ROUTES.LOGIN}
@@ -64,7 +65,7 @@ export default function HomePage() {
               <Link
                 href={ROUTES.REGISTER}
                 className="px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-medium rounded-xl text-white transition-colors hover:opacity-90"
-                style={{ backgroundColor: 'var(--primary)' }}
+                style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)' }}
               >
                 Sign Up
               </Link>

@@ -9,8 +9,7 @@
  * updated via Profile in the header dropdown.
  */
 
-import { SelectDropdown } from '@/components';
-import type { SelectOption } from '@/components';
+import { ProfileStyleSelect } from '@/components/ui';
 import { ROUTES } from '@/constants';
 import { useJobCategories, useRolesByCategory } from '@/lib/hooks';
 import { createBasicProfile } from '@/services';
@@ -42,14 +41,16 @@ export default function CompleteProfilePage() {
     formData.preferred_job_category_id || undefined
   );
 
-  const categoryOptions: SelectOption[] = [
-    { value: '', label: 'Select a job category...' },
-    ...categories.map((c) => ({ value: c.id, label: c.name })),
-  ];
-  const roleOptions: SelectOption[] = [
-    { value: '', label: formData.preferred_job_category_id ? 'Select a role...' : 'Select category first...' },
-    ...roles.map((r) => ({ value: r.id, label: r.name })),
-  ];
+  const categoryOptions = categories.map((c) => ({
+    value: c.id,
+    label: c.name,
+    slug: c.slug,
+  }));
+  const roleOptions = roles.map((r) => ({
+    value: r.id,
+    label: r.name,
+    slug: r.slug,
+  }));
 
   // Pre-fill from sessionStorage (set by register page) or from candidate
   useEffect(() => {
@@ -209,31 +210,34 @@ export default function CompleteProfilePage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>
-              Preferred Job Category <span className="text-red-500">*</span>
-            </label>
             {categoriesError && (
               <p className="text-sm mb-2" style={{ color: '#b91c1c' }}>
                 Could not load categories. Check that the backend is running and try again.
               </p>
             )}
-            <SelectDropdown
+            <ProfileStyleSelect
+              label="Preferred Job Category *"
               options={categoryOptions}
               value={formData.preferred_job_category_id}
               onChange={(v) => setFormData((prev) => ({ ...prev, preferred_job_category_id: v, preferred_job_role_id: '' }))}
               placeholder={categoriesLoading ? 'Loading...' : 'Select a job category'}
+              isLoading={categoriesLoading}
+              allowCustom
+              customPlaceholder="Or type your category"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>
-              Preferred Job Role <span className="text-red-500">*</span>
-            </label>
-            <SelectDropdown
+            <ProfileStyleSelect
+              label="Preferred Job Role *"
               options={roleOptions}
               value={formData.preferred_job_role_id}
               onChange={(v) => setFormData((prev) => ({ ...prev, preferred_job_role_id: v }))}
               placeholder={rolesLoading ? 'Loading...' : formData.preferred_job_category_id ? 'Select role' : 'Select category first'}
+              disabled={!formData.preferred_job_category_id}
+              isLoading={rolesLoading}
+              allowCustom
+              customPlaceholder="Or type your role (e.g. Backend Developer)"
             />
           </div>
 

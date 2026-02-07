@@ -1,7 +1,6 @@
 'use client';
 
-import type { SelectOption } from '@/components';
-import { SelectDropdown } from '@/components';
+import { ProfileStyleSelect } from '@/components/ui';
 import { CANDIDATE_VALIDATION, ROUTES } from '@/constants';
 import { getErrorMessage, isApiError } from '@/lib/api';
 import { useJobCategories, useRolesByCategory } from '@/lib/hooks/use-candidate';
@@ -48,22 +47,18 @@ export default function CandidateRegisterPage() {
     formData.preferred_job_category_id || undefined
   );
 
-  // Build dropdown options from API data
-  const categoryOptions: SelectOption[] = [
-    { value: '', label: 'Select a job category...' },
-    ...categories.map((cat) => ({
-      value: cat.id,
-      label: cat.name,
-    })),
-  ];
+  // Options for ProfileStyleSelect (scrollable + add custom): real options only, no empty placeholder
+  const categoryOptions = categories.map((cat) => ({
+    value: cat.id,
+    label: cat.name,
+    slug: cat.slug,
+  }));
 
-  const roleOptions: SelectOption[] = [
-    { value: '', label: formData.preferred_job_category_id ? 'Select a role...' : 'Select category first...' },
-    ...roles.map((role) => ({
-      value: role.id,
-      label: role.name,
-    })),
-  ];
+  const roleOptions = roles.map((role) => ({
+    value: role.id,
+    label: role.name,
+    slug: role.slug,
+  }));
 
   // Redirect if already authenticated (and profile complete, else complete-profile handles redirect)
   useEffect(() => {
@@ -367,40 +362,39 @@ export default function CandidateRegisterPage() {
               </div>
             </div>
 
-            {/* Job Category & Role Row */}
+            {/* Job Category & Role – scrollable dropdowns with "Or type your own" */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>
-                  Preferred Job Category
-                </label>
-                <SelectDropdown
-                  options={categoryOptions}
-                  value={formData.preferred_job_category_id}
-                  onChange={(val) =>
-                    setFormData((prev) => ({ ...prev, preferred_job_category_id: val }))
-                  }
-                  placeholder={categoriesLoading ? 'Loading categories...' : 'Select a category...'}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>
-                  Preferred Job Role
-                </label>
-                <SelectDropdown
-                  options={roleOptions}
-                  value={formData.preferred_job_role_id}
-                  onChange={(val) =>
-                    setFormData((prev) => ({ ...prev, preferred_job_role_id: val }))
-                  }
-                  placeholder={
-                    rolesLoading
-                      ? 'Loading roles...'
-                      : formData.preferred_job_category_id
-                        ? 'Select a role...'
-                        : 'Select category first...'
-                  }
-                />
-              </div>
+              <ProfileStyleSelect
+                label="Preferred Job Category"
+                options={categoryOptions}
+                value={formData.preferred_job_category_id}
+                onChange={(val) =>
+                  setFormData((prev) => ({ ...prev, preferred_job_category_id: val }))
+                }
+                placeholder={categoriesLoading ? 'Loading categories...' : 'Select a job category...'}
+                isLoading={categoriesLoading}
+                allowCustom
+                customPlaceholder="Or type your category"
+              />
+              <ProfileStyleSelect
+                label="Preferred Job Role"
+                options={roleOptions}
+                value={formData.preferred_job_role_id}
+                onChange={(val) =>
+                  setFormData((prev) => ({ ...prev, preferred_job_role_id: val }))
+                }
+                placeholder={
+                  rolesLoading
+                    ? 'Loading roles...'
+                    : formData.preferred_job_category_id
+                      ? 'Select a role...'
+                      : 'Select category first...'
+                }
+                disabled={!formData.preferred_job_category_id}
+                isLoading={rolesLoading}
+                allowCustom
+                customPlaceholder="Or type your role (e.g. Backend Developer)"
+              />
             </div>
 
             {/* Submit Button */}

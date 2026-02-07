@@ -79,7 +79,7 @@ export function SelectDropdown({
         />
       </button>
 
-      {/* Dropdown Menu */}
+      {/* Dropdown Menu – scrollable when many options */}
       {isOpen && (
         <div 
           className="absolute z-50 w-full mt-2 py-1 rounded-xl shadow-xl border overflow-hidden"
@@ -91,6 +91,7 @@ export function SelectDropdown({
             boxShadow: '0 10px 40px rgba(124, 58, 237, 0.15)',
           }}
         >
+          <div className="max-h-60 overflow-y-auto overflow-x-hidden py-1">
           {options.map((option) => {
             const isSelected = option.value === value;
             return (
@@ -125,6 +126,7 @@ export function SelectDropdown({
               </button>
             );
           })}
+          </div>
         </div>
       )}
     </div>
