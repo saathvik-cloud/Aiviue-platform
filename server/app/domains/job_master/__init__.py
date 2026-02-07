@@ -7,6 +7,7 @@ Question templates are stored per role for the resume builder bot.
 """
 
 from app.domains.job_master.models import (
+    FallbackResumeQuestion,
     JobCategory,
     JobRole,
     RoleQuestionTemplate,
@@ -26,6 +27,7 @@ from app.domains.job_master.api.routes import router as job_master_router
 
 __all__ = [
     # Models
+    "FallbackResumeQuestion",
     "JobCategory",
     "JobRole",
     "RoleQuestionTemplate",

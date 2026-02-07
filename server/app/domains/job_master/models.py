@@ -369,3 +369,82 @@ class RoleQuestionTemplate(Base):
 
     def __repr__(self) -> str:
         return f"<RoleQuestionTemplate(id={self.id}, role_id={self.role_id}, key={self.question_key})>"
+
+
+# ==================== FALLBACK RESUME QUESTIONS ====================
+# Used when candidate has no role in DB: general + job_type (blue/white/grey) questions.
+
+
+class FallbackResumeQuestion(Base):
+    """
+    Question template for fallback resume flow (no role or custom role).
+
+    job_type + experience_level both NULL = general questions.
+    Otherwise type-specific (e.g. blue_collar + experienced).
+    """
+
+    __tablename__ = "fallback_resume_questions"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
+    )
+    job_type: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="blue_collar, white_collar, grey_collar; null = general",
+    )
+    experience_level: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="experienced, fresher; null = general",
+    )
+    question_key: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+    question_text: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    question_type: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="text",
+    )
+    options: Mapped[Optional[dict]] = mapped_column(
+        JSONB,
+        nullable=True,
+    )
+    is_required: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False,
+    )
+    display_order: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
+    validation_rules: Mapped[Optional[dict]] = mapped_column(
+        JSONB,
+        nullable=True,
+    )
+    condition: Mapped[Optional[dict]] = mapped_column(
+        JSONB,
+        nullable=True,
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    def __repr__(self) -> str:
+        return f"<FallbackResumeQuestion(id={self.id}, key={self.question_key}, job_type={self.job_type})>"

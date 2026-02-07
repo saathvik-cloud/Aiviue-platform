@@ -74,6 +74,28 @@ QUESTION_KEY_TO_SECTION: Dict[str, str] = {
 
     # About
     "about": "about",
+
+    # Fallback / blue-collar extra (map to section or additional_info)
+    "reason_for_change": "about",
+    "training_certificates": "qualifications",
+    "when_can_start": "job_preferences",
+    "current_work": "experience",
+    "tools_machines": "skills",
+    "experience_years_blue": "experience",
+    "languages_blue": "personal_info",
+    "night_shift_ok": "job_preferences",
+    "why_this_work": "about",
+    "iti_training": "education",
+    "worked_before": "experience",
+    "learn_on_job": "about",
+    "current_job_daily": "experience",
+    "equipment_systems": "skills",
+    "certificates_licenses": "qualifications",
+    "difficult_problem": "about",
+    "work_alone": "about",
+    "on_call_ok": "job_preferences",
+    "customer_facing": "experience",
+    "desired_role_title": "personal_info",
 }
 
 

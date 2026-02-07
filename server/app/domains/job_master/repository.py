@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.domains.job_master.models import (
+    FallbackResumeQuestion,
     JobCategory,
     JobRole,
     RoleQuestionTemplate,
@@ -229,3 +230,31 @@ class JobMasterRepository:
 
         result = await self.db.execute(query)
         return list(result.scalars().unique().all())
+
+    # ==================== FALLBACK QUESTIONS ====================
+
+    async def get_fallback_questions(
+        self,
+        job_type: Optional[str] = None,
+        experience_level: Optional[str] = None,
+        active_only: bool = True,
+    ) -> List[FallbackResumeQuestion]:
+        """
+        Get fallback resume questions (for no-role flow).
+        Both job_type and experience_level None = general questions.
+        """
+        conditions = []
+        if job_type is None:
+            conditions.append(FallbackResumeQuestion.job_type.is_(None))
+        else:
+            conditions.append(FallbackResumeQuestion.job_type == job_type)
+        if experience_level is None:
+            conditions.append(FallbackResumeQuestion.experience_level.is_(None))
+        else:
+            conditions.append(FallbackResumeQuestion.experience_level == experience_level)
+        query = select(FallbackResumeQuestion).where(and_(*conditions))
+        if active_only:
+            query = query.where(FallbackResumeQuestion.is_active == True)
+        query = query.order_by(FallbackResumeQuestion.display_order)
+        result = await self.db.execute(query)
+        return list(result.scalars().all())

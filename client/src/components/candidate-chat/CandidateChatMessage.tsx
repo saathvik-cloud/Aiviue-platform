@@ -34,6 +34,19 @@ interface CandidateChatMessageProps {
     previousMessageType?: string;
 }
 
+/** Renders bot content and converts **bold** to <strong> for better UX. */
+function BotContent({ content, className = '' }: { content: string; className?: string }) {
+    if (content == null || content === '') return null;
+    const parts = content.split(/\*\*(.+?)\*\*/g);
+    return (
+        <span className={`whitespace-pre-wrap ${className}`}>
+            {parts.map((part, i) =>
+                i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+            )}
+        </span>
+    );
+}
+
 /**
  * CandidateChatMessage - Renders a single message with different styles based on type.
  */
@@ -108,7 +121,7 @@ export function CandidateChatMessage({
                         }}
                     >
                         <p className="text-sm" style={{ color: 'var(--status-closed)' }}>
-                            {message.content}
+                            <BotContent content={message.content} />
                         </p>
                     </div>
 
@@ -138,8 +151,8 @@ export function CandidateChatMessage({
             <div className={`flex items-start gap-3 mb-8 animate-fade-in`}>
                 {showAvatar ? <BotAvatar /> : <div className="w-9" />}
                 <div className="flex-1 max-w-md">
-                    <p className="text-sm mb-3 whitespace-pre-wrap" style={{ color: 'var(--neutral-dark)' }}>
-                        {message.content}
+                    <p className="text-sm mb-3" style={{ color: 'var(--neutral-dark)' }}>
+                        <BotContent content={message.content} />
                     </p>
 
                     {/* Resume Preview Card – extra mb-8 so "Would you like to save?" never overlaps */}
@@ -227,8 +240,8 @@ export function CandidateChatMessage({
                             border: '1px solid rgba(13, 148, 136, 0.1)',
                         }}
                     >
-                        <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--neutral-dark)' }}>
-                            {message.content}
+                        <p className="text-sm" style={{ color: 'var(--neutral-dark)' }}>
+                            <BotContent content={message.content} />
                         </p>
                     </div>
 
@@ -295,8 +308,8 @@ export function CandidateChatMessage({
                             border: '1px solid rgba(13, 148, 136, 0.1)',
                         }}
                     >
-                        <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--neutral-dark)' }}>
-                            {message.content}
+                        <p className="text-sm" style={{ color: 'var(--neutral-dark)' }}>
+                            <BotContent content={message.content} />
                         </p>
                     </div>
 
@@ -348,8 +361,8 @@ export function CandidateChatMessage({
                             border: '1px solid rgba(13, 148, 136, 0.1)',
                         }}
                     >
-                        <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--neutral-dark)' }}>
-                            {message.content}
+                        <p className="text-sm" style={{ color: 'var(--neutral-dark)' }}>
+                            <BotContent content={message.content} />
                         </p>
                     </div>
 
@@ -382,8 +395,8 @@ export function CandidateChatMessage({
                             border: '1px solid rgba(13, 148, 136, 0.1)',
                         }}
                     >
-                        <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--neutral-dark)' }}>
-                            {message.content}
+                        <p className="text-sm" style={{ color: 'var(--neutral-dark)' }}>
+                            <BotContent content={message.content} />
                         </p>
                     </div>
                 </div>
@@ -459,8 +472,8 @@ function MultiSelectMessage({
                         border: '1px solid rgba(13, 148, 136, 0.1)',
                     }}
                 >
-                    <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--neutral-dark)' }}>
-                        {message.content}
+                    <p className="text-sm" style={{ color: 'var(--neutral-dark)' }}>
+                        <BotContent content={message.content} />
                     </p>
                 </div>
 

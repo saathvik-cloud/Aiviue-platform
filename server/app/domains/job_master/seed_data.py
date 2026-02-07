@@ -9,7 +9,7 @@ import asyncio
 import uuid
 from typing import List, Dict, Any
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.job_master.models import (
@@ -506,6 +506,99 @@ QUESTION_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
             "display_order": 11,
         },
     ],
+    # White-collar: Backend Developer
+    "backend-developer": [
+        {
+            "question_key": "full_name",
+            "question_text": "What is your full name?",
+            "question_type": "text",
+            "is_required": True,
+            "display_order": 1,
+        },
+        {
+            "question_key": "date_of_birth",
+            "question_text": "What is your date of birth?",
+            "question_type": "date",
+            "is_required": True,
+            "display_order": 2,
+        },
+        {
+            "question_key": "education",
+            "question_text": "What is your highest education qualification?",
+            "question_type": "select",
+            "options": ["High School", "Diploma", "Bachelor's Degree", "Master's Degree", "PhD", "Other"],
+            "is_required": True,
+            "display_order": 3,
+        },
+        {
+            "question_key": "technical_skills",
+            "question_text": "What backend technologies and languages do you use?",
+            "question_type": "multi_select",
+            "options": ["Python", "Node.js", "Java", "Go", "C#", "Ruby", "PHP", "PostgreSQL", "MongoDB", "Redis", "SQL", "REST APIs", "GraphQL", "Docker", "AWS", "FastAPI", "Django", "Express.js", "Spring Boot"],
+            "is_required": True,
+            "display_order": 4,
+        },
+        {
+            "question_key": "experience_years",
+            "question_text": "How many years of backend development experience do you have?",
+            "question_type": "number",
+            "is_required": True,
+            "display_order": 5,
+            "validation_rules": {"min": 0, "max": 40},
+        },
+        {
+            "question_key": "experience_details",
+            "question_text": "Do you have experience building REST or GraphQL APIs? Briefly describe your backend experience.",
+            "question_type": "text",
+            "is_required": False,
+            "display_order": 6,
+        },
+        {
+            "question_key": "preferred_work_type",
+            "question_text": "What is your preferred work arrangement?",
+            "question_type": "select",
+            "options": ["Remote", "Onsite", "Hybrid", "Flexible"],
+            "is_required": True,
+            "display_order": 7,
+        },
+        {
+            "question_key": "preferred_location",
+            "question_text": "What is your preferred job location?",
+            "question_type": "text",
+            "is_required": True,
+            "display_order": 8,
+        },
+        {
+            "question_key": "languages_known",
+            "question_text": "Which languages do you speak?",
+            "question_type": "multi_select",
+            "options": ["Hindi", "English", "Tamil", "Telugu", "Kannada", "Bengali", "Marathi", "Gujarati", "Other"],
+            "is_required": False,
+            "display_order": 9,
+        },
+        {
+            "question_key": "salary_expectation",
+            "question_text": "What is your expected monthly salary (in INR)?",
+            "question_type": "number",
+            "is_required": True,
+            "display_order": 10,
+            "validation_rules": {"min": 15000, "max": 500000},
+        },
+        {
+            "question_key": "portfolio_url",
+            "question_text": "Do you have a GitHub profile or portfolio link? (Optional)",
+            "question_type": "text",
+            "is_required": False,
+            "display_order": 11,
+        },
+        {
+            "question_key": "about",
+            "question_text": "Tell us a little about yourself and your backend development goals.",
+            "question_type": "text",
+            "is_required": False,
+            "display_order": 12,
+        },
+    ],
     # White-collar: Graphic Designer
     "graphic-designer": [
         {
@@ -753,8 +846,51 @@ async def seed_job_master_data() -> None:
             raise
 
 
+async def add_backend_developer_templates_if_missing() -> None:
+    """
+    Add question templates for Backend Developer role if the role exists but has no templates.
+    Use this when the DB was already seeded before backend-developer templates were added.
+    """
+    async with async_session_factory() as session:
+        try:
+            # Find Backend Developer role by slug
+            result = await session.execute(
+                select(JobRole).where(JobRole.slug == "backend-developer")
+            )
+            role = result.scalar_one_or_none()
+            if not role:
+                logger.info("Backend Developer role not found. Run full seed first.")
+                return
+
+            # Check if it already has templates
+            count_result = await session.execute(
+                select(func.count()).select_from(RoleQuestionTemplate).where(
+                    RoleQuestionTemplate.role_id == role.id
+                )
+            )
+            if (count_result.scalar() or 0) > 0:
+                logger.info("Backend Developer already has question templates. Skipping.")
+                return
+
+            templates = QUESTION_TEMPLATES.get("backend-developer", [])
+            if not templates:
+                logger.warning("No backend-developer templates defined in QUESTION_TEMPLATES.")
+                return
+
+            for tmpl_data in templates:
+                template = RoleQuestionTemplate(role_id=role.id, **tmpl_data)
+                session.add(template)
+            await session.commit()
+            logger.info(f"Added {len(templates)} question templates for Backend Developer.")
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Failed to add Backend Developer templates: {e}")
+            raise
+
+
 # Allow running directly
 if __name__ == "__main__":
-    from sqlalchemy import func
     setup_logging()
     asyncio.run(seed_job_master_data())
+    # Also add backend-developer templates if DB was already seeded without them
+    asyncio.run(add_backend_developer_templates_if_missing())
