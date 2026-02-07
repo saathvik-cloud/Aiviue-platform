@@ -25,6 +25,7 @@ export const ROUTES = {
 
   // Candidate Dashboard Routes
   CANDIDATE_DASHBOARD: '/candidate/dashboard',
+  CANDIDATE_DASHBOARD_COMPLETE_PROFILE: '/candidate/dashboard/complete-profile',
   CANDIDATE_DASHBOARD_RESUME: '/candidate/dashboard/resume',
   CANDIDATE_DASHBOARD_RESUME_NEW: '/candidate/dashboard/resume/new',
   CANDIDATE_DASHBOARD_PROFILE: '/candidate/dashboard/profile',

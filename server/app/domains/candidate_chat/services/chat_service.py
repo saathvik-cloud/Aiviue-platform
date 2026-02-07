@@ -766,8 +766,9 @@ class CandidateChatService:
             job_type = ctx.get("job_type", "")
             method = ctx.get("method", "aivi_bot")
 
-            # Determine resume source
+            # Determine resume source and uploaded PDF URL (for download link)
             source = "pdf_upload" if method == "pdf_upload" else "aivi_bot"
+            uploaded_pdf_url = ctx.get("uploaded_pdf_url") if source == "pdf_upload" else None
 
             try:
                 # ==================== COMPILE & PERSIST RESUME ====================
@@ -778,6 +779,7 @@ class CandidateChatService:
                     job_type=job_type,
                     source=source,
                     chat_session_id=session.id,
+                    pdf_url=uploaded_pdf_url,
                 )
 
                 resume_id = result["resume_id"]

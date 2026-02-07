@@ -79,13 +79,19 @@ const EXTRACTION_PROGRESS_MESSAGES = [
     'Almost there... ✨',
 ];
 
+export interface CandidateChatContainerProps {
+    /** When 'upload', auto-selects "Upload PDF" so user goes straight to upload step */
+    initialFlow?: 'upload';
+}
+
 /**
  * CandidateChatContainer
  */
-export function CandidateChatContainer() {
+export function CandidateChatContainer({ initialFlow }: CandidateChatContainerProps = {}) {
     const candidate = useCandidateAuthStore((state) => state.candidate);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const wsManagerRef = useRef<CandidateChatSocketManager | null>(null);
+    const initialFlowSentRef = useRef(false);
 
     // View state
     const [viewMode, setViewMode] = useState<ViewMode>('chat');
@@ -299,6 +305,25 @@ export function CandidateChatContainer() {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [candidate?.id]);
+
+    // When initialFlow=upload, auto-send "Upload PDF" choice once session is ready
+    useEffect(() => {
+        if (
+            initialFlow !== 'upload' ||
+            initialFlowSentRef.current ||
+            !currentSessionId ||
+            isInitializing
+        ) {
+            return;
+        }
+        initialFlowSentRef.current = true;
+        handleSendMessage('📄 Upload My Resume', {
+            value: 'upload_pdf',
+            button_id: 'upload_pdf',
+            message_type: 'button_click',
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialFlow, currentSessionId, isInitializing]);
 
     // Send a message (via WebSocket, with REST fallback)
     const handleSendMessage = async (content: string, messageData?: Record<string, any>) => {

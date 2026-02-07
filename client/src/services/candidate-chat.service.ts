@@ -9,6 +9,7 @@
 import { API_ENDPOINTS, buildQueryParams } from '@/constants';
 import { del, get, post } from '@/lib/api';
 import type {
+    CandidateChatMessage,
     CandidateChatSessionListResponse,
     CandidateChatSessionWithMessages,
     CandidateSendMessageRequest,
@@ -97,9 +98,9 @@ export async function sendCandidateChatMessage(
 export async function getCandidateChatMessages(
   sessionId: string,
   limit?: number
-): Promise<any[]> {
+): Promise<CandidateChatMessage[]> {
   const params = limit ? buildQueryParams({ limit }) : '';
-  return get<any[]>(
+  return get<CandidateChatMessage[]>(
     `${API_ENDPOINTS.CANDIDATE_CHAT.SESSION_MESSAGES(sessionId)}${params}`
   );
 }
@@ -117,20 +118,24 @@ export async function deleteCandidateChatSession(
 
 /**
  * Build the WebSocket URL for a candidate chat session.
+ * Uses API base URL so WS connects to the same backend as REST (e.g. localhost:8000 in dev).
  */
 export function buildCandidateChatWSUrl(
   sessionId: string,
   candidateId: string
 ): string {
-  const protocol =
-    typeof window !== 'undefined' && window.location.protocol === 'https:'
-      ? 'wss:'
-      : 'ws:';
-  const host =
-    typeof window !== 'undefined'
-      ? window.location.host
-      : 'localhost:8000';
   const apiVersion = process.env.NEXT_PUBLIC_API_VERSION || 'v1';
-
-  return `${protocol}//${host}/api/${apiVersion}/candidate-chat/ws/${sessionId}?candidate_id=${candidateId}`;
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const isHttps = apiBase.startsWith('https:');
+  const protocol = isHttps ? 'wss:' : 'ws:';
+  try {
+    const url = new URL(apiBase);
+    const host = url.host;
+    return `${protocol}//${host}/api/${apiVersion}/candidate-chat/ws/${sessionId}?candidate_id=${candidateId}`;
+  } catch {
+    const host = typeof window !== 'undefined' ? window.location.host : 'localhost:8000';
+    const protocol =
+      typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${host}/api/${apiVersion}/candidate-chat/ws/${sessionId}?candidate_id=${candidateId}`;
+  }
 }

@@ -37,6 +37,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string; style?: 
  */
 const PAGE_TITLE_MAP: Record<string, string> = {
   [ROUTES.CANDIDATE_DASHBOARD]: 'Dashboard',
+  [ROUTES.CANDIDATE_DASHBOARD_COMPLETE_PROFILE]: 'Complete Profile',
   [ROUTES.CANDIDATE_DASHBOARD_RESUME]: 'Resume',
   [ROUTES.CANDIDATE_DASHBOARD_RESUME_NEW]: 'Build Resume',
   [ROUTES.CANDIDATE_DASHBOARD_PROFILE]: 'Profile',
@@ -79,6 +80,14 @@ export default function CandidateDashboardLayout({
       router.push(ROUTES.CANDIDATE_LOGIN);
     }
   }, [isAuthenticated, isLoading, router]);
+
+  // Require complete profile: if status is basic, redirect to complete-profile unless already there
+  useEffect(() => {
+    if (isLoading || !isAuthenticated || !candidate) return;
+    if (candidate.profile_status === 'basic' && pathname !== ROUTES.CANDIDATE_DASHBOARD_COMPLETE_PROFILE) {
+      router.replace(ROUTES.CANDIDATE_DASHBOARD_COMPLETE_PROFILE);
+    }
+  }, [candidate?.profile_status, isAuthenticated, isLoading, pathname, router]);
 
   const handleLogout = () => {
     clearCandidate();

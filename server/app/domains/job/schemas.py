@@ -243,7 +243,8 @@ class JobResponse(BaseModel):
     
     id: UUID
     employer_id: UUID
-    
+    employer_name: Optional[str] = None  # Company/employer name for candidate job detail
+
     # Basic Info
     title: str
     description: str
@@ -305,6 +306,7 @@ class JobSummaryResponse(BaseModel):
     
     id: UUID
     employer_id: UUID
+    employer_name: Optional[str] = None  # Company/employer name for candidate job cards
     title: str
     location: Optional[str]
     work_type: Optional[str]

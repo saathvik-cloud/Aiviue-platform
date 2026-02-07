@@ -16,6 +16,7 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
 // Storage bucket names
 export const LOGO_BUCKET = 'aiviue-logos';
 export const RESUME_BUCKET = 'resumes';
+export const PROFILE_PHOTO_BUCKET = 'profile-photos';
 
 /**
  * Upload resume PDF to Supabase Storage
@@ -76,6 +77,39 @@ export async function uploadLogo(file: File, employerId: string): Promise<string
   // Get public URL
   const { data: { publicUrl } } = supabase.storage
     .from(LOGO_BUCKET)
+    .getPublicUrl(filePath);
+
+  return publicUrl;
+}
+
+/**
+ * Upload candidate profile photo to Supabase Storage
+ * @param file - Image file (JPG/PNG, max 2MB recommended)
+ * @param candidateId - Candidate UUID for path
+ * @returns The public URL of the uploaded file
+ */
+export async function uploadProfilePhoto(file: File, candidateId: string): Promise<string> {
+  const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  if (!['jpg', 'jpeg', 'png', 'webp'].includes(fileExt)) {
+    throw new Error('Profile photo must be JPG, PNG, or WebP');
+  }
+  const fileName = `${candidateId}-${Date.now()}.${fileExt}`;
+  const filePath = `candidates/${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(PROFILE_PHOTO_BUCKET)
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: true,
+    });
+
+  if (uploadError) {
+    console.error('Upload error:', uploadError);
+    throw new Error(`Failed to upload photo: ${uploadError.message}`);
+  }
+
+  const { data: { publicUrl } } = supabase.storage
+    .from(PROFILE_PHOTO_BUCKET)
     .getPublicUrl(filePath);
 
   return publicUrl;

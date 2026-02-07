@@ -698,10 +698,12 @@ class JobService:
         return data
     
     def _to_response(self, job: Job) -> JobResponse:
-        """Convert Job model to response."""
+        """Convert Job model to response (includes employer name when loaded)."""
+        employer_name = job.employer.company_name if job.employer else None
         return JobResponse(
             id=job.id,
             employer_id=job.employer_id,
+            employer_name=employer_name,
             title=job.title,
             description=job.description,
             requirements=job.requirements,
@@ -734,10 +736,12 @@ class JobService:
         )
     
     def _to_summary_response(self, job: Job) -> JobSummaryResponse:
-        """Convert Job model to summary response."""
+        """Convert Job model to summary response (includes employer/company name for candidate cards)."""
+        employer_name = job.employer.company_name if job.employer else None
         return JobSummaryResponse(
             id=job.id,
             employer_id=job.employer_id,
+            employer_name=employer_name,
             title=job.title,
             location=job.location,
             work_type=job.work_type,

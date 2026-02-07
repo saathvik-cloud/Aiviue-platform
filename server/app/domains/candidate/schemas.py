@@ -216,6 +216,9 @@ class CandidateResponse(BaseModel):
     version: int
     created_at: datetime
     updated_at: datetime
+    # Masked sensitive fields (last 4 digits visible); never raw Aadhaar/PAN
+    aadhaar_masked: Optional[str] = None
+    pan_masked: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

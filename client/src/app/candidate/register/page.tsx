@@ -65,10 +65,12 @@ export default function CandidateRegisterPage() {
     })),
   ];
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (and profile complete, else complete-profile handles redirect)
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      router.push(ROUTES.CANDIDATE_DASHBOARD);
+      const c = useCandidateAuthStore.getState().candidate;
+      if (c?.profile_status === 'complete') router.push(ROUTES.CANDIDATE_DASHBOARD);
+      else router.push(ROUTES.CANDIDATE_DASHBOARD_COMPLETE_PROFILE);
     }
   }, [isAuthenticated, authLoading, router]);
 
@@ -151,8 +153,21 @@ export default function CandidateRegisterPage() {
       });
 
       setCandidate(response.candidate);
-      toast.success('Account created successfully! Welcome to AIVIUE.');
-      router.push(ROUTES.CANDIDATE_DASHBOARD);
+      toast.success('Account created successfully! Complete your profile to continue.');
+      // Pass signup form data for pre-fill on complete-profile page
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(
+          'aiviue_complete_profile_prefill',
+          JSON.stringify({
+            name: formData.name.trim(),
+            current_location: formData.current_location.trim(),
+            preferred_job_category_id: formData.preferred_job_category_id,
+            preferred_job_role_id: formData.preferred_job_role_id,
+            preferred_job_location: formData.preferred_job_location.trim(),
+          })
+        );
+      }
+      router.push(ROUTES.CANDIDATE_DASHBOARD_COMPLETE_PROFILE);
     } catch (err) {
       if (isApiError(err, 'MOBILE_ALREADY_EXISTS') || isApiError(err, 'CONFLICT')) {
         setMobileError('This mobile number is already registered. Please login instead.');

@@ -5,7 +5,7 @@ Pydantic schemas (DTOs) for job categories, roles, and question templates.
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -74,7 +74,8 @@ class JobRoleResponse(BaseModel):
     slug: str
     description: Optional[str] = None
     job_type: str
-    suggested_skills: Optional[dict] = None
+    # DB/seed stores list of strings; allow dict for backwards compatibility
+    suggested_skills: Optional[Union[dict, List[str]]] = None
     is_active: bool
     created_at: datetime
 
@@ -89,7 +90,8 @@ class JobRoleWithCategoriesResponse(BaseModel):
     slug: str
     description: Optional[str] = None
     job_type: str
-    suggested_skills: Optional[dict] = None
+    # DB/seed stores list of strings; allow dict for backwards compatibility
+    suggested_skills: Optional[Union[dict, List[str]]] = None
     is_active: bool
     created_at: datetime
     categories: List[JobCategoryResponse] = Field(default_factory=list)

@@ -10,6 +10,7 @@ import { get, post, put } from '@/lib/api';
 import type {
     Candidate,
     CandidateAuthResponse,
+    CandidateBasicProfileRequest,
     CandidateLoginRequest,
     CandidateResume,
     CandidateSignupRequest,
@@ -58,6 +59,17 @@ export async function getCandidateById(id: string): Promise<Candidate> {
 }
 
 /**
+ * Create basic profile (mandatory after signup).
+ * Required: name, current_location, preferred_job_category_id, preferred_job_role_id, preferred_job_location.
+ */
+export async function createBasicProfile(
+  candidateId: string,
+  data: CandidateBasicProfileRequest
+): Promise<Candidate> {
+  return post<Candidate>(API_ENDPOINTS.CANDIDATES.BASIC_PROFILE(candidateId), data);
+}
+
+/**
  * Update candidate profile.
  * Requires version for optimistic locking.
  */
@@ -81,9 +93,13 @@ export async function getLatestResume(candidateId: string): Promise<CandidateRes
 
 /**
  * Get all job categories (with roles).
+ * Backend returns { items: JobCategory[], total_count: number }.
  */
 export async function getJobCategories(): Promise<JobCategory[]> {
-  return get<JobCategory[]>(API_ENDPOINTS.JOB_MASTER.CATEGORIES);
+  const res = await get<{ items: JobCategory[]; total_count: number }>(
+    API_ENDPOINTS.JOB_MASTER.CATEGORIES
+  );
+  return res?.items ?? [];
 }
 
 /**

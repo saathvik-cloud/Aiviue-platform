@@ -43,6 +43,7 @@ export const API_ENDPOINTS = {
     BY_MOBILE: (mobile: string) => `/api/${API_VERSION}/candidates/mobile/${mobile}`,
     SIGNUP: `/api/${API_VERSION}/candidates/signup`,
     LOGIN: `/api/${API_VERSION}/candidates/login`,
+    BASIC_PROFILE: (id: string) => `/api/${API_VERSION}/candidates/${id}/basic-profile`,
     PROFILE: (id: string) => `/api/${API_VERSION}/candidates/${id}/profile`,
     RESUME: (id: string) => `/api/${API_VERSION}/candidates/${id}/resume`,
   },

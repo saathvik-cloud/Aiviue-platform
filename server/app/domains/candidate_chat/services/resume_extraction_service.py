@@ -131,6 +131,7 @@ FIELD_NORMALIZERS: Dict[str, callable] = {
 }
 
 # Question key → expected type (for normalization without template)
+# Keep in sync with role question templates and resume parse prompt keys.
 KEY_TYPE_HINTS: Dict[str, str] = {
     "full_name": "text",
     "date_of_birth": "date",
@@ -139,7 +140,11 @@ KEY_TYPE_HINTS: Dict[str, str] = {
     "preferred_location": "text",
     "languages_known": "multi_select",
     "education": "text",
+    "highest_education": "text",
     "skills": "multi_select",
+    "technical_skills": "multi_select",
+    "design_skills": "multi_select",
+    "design_tools": "multi_select",
     "experience_years": "number",
     "experience_details": "text",
     "salary_expectation": "number",
@@ -451,8 +456,9 @@ class ResumeExtractionService:
                 retryable=True,
             )
 
-        # Step 3: Normalize extracted data
-        extracted_data = llm_result.get("extracted_data", {})
+        # Step 3: Normalize extracted data (keys lowercased so "Full_Name" matches "full_name")
+        raw_extracted = llm_result.get("extracted_data", {}) or {}
+        extracted_data = {str(k).strip().lower(): v for k, v in raw_extracted.items() if k}
         normalized_data = self._normalize_extracted_data(
             extracted_data, question_templates
         )

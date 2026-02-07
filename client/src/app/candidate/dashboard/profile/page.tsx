@@ -17,7 +17,9 @@
  * Design: Glassmorphism cards with teal accents (candidate theme)
  */
 
+import { CANDIDATE_VALIDATION } from '@/constants';
 import { useJobCategories, useRolesByCategory, useUpdateCandidate } from '@/lib/hooks';
+import { uploadProfilePhoto } from '@/lib/supabase';
 import { useCandidateAuthStore } from '@/stores';
 import type { CandidateUpdateRequest, JobCategory, JobRole } from '@/types';
 import {
@@ -38,7 +40,7 @@ import {
   User
 } from 'lucide-react';
 import Image from 'next/image';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 // ==================== TYPES ====================
@@ -129,6 +131,9 @@ export default function CandidateProfilePage() {
   const [errors, setErrors] = useState<Partial<Record<keyof ProfileFormData, string>>>({});
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize form from candidate data
   useEffect(() => {
@@ -484,6 +489,40 @@ export default function CandidateProfilePage() {
         'Profile Photo',
         <Camera className="w-5 h-5 text-teal-600" />,
         <div className="flex items-center gap-6">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (!file || !candidate) return;
+              setPhotoError(null);
+              const maxBytes = CANDIDATE_VALIDATION.PROFILE_PHOTO_MAX_SIZE_MB * 1024 * 1024;
+              if (file.size > maxBytes) {
+                setPhotoError(`Photo must be under ${CANDIDATE_VALIDATION.PROFILE_PHOTO_MAX_SIZE_MB}MB`);
+                toast.error(`File too large. Max ${CANDIDATE_VALIDATION.PROFILE_PHOTO_MAX_SIZE_MB}MB.`);
+                return;
+              }
+              setIsUploadingPhoto(true);
+              try {
+                const url = await uploadProfilePhoto(file, candidate.id);
+                const updated = await updateCandidateMutation.mutateAsync({
+                  id: candidate.id,
+                  data: { profile_photo_url: url, version: candidate.version },
+                });
+                setCandidate(updated);
+                toast.success('Profile photo updated');
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : 'Upload failed';
+                setPhotoError(msg);
+                toast.error(msg);
+              } finally {
+                setIsUploadingPhoto(false);
+              }
+            }}
+          />
           {/* Photo Preview */}
           <div className="relative">
             <div
@@ -506,10 +545,13 @@ export default function CandidateProfilePage() {
               )}
             </div>
             <button
-              className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full flex items-center justify-center text-white shadow-lg"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingPhoto}
+              className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full flex items-center justify-center text-white shadow-lg disabled:opacity-60"
               style={{ background: 'linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)' }}
             >
-              <Camera className="w-4 h-4" />
+              {isUploadingPhoto ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
             </button>
           </div>
 
@@ -520,11 +562,24 @@ export default function CandidateProfilePage() {
             <p className="text-xs mt-1" style={{ color: 'var(--neutral-gray)' }}>
               JPG or PNG, max 2MB. Square images work best.
             </p>
+            {photoError && (
+              <p className="mt-1 text-xs text-red-600">{photoError}</p>
+            )}
             <button
-              className="mt-3 px-4 py-2 rounded-lg text-sm font-medium btn-glass border border-neutral-200 hover:border-teal-300 transition-all"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingPhoto}
+              className="mt-3 px-4 py-2 rounded-lg text-sm font-medium btn-glass border border-neutral-200 hover:border-teal-300 transition-all disabled:opacity-60"
               style={{ color: 'var(--neutral-dark)' }}
             >
-              Upload Photo
+              {isUploadingPhoto ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin inline-block mr-2" />
+                  Uploading...
+                </>
+              ) : (
+                'Upload Photo'
+              )}
             </button>
           </div>
         </div>

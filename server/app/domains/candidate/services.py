@@ -4,11 +4,14 @@ Candidate Domain Services for Aiviue Platform.
 Business logic for candidate management, authentication, and profile operations.
 """
 
-import hashlib
+import base64
 import os
 from typing import Optional
 from uuid import UUID
 
+from cryptography.fernet import Fernet, InvalidToken
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.candidate.models import (
@@ -37,28 +40,82 @@ from app.shared.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Fixed salt for key derivation (not used as encryption IV; key is from secret)
+_FERNET_KDF_SALT = b"aiviue_aadhaar_pan_salt_v1"
 
-# ==================== ENCRYPTION HELPERS ====================
+
+def _get_fernet() -> Optional[Fernet]:
+    """Build Fernet (AES) instance from env secret. Returns None if not configured."""
+    secret = os.environ.get("ENCRYPTION_KEY") or os.environ.get("SECRET_KEY")
+    if not secret:
+        return None
+    try:
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=_FERNET_KDF_SALT,
+            iterations=480_000,
+        )
+        key = base64.urlsafe_b64encode(kdf.derive(secret.encode()))
+        return Fernet(key)
+    except Exception:
+        return None
+
 
 def _encrypt_sensitive(value: str) -> str:
     """
-    Basic encryption for sensitive data (Aadhaar/PAN).
-    
-    For MVP, we use SHA-256 hashing with a salt prefix.
-    In production, replace with proper AES encryption.
+    Encrypt sensitive data (Aadhaar/PAN) with AES (Fernet).
+    Allows decryption for masked display (e.g. last 4 digits).
     """
-    salt = os.environ.get("ENCRYPTION_SALT", "aiviue_mvp_salt_2026")
-    return hashlib.sha256(f"{salt}:{value}".encode()).hexdigest()
+    f = _get_fernet()
+    if not f:
+        # Fallback: do not store plaintext; use a placeholder so we don't break
+        logger.warning("ENCRYPTION_KEY or SECRET_KEY not set; sensitive fields will not be stored")
+        return ""
+    return f.encrypt(value.encode()).decode()
 
 
+def _decrypt_sensitive(encrypted: str) -> Optional[str]:
+    """Decrypt value for masking only. Returns None if decryption fails or not configured."""
+    if not encrypted:
+        return None
+    f = _get_fernet()
+    if not f:
+        return None
+    try:
+        return f.decrypt(encrypted.encode()).decode()
+    except InvalidToken:
+        return None
+
+
+# Used when returning masked Aadhaar/PAN in profile/API responses (aadhaar_masked, pan_masked).
 def _mask_aadhaar(aadhaar: str) -> str:
-    """Mask Aadhaar for display: XXXX XXXX 1234"""
+    """Mask Aadhaar for display: XXXX XXXX 1234 (last 4 digits visible)."""
     return f"XXXX XXXX {aadhaar[-4:]}" if len(aadhaar) >= 4 else "XXXX"
 
 
 def _mask_pan(pan: str) -> str:
-    """Mask PAN for display: XXXXX1234X"""
+    """Mask PAN for display: XXXXX1234X (last 5 chars visible)."""
     return f"XXXXX{pan[5:]}" if len(pan) >= 6 else "XXXXX"
+
+
+def _candidate_response_with_masked(
+    candidate: Candidate,
+    response: Optional[CandidateResponse] = None,
+) -> CandidateResponse:
+    """Attach aadhaar_masked and pan_masked to CandidateResponse from encrypted fields."""
+    r = response or CandidateResponse.model_validate(candidate)
+    aadhaar_masked = None
+    pan_masked = None
+    if getattr(candidate, "aadhaar_number_encrypted", None):
+        plain = _decrypt_sensitive(candidate.aadhaar_number_encrypted)
+        if plain:
+            aadhaar_masked = _mask_aadhaar(plain)
+    if getattr(candidate, "pan_number_encrypted", None):
+        plain = _decrypt_sensitive(candidate.pan_number_encrypted)
+        if plain:
+            pan_masked = _mask_pan(plain)
+    return r.model_copy(update={"aadhaar_masked": aadhaar_masked, "pan_masked": pan_masked})
 
 
 # ==================== SERVICE ====================
@@ -103,7 +160,7 @@ class CandidateService:
         logger.info(f"New candidate registered: {candidate.id}", extra={"candidate_id": str(candidate.id)})
 
         return CandidateAuthResponse(
-            candidate=CandidateResponse.model_validate(candidate),
+            candidate=_candidate_response_with_masked(candidate),
             is_new=True,
             message="Account created successfully! Please complete your basic profile.",
         )
@@ -125,7 +182,7 @@ class CandidateService:
         logger.info(f"Candidate logged in: {candidate.id}", extra={"candidate_id": str(candidate.id)})
 
         return CandidateAuthResponse(
-            candidate=CandidateResponse.model_validate(candidate),
+            candidate=_candidate_response_with_masked(candidate),
             is_new=False,
             message="Welcome back!",
         )
@@ -141,7 +198,7 @@ class CandidateService:
                 error_code="CANDIDATE_NOT_FOUND",
                 context={"candidate_id": str(candidate_id)},
             )
-        return CandidateResponse.model_validate(candidate)
+        return _candidate_response_with_masked(candidate)
 
     async def create_basic_profile(
         self,
@@ -166,7 +223,7 @@ class CandidateService:
             "preferred_job_category_id": request.preferred_job_category_id,
             "preferred_job_role_id": request.preferred_job_role_id,
             "preferred_job_location": request.preferred_job_location.strip(),
-            "profile_status": ProfileStatus.BASIC,
+            "profile_status": ProfileStatus.COMPLETE,  # User finished mandatory step; allow dashboard access
         }
 
         updated = await self.repository.update(
@@ -180,7 +237,7 @@ class CandidateService:
             raise NotFoundError(message="Candidate not found")
 
         await self.session.refresh(updated)
-        return CandidateResponse.model_validate(updated)
+        return _candidate_response_with_masked(updated)
 
     async def update_profile(
         self,
@@ -221,19 +278,22 @@ class CandidateService:
         if request.languages_known is not None:
             update_data["languages_known"] = request.languages_known
 
-        # Handle sensitive fields (encrypt)
-        if request.aadhaar_number is not None:
-            update_data["aadhaar_number_encrypted"] = _encrypt_sensitive(request.aadhaar_number)
-
-        if request.pan_number is not None:
-            update_data["pan_number_encrypted"] = _encrypt_sensitive(request.pan_number)
+        # Handle sensitive fields (AES encrypt; skip if no key configured)
+        if request.aadhaar_number is not None and _get_fernet():
+            enc = _encrypt_sensitive(request.aadhaar_number)
+            if enc:
+                update_data["aadhaar_number_encrypted"] = enc
+        if request.pan_number is not None and _get_fernet():
+            enc = _encrypt_sensitive(request.pan_number)
+            if enc:
+                update_data["pan_number_encrypted"] = enc
 
         # Update profile status to complete if we have all key fields
         if self._is_profile_complete(candidate, update_data):
             update_data["profile_status"] = ProfileStatus.COMPLETE
 
         if not update_data:
-            return CandidateResponse.model_validate(candidate)
+            return _candidate_response_with_masked(candidate)
 
         updated = await self.repository.update(
             candidate_id,
@@ -246,7 +306,7 @@ class CandidateService:
             raise NotFoundError(message="Candidate not found")
 
         await self.session.refresh(updated)
-        return CandidateResponse.model_validate(updated)
+        return _candidate_response_with_masked(updated)
 
     def _is_profile_complete(self, candidate: Candidate, update_data: dict) -> bool:
         """Check if profile has all required fields for 'complete' status."""

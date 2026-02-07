@@ -23,10 +23,12 @@ export default function CandidateLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (to dashboard or complete-profile if basic)
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      router.push(ROUTES.CANDIDATE_DASHBOARD);
+      const c = useCandidateAuthStore.getState().candidate;
+      if (c?.profile_status === 'complete') router.push(ROUTES.CANDIDATE_DASHBOARD);
+      else router.push(ROUTES.CANDIDATE_DASHBOARD_COMPLETE_PROFILE);
     }
   }, [isAuthenticated, authLoading, router]);
 
@@ -53,7 +55,8 @@ export default function CandidateLoginPage() {
       const candidate = await getCandidateByMobile(mobile);
       setCandidate(candidate);
       toast.success(`Welcome back, ${candidate.name}!`);
-      router.push(ROUTES.CANDIDATE_DASHBOARD);
+      if (candidate.profile_status === 'complete') router.push(ROUTES.CANDIDATE_DASHBOARD);
+      else router.push(ROUTES.CANDIDATE_DASHBOARD_COMPLETE_PROFILE);
     } catch (err) {
       const message = getErrorMessage(err);
       if (message.includes('not found') || message.includes('Not Found')) {

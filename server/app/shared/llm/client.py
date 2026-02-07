@@ -460,33 +460,40 @@ class GeminiClient:
             )
     
     def _parse_json(self, content: str) -> dict[str, Any]:
-        """Parse JSON from LLM response, handling markdown code blocks."""
-        # Clean up content
+        """Parse JSON from LLM response, handling markdown code blocks and trailing noise."""
         text = content.strip()
-        
         # Remove markdown code blocks if present
         if text.startswith("```"):
             lines = text.split("\n")
-            # Remove first line (```json or ```)
             lines = lines[1:]
-            # Remove last line (```)
             if lines and lines[-1].strip() == "```":
                 lines = lines[:-1]
             text = "\n".join(lines)
-        
+        text = text.strip()
         try:
             return json.loads(text)
-        except json.JSONDecodeError as e:
-            logger.error(
-                f"JSON parse error: {e}",
-                extra={"content": content[:500]}
-            )
-            raise LLMError(
-                error_type=LLMErrorType.PARSE_ERROR,
-                message=f"Failed to parse JSON: {str(e)}",
-                retryable=False,
-                raw_error=e,
-            )
+        except json.JSONDecodeError:
+            pass
+        # Fallback: find first { and last } to extract a single JSON object
+        start = text.find("{")
+        if start != -1:
+            depth = 0
+            for i in range(start, len(text)):
+                if text[i] == "{":
+                    depth += 1
+                elif text[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        try:
+                            return json.loads(text[start : i + 1])
+                        except json.JSONDecodeError:
+                            break
+        logger.error("JSON parse failed", extra={"content": content[:500]})
+        raise LLMError(
+            error_type=LLMErrorType.PARSE_ERROR,
+            message="Failed to parse JSON from LLM response",
+            retryable=False,
+        )
 
 
 # Global client instance (lazy initialized)

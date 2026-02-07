@@ -20,6 +20,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.candidate.models import ResumeSource, ResumeStatus
 from app.domains.candidate.repository import CandidateRepository
+from app.domains.candidate_chat.services.resume_pdf_service import (
+    build_resume_pdf,
+    upload_resume_pdf,
+)
 from app.shared.logging import get_logger
 
 
@@ -117,6 +121,7 @@ class ResumeBuilderService:
         job_type: str,
         source: str = ResumeSource.AIVI_BOT,
         chat_session_id: Optional[UUID] = None,
+        pdf_url: Optional[str] = None,
     ) -> dict:
         """
         Compile collected answers into structured resume and persist.
@@ -125,7 +130,7 @@ class ResumeBuilderService:
         1. Structure flat data into sections via dictionary dispatch
         2. Add metadata (role, job_type, timestamps)
         3. Invalidate all existing completed resumes (atomic)
-        4. Create new resume with incremented version
+        4. Create new resume with incremented version (and pdf_url when provided)
         5. Return the created resume data
 
         Args:
@@ -135,6 +140,7 @@ class ResumeBuilderService:
             job_type: "blue_collar" or "white_collar"
             source: How resume was created (aivi_bot or pdf_upload)
             chat_session_id: Link to the chat session (for traceability)
+            pdf_url: Optional URL for resume PDF (uploaded file URL or generated PDF URL)
 
         Returns:
             Dict with resume_id, version, resume_data, and status
@@ -169,11 +175,21 @@ class ResumeBuilderService:
                 extra={"candidate_id": str(candidate_id)},
             )
 
-        # Step 4: Create new resume record
+        # Step 3b: If no pdf_url (e.g. aivi_bot flow), generate PDF from JSON and upload
+        if pdf_url is None:
+            try:
+                pdf_bytes = build_resume_pdf(structured_data)
+                generated_url = upload_resume_pdf(pdf_bytes, candidate_id, new_version)
+                if generated_url:
+                    pdf_url = generated_url
+            except Exception as e:
+                logger.warning("Resume PDF generation/upload failed: %s", e)
+
+        # Step 4: Create new resume record (pdf_url: uploaded file URL or generated PDF URL)
         resume_record = await self._candidate_repo.create_resume({
             "candidate_id": candidate_id,
             "resume_data": structured_data,
-            "pdf_url": None,  # PDF generation is a future step
+            "pdf_url": pdf_url,
             "source": source,
             "status": ResumeStatus.COMPLETED,
             "version_number": new_version,
