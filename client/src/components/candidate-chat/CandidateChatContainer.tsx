@@ -618,7 +618,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
                                         Click below to start a conversation with AIVI
                                     </p>
                                     <button
-                                        onClick={handleNewChat}
+                                        onClick={() => handleNewChat()}
                                         className="px-6 py-2.5 rounded-xl font-medium text-white transition-all hover:scale-105"
                                         style={{ background: 'linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)' }}
                                     >
