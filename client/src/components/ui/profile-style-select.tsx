@@ -3,9 +3,11 @@
 /**
  * ProfileStyleSelect - Dropdown that matches the profile menu look (rounded card, icon + text, separators).
  * Supports "Or type your own" with normalized matching (case, hyphen, spaces) so e.g. "backend developer" matches "Backend Developer".
+ * Renders dropdown in a portal so it appears above sibling sections (avoids z-index/stacking and overflow clipping).
  */
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useLayoutEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
 
 export interface ProfileStyleSelectOption {
@@ -79,17 +81,56 @@ export function ProfileStyleSelect({
 }: ProfileStyleSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [customInput, setCustomInput] = useState('');
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selectedOption = options.find((o) => o.value === value);
 
+  // Position dropdown under trigger (for portal). Fixed = viewport-relative.
+  useLayoutEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return;
+    const el = dropdownRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setDropdownPosition({
+      top: rect.bottom,
+      left: rect.left,
+      width: rect.width,
+    });
+  }, [isOpen]);
+
+  const updatePosition = () => {
+    const el = dropdownRef.current;
+    if (!el || !isOpen) return;
+    const rect = el.getBoundingClientRect();
+    setDropdownPosition({
+      top: rect.bottom,
+      left: rect.left,
+      width: rect.width,
+    });
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [isOpen]);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const inTrigger = dropdownRef.current?.contains(target);
+      const inPanel = panelRef.current?.contains(target);
+      if (!inTrigger && !inPanel) {
         setIsOpen(false);
+        setDropdownPosition(null);
         if (allowCustom && customInput.trim()) {
-          const normalized = normalizeForMatch(customInput);
           const match = options.find((o) => optionMatchesInput(o, customInput));
           if (match) {
             onChange(match.value);
@@ -104,7 +145,10 @@ export function ProfileStyleSelect({
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsOpen(false);
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+        setDropdownPosition(null);
+      }
     };
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
@@ -118,6 +162,7 @@ export function ProfileStyleSelect({
     onChange(optionValue);
     setCustomInput('');
     setIsOpen(false);
+    setDropdownPosition(null);
   };
 
   const handleCustomKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -162,62 +207,70 @@ export function ProfileStyleSelect({
           )}
         </button>
 
-        {isOpen && (
-          <div
-            className="absolute z-50 w-full mt-2 rounded-2xl py-2 overflow-hidden"
-            style={{
-              background: 'rgba(255, 255, 255, 0.98)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              border: '1px solid rgba(226, 232, 240, 0.8)',
-              boxShadow: '0 10px 40px rgba(124, 58, 237, 0.15)',
-            }}
-          >
-            <div className="py-1 max-h-60 overflow-y-auto">
-              {filteredOptions.map((option) => {
-                const isSelected = option.value === value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => handleSelect(option.value)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors hover:bg-[var(--primary-50)]"
-                    style={{
-                      color: isSelected ? 'var(--primary)' : 'var(--neutral-dark)',
-                      backgroundColor: isSelected ? 'var(--primary-50)' : 'transparent',
-                    }}
-                  >
-                    {icon && <span style={{ color: 'var(--neutral-gray)' }}>{icon}</span>}
-                    <span className="flex-1 truncate">{option.label}</span>
-                    {isSelected && <Check className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--primary)' }} />}
-                  </button>
-                );
-              })}
-            </div>
-
-            {allowCustom && (
-              <div
-                className="border-t px-3 py-2"
-                style={{ borderColor: 'var(--neutral-border)' }}
-              >
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={customInput}
-                  onChange={(e) => setCustomInput(e.target.value)}
-                  onKeyDown={handleCustomKeyDown}
-                  placeholder={customPlaceholder}
-                  className="w-full px-3 py-2 rounded-xl text-sm border"
-                  style={{
-                    borderColor: 'var(--neutral-border)',
-                    background: 'rgba(246, 239, 214, 0.3)',
-                    color: 'var(--text-primary)',
-                  }}
-                />
+        {isOpen &&
+          typeof document !== 'undefined' &&
+          createPortal(
+            <div
+              ref={panelRef}
+              className="fixed rounded-2xl py-2 overflow-hidden mt-2"
+              style={{
+                top: dropdownPosition?.top ?? 0,
+                left: dropdownPosition?.left ?? 0,
+                width: dropdownPosition?.width ?? 240,
+                zIndex: 9999,
+                background: 'rgba(255, 255, 255, 0.98)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: '1px solid rgba(226, 232, 240, 0.8)',
+                boxShadow: '0 10px 40px rgba(124, 58, 237, 0.15)',
+              }}
+            >
+              <div className="py-1 max-h-60 overflow-y-auto overflow-x-hidden">
+                {filteredOptions.map((option) => {
+                  const isSelected = option.value === value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleSelect(option.value)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors hover:bg-[var(--primary-50)]"
+                      style={{
+                        color: isSelected ? 'var(--primary)' : 'var(--neutral-dark)',
+                        backgroundColor: isSelected ? 'var(--primary-50)' : 'transparent',
+                      }}
+                    >
+                      {icon && <span style={{ color: 'var(--neutral-gray)' }}>{icon}</span>}
+                      <span className="flex-1 truncate">{option.label}</span>
+                      {isSelected && <Check className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--primary)' }} />}
+                    </button>
+                  );
+                })}
               </div>
-            )}
-          </div>
-        )}
+
+              {allowCustom && (
+                <div
+                  className="border-t px-3 py-2"
+                  style={{ borderColor: 'var(--neutral-border)' }}
+                >
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={customInput}
+                    onChange={(e) => setCustomInput(e.target.value)}
+                    onKeyDown={handleCustomKeyDown}
+                    placeholder={customPlaceholder}
+                    className="w-full px-3 py-2 rounded-xl text-sm border"
+                    style={{
+                      borderColor: 'var(--neutral-border)',
+                      background: 'rgba(246, 239, 214, 0.3)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                </div>
+              )}
+            </div>,
+            document.body
+          )}
       </div>
     </div>
   );
