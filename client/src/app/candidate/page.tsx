@@ -43,7 +43,12 @@ export default function CandidateLandingPage() {
                   priority
                 />
               </Link>
-              <span
+              
+            </div>
+
+            {/* Auth Buttons */}
+            <div className="flex items-center gap-2 sm:gap-3">
+            <span
                 className="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold"
                 style={{
                   background: 'rgba(20, 184, 166, 0.1)',
@@ -53,10 +58,6 @@ export default function CandidateLandingPage() {
               >
                 For Candidates
               </span>
-            </div>
-
-            {/* Auth Buttons */}
-            <div className="flex items-center gap-2 sm:gap-3">
               <Link
                 href={ROUTES.HOME}
                 className="btn-glass px-3 sm:px-4 py-2 sm:py-2.5 text-sm font-medium rounded-xl transition-all hidden sm:inline-flex"
@@ -88,7 +89,7 @@ export default function CandidateLandingPage() {
         <div className="max-w-4xl mx-auto text-center">
           {/* Badge */}
           <div className="glass-card inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium mb-8">
-            <span className="text-lg">🚀</span>
+            
             <span className="gradient-text font-semibold">Your Career Starts Here</span>
           </div>
 

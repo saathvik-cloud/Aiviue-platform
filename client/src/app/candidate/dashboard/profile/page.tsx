@@ -17,6 +17,7 @@
  * Design: Glassmorphism cards with teal accents (candidate theme)
  */
 
+import { ProfileStyleSelect } from '@/components/ui';
 import { CANDIDATE_VALIDATION } from '@/constants';
 import { useJobCategories, useRolesByCategory, useUpdateCandidate } from '@/lib/hooks';
 import { uploadProfilePhoto } from '@/lib/supabase';
@@ -405,49 +406,6 @@ export default function CandidateProfilePage() {
     </div>
   );
 
-  const renderSelect = (
-    field: keyof ProfileFormData,
-    label: string,
-    icon: React.ReactNode,
-    options: { value: string; label: string }[],
-    placeholder: string = 'Select...',
-    isLoading: boolean = false
-  ) => (
-    <div className="space-y-2">
-      <label className="text-sm font-medium" style={{ color: 'var(--neutral-dark)' }}>
-        {label}
-      </label>
-      <div className="relative">
-        <div className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--neutral-gray)' }}>
-          {icon}
-        </div>
-        <select
-          value={formData[field] as string}
-          onChange={(e) => handleInputChange(field, e.target.value)}
-          disabled={isLoading}
-          className="w-full pl-10 pr-4 py-3 rounded-xl text-sm transition-all focus:outline-none focus:ring-2 focus:ring-teal-500/30 appearance-none cursor-pointer"
-          style={{
-            background: 'rgba(246, 239, 214, 0.5)',
-            border: '1px solid var(--neutral-border)',
-            color: 'var(--text-primary)',
-          }}
-        >
-          <option value="">{isLoading ? 'Loading...' : placeholder}</option>
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        {isLoading && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <Loader2 className="w-4 h-4 animate-spin text-teal-500" />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
   // ==================== RENDER ====================
 
   if (!candidate) {
@@ -461,13 +419,17 @@ export default function CandidateProfilePage() {
     );
   }
 
-  const categoryOptions: { value: string; label: string }[] = (categories || []).map(
-    (cat: JobCategory) => ({ value: cat.id, label: cat.name })
-  );
+  const categoryOptions = (categories || []).map((cat: JobCategory) => ({
+    value: cat.id,
+    label: cat.name,
+    slug: cat.slug,
+  }));
 
-  const roleOptions: { value: string; label: string }[] = (roles || []).map(
-    (role: JobRole) => ({ value: role.id, label: role.name })
-  );
+  const roleOptions = (roles || []).map((role: JobRole) => ({
+    value: role.id,
+    label: role.name,
+    slug: role.slug,
+  }));
 
   const locationOptions = INDIAN_CITIES.map((city) => ({ value: city, label: city }));
 
@@ -670,44 +632,57 @@ export default function CandidateProfilePage() {
         </div>
       )}
 
-      {/* Job Preferences */}
+      {/* Job Preferences - profile-style dropdowns with "type your own" for category/role */}
       {renderSection(
         'Job Preferences',
         <Briefcase className="w-5 h-5 text-teal-600" />,
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {renderSelect(
-            'preferred_job_category_id',
-            'Job Category',
-            <Briefcase className="w-4 h-4" />,
-            categoryOptions,
-            'Select category',
-            categoriesLoading
-          )}
+          <ProfileStyleSelect
+            label="Job Category"
+            icon={<Briefcase className="w-4 h-4" />}
+            options={categoryOptions}
+            value={formData.preferred_job_category_id}
+            onChange={(v) => {
+              handleInputChange('preferred_job_category_id', v);
+              setSelectedCategoryId(v);
+            }}
+            placeholder="Select category"
+            disabled={false}
+            isLoading={categoriesLoading}
+            allowCustom
+            customPlaceholder="Or type your category"
+          />
 
-          {renderSelect(
-            'preferred_job_role_id',
-            'Job Role',
-            <Briefcase className="w-4 h-4" />,
-            roleOptions,
-            selectedCategoryId ? 'Select role' : 'Select category first',
-            rolesLoading
-          )}
+          <ProfileStyleSelect
+            label="Job Role"
+            icon={<Briefcase className="w-4 h-4" />}
+            options={roleOptions}
+            value={formData.preferred_job_role_id}
+            onChange={(v) => handleInputChange('preferred_job_role_id', v)}
+            placeholder={selectedCategoryId ? 'Select role' : 'Select category first'}
+            disabled={!selectedCategoryId}
+            isLoading={rolesLoading}
+            allowCustom
+            customPlaceholder="Or type your role (e.g. Backend Developer)"
+          />
 
-          {renderSelect(
-            'current_location',
-            'Current Location',
-            <MapPin className="w-4 h-4" />,
-            locationOptions,
-            'Select city'
-          )}
+          <ProfileStyleSelect
+            label="Current Location"
+            icon={<MapPin className="w-4 h-4" />}
+            options={locationOptions}
+            value={formData.current_location}
+            onChange={(v) => handleInputChange('current_location', v)}
+            placeholder="Select city"
+          />
 
-          {renderSelect(
-            'preferred_job_location',
-            'Preferred Job Location',
-            <MapPin className="w-4 h-4" />,
-            locationOptions,
-            'Select preferred city'
-          )}
+          <ProfileStyleSelect
+            label="Preferred Job Location"
+            icon={<MapPin className="w-4 h-4" />}
+            options={locationOptions}
+            value={formData.preferred_job_location}
+            onChange={(v) => handleInputChange('preferred_job_location', v)}
+            placeholder="Select preferred city"
+          />
         </div>
       )}
 

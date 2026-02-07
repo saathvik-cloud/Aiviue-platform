@@ -16,6 +16,7 @@ Conversation Flow:
 """
 
 import copy
+import re
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from uuid import UUID
 
@@ -105,6 +106,13 @@ EDIT_FIELD_ALIASES: Dict[str, str] = {
     "experience details": "experience_details",
     "languages": "languages_known",
 }
+
+
+def _normalize_for_match(text: str) -> str:
+    """Normalize for matching: lowercase, hyphens to spaces, collapse spaces, trim."""
+    if not text:
+        return ""
+    return re.sub(r"\s+", " ", text.strip().lower().replace("-", " ")).strip()
 
 
 # ==================== CHAT SERVICE ====================
@@ -634,15 +642,21 @@ class CandidateChatService:
 
         # ==================== EDIT RESUME: user just typed which field to change ====================
         if ctx.get("awaiting_edit_field_name") and not data.get("question_key"):
-            field_name = (content or "").strip().lower()
-            if not field_name:
+            field_name_raw = (content or "").strip()
+            if not field_name_raw:
                 return [{
                     "role": CandidateMessageRole.BOT,
                     "content": "Please type the field you want to change (e.g. name, skills, salary).",
                     "message_type": CandidateMessageType.TEXT,
                     "message_data": {},
                 }]
-            question_key = EDIT_FIELD_ALIASES.get(field_name) or (field_name.replace(" ", "_") if field_name else None)
+            field_name = _normalize_for_match(field_name_raw)
+            field_name_underscore = field_name.replace(" ", "_")
+            question_key = (
+                EDIT_FIELD_ALIASES.get(field_name)
+                or EDIT_FIELD_ALIASES.get(field_name_underscore)
+                or (field_name_underscore if field_name else None)
+            )
             role_id = ctx.get("role_id")
             if not role_id:
                 ctx["awaiting_edit_field_name"] = False

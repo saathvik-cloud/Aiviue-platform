@@ -230,16 +230,7 @@ export default function CandidateRegisterPage() {
               priority
             />
           </Link>
-          <span
-            className="inline-flex items-center mt-3 px-3 py-1 rounded-full text-xs font-semibold"
-            style={{
-              background: 'rgba(20, 184, 166, 0.1)',
-              color: 'var(--secondary-teal)',
-              border: '1px solid rgba(20, 184, 166, 0.3)',
-            }}
-          >
-            Candidate Portal
-          </span>
+          
         </div>
 
         {/* Register Card */}
