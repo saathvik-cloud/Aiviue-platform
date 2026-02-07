@@ -392,6 +392,12 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
         }
     };
 
+    // Handle multi_select submit (e.g. skills: selected options + custom)
+    const handleMultiSelectSubmit = (questionKey: string, values: string[]) => {
+        const content = values.join(', ');
+        handleSendMessage(content, { question_key: questionKey, value: values });
+    };
+
     // Handle button click
     const handleButtonClick = async (button: CandidateChatButton) => {
         // Wait for session if not ready
@@ -529,6 +535,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
         if (lastBotMessage.message_type === 'buttons') return 'disabled';
         if (lastBotMessage.message_type === 'boolean') return 'disabled';
         if (lastBotMessage.message_type === 'resume_preview') return 'disabled';
+        if (lastBotMessage.message_type === 'multi_select') return 'disabled';
         if (lastBotMessage.message_type === 'input_file') return 'file';
         if (lastBotMessage.message_type === 'input_textarea') return 'textarea';
         if (lastBotMessage.message_type === 'input_number') return 'number';
@@ -631,7 +638,9 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
                                             isLatest={msg.id === lastBotMessage?.id}
                                             onButtonClick={handleButtonClick}
                                             onRetry={handleRetry}
+                                            onMultiSelectSubmit={handleMultiSelectSubmit}
                                             showAvatar={isFirstInGroup}
+                                            previousMessageType={displayMessages[index - 1]?.message_type}
                                         />
                                     );
                                 })}

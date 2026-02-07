@@ -80,6 +80,33 @@ WELCOME_MESSAGES = [
 ]
 
 
+# User-friendly field names → question_key when editing resume (e.g. "salary" → "salary_expectation")
+EDIT_FIELD_ALIASES: Dict[str, str] = {
+    "name": "full_name",
+    "full name": "full_name",
+    "salary": "salary_expectation",
+    "salary expectation": "salary_expectation",
+    "expected salary": "salary_expectation",
+    "skills": "skills",
+    "technical skills": "skills",
+    "about": "about",
+    "experience": "experience_years",
+    "years of experience": "experience_years",
+    "location": "preferred_location",
+    "preferred location": "preferred_location",
+    "dob": "date_of_birth",
+    "date of birth": "date_of_birth",
+    "birth": "date_of_birth",
+    "education": "education",
+    "portfolio": "portfolio_url",
+    "work type": "preferred_work_type",
+    "work arrangement": "preferred_work_type",
+    "shift": "preferred_shift",
+    "experience details": "experience_details",
+    "languages": "languages_known",
+}
+
+
 # ==================== CHAT SERVICE ====================
 
 class CandidateChatService:
@@ -595,6 +622,7 @@ class CandidateChatService:
         Handle a user's answer to a question during the AIVI bot flow.
 
         Flow:
+        0. If awaiting_edit_field_name: treat content as field name → ask that question.
         1. Determine which question is being answered (from context or data)
         2. Validate the answer via QuestionEngine
         3. If invalid → re-ask with error message
@@ -603,6 +631,45 @@ class CandidateChatService:
         """
         ctx = self._copy_context(session)
         collected_data = ctx.get("collected_data", {})
+
+        # ==================== EDIT RESUME: user just typed which field to change ====================
+        if ctx.get("awaiting_edit_field_name") and not data.get("question_key"):
+            field_name = (content or "").strip().lower()
+            if not field_name:
+                return [{
+                    "role": CandidateMessageRole.BOT,
+                    "content": "Please type the field you want to change (e.g. name, skills, salary).",
+                    "message_type": CandidateMessageType.TEXT,
+                    "message_data": {},
+                }]
+            question_key = EDIT_FIELD_ALIASES.get(field_name) or (field_name.replace(" ", "_") if field_name else None)
+            role_id = ctx.get("role_id")
+            if not role_id:
+                ctx["awaiting_edit_field_name"] = False
+                await self._chat_repo.update_session(session.id, context_data=ctx)
+                return [{
+                    "role": CandidateMessageRole.BOT,
+                    "content": "Something went wrong — your role preference is missing. Please update your profile and try again.",
+                    "message_type": CandidateMessageType.ERROR,
+                    "message_data": {},
+                }]
+            templates = await self._job_master_repo.get_templates_by_role(UUID(role_id))
+            template_by_key = {t.question_key: t for t in templates}
+            if question_key and question_key in template_by_key:
+                ctx["awaiting_edit_field_name"] = False
+                ctx["current_question_key"] = question_key
+                await self._chat_repo.update_session(session.id, context_data=ctx)
+                engine = QuestionEngine(templates, collected_data)
+                template = template_by_key[question_key]
+                return [engine.build_question_message(template)]
+            # Not found: suggest some keys from this role
+            suggested = ", ".join(sorted(template_by_key.keys())[:10])
+            return [{
+                "role": CandidateMessageRole.BOT,
+                "content": f"I didn't recognize that field. Try one of: {suggested}",
+                "message_type": CandidateMessageType.TEXT,
+                "message_data": {},
+            }]
 
         # Get the question_key being answered
         question_key = data.get("question_key")
@@ -749,9 +816,11 @@ class CandidateChatService:
         is_edit = button_id in edit_keywords or any(k in content_lower for k in edit_keywords)
 
         if is_edit:
-            # Go back to asking questions
+            # Go back to asking questions; next user message is the field name they want to edit
             ctx = self._copy_context(session)
             ctx["step"] = ChatStep.ASKING_QUESTIONS
+            ctx["awaiting_edit_field_name"] = True
+            ctx["current_question_key"] = None
             await self._chat_repo.update_session(session.id, context_data=ctx)
 
             return [{
