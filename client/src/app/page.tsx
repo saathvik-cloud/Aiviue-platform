@@ -1,4 +1,5 @@
 import { ROUTES } from '@/constants';
+import { EmployerLandingNav } from '@/components/employer-landing-nav';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -25,54 +26,8 @@ export default function HomePage() {
         />
       </div>
 
-      {/* Glassmorphism Navigation */}
-      <nav className="glass-navbar fixed top-0 left-0 right-0 z-50">
-        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
-          <div className="flex items-center justify-between">
-            {/* Logo */}
-            <Link href={ROUTES.HOME} className="flex items-center gap-2">
-              <Image
-                src="/aiviue-logo.png"
-                alt="AIVIUE"
-                width={180}
-                height={60}
-                className="h-12 sm:h-14 md:h-16 w-auto"
-                priority
-              />
-            </Link>
-
-            {/* Nav Buttons – match candidate module: For Candidates, For Employers (violet-pink gradient), Login, Sign Up */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              <Link
-                href={ROUTES.CANDIDATE_HOME}
-                className="nav-link-gradient px-3 sm:px-4 py-2 sm:py-2.5 text-sm font-medium rounded-xl transition-all hidden sm:inline-flex"
-              >
-                For Candidates
-              </Link>
-              <Link
-                href={ROUTES.HOME}
-                className="nav-link-gradient px-3 sm:px-4 py-2 sm:py-2.5 text-sm font-medium rounded-xl transition-all hidden sm:inline-flex"
-              >
-                For Employers
-              </Link>
-              <Link
-                href={ROUTES.LOGIN}
-                className="btn-glass px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-medium rounded-xl transition-all"
-                style={{ color: 'var(--primary)' }}
-              >
-                Login
-              </Link>
-              <Link
-                href={ROUTES.REGISTER}
-                className="px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-medium rounded-xl text-white transition-colors hover:opacity-90"
-                style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)' }}
-              >
-                Sign Up
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      {/* Glassmorphism Navigation (mobile: menu dropdown for Candidate / Employer) */}
+      <EmployerLandingNav />
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 sm:px-6 pt-28 sm:pt-32 pb-12 sm:pb-16 relative z-10">
