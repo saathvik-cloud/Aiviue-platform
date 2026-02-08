@@ -723,6 +723,7 @@ export function ChatContainer() {
             {/* Header */}
             <ChatHeader
                 title="AIVI Assistant"
+                sessionReady={Boolean(currentSessionId) && !isInitializing && !createSession.isPending}
                 onNewChat={handleNewChat}
                 onToggleHistory={() => setViewMode(viewMode === 'chat' ? 'history' : 'chat')}
                 showHistoryButton={true}

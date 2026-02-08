@@ -1,10 +1,12 @@
 'use client';
 
-import { History, Plus, X } from 'lucide-react';
+import { CheckCircle, History, Plus, Wifi, X } from 'lucide-react';
 import Image from 'next/image';
 
 interface ChatHeaderProps {
     title?: string;
+    /** When true, show green "Connected"; when false, show "Connecting..." with pulse (session not ready yet). */
+    sessionReady?: boolean;
     onNewChat: () => void;
     onToggleHistory: () => void;
     onClose?: () => void;
@@ -12,15 +14,22 @@ interface ChatHeaderProps {
 }
 
 /**
- * ChatHeader - Top bar with AIVI branding, new chat, and history buttons.
+ * ChatHeader - Top bar with AIVI branding, connection status, new chat, and history buttons.
+ * Status: "Connecting..." (animated) until session is ready, then "Connected" (green).
  */
 export function ChatHeader({
     title = 'AIVI Assistant',
+    sessionReady = false,
     onNewChat,
     onToggleHistory,
     onClose,
     showHistoryButton = true,
 }: ChatHeaderProps) {
+    const status = sessionReady
+        ? { color: '#10B981', icon: CheckCircle, text: 'Connected', animate: false as const }
+        : { color: 'var(--status-draft)', icon: Wifi, text: 'Connecting...', animate: true as const };
+    const StatusIcon = status.icon;
+
     return (
         <div className="chat-header flex items-center justify-between px-5 py-4 border-b"
             style={{
@@ -28,7 +37,7 @@ export function ChatHeader({
                 borderColor: 'rgba(124, 58, 237, 0.08)'
             }}
         >
-            {/* Left: AIVI Avatar + Title */}
+            {/* Left: AIVI Avatar + Title + Status */}
             <div className="flex items-center gap-3">
                 <div className="relative">
                     <div
@@ -48,17 +57,23 @@ export function ChatHeader({
                             />
                         </div>
                     </div>
-                    {/* Online indicator */}
+                    {/* Status indicator: green when connected, pulse when connecting */}
                     <div
-                        className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white"
-                        style={{ backgroundColor: 'var(--status-published)' }}
+                        className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${!sessionReady ? 'animate-pulse' : ''}`}
+                        style={{ backgroundColor: sessionReady ? 'var(--status-published)' : 'var(--status-draft)' }}
                     />
                 </div>
                 <div>
                     <h2 className="text-base font-semibold gradient-text">{title}</h2>
-                    <p className="text-[10px] font-medium tracking-wide uppercase opacity-60" style={{ color: 'var(--neutral-dark)' }}>
-                        AI Recruiting Expert
-                    </p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                        <StatusIcon
+                            className={`w-3 h-3 ${status.animate ? 'animate-pulse' : ''}`}
+                            style={{ color: status.color }}
+                        />
+                        <span className="text-xs" style={{ color: status.color }}>
+                            {status.text}
+                        </span>
+                    </div>
                 </div>
             </div>
 
