@@ -2,7 +2,7 @@
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { ROUTES } from '@/constants';
-import { useJobs } from '@/lib/hooks';
+import { useCandidateResumes, useJobs } from '@/lib/hooks';
 import { formatDate, getCurrencySymbol, stripSalaryRangeCurrency } from '@/lib/utils';
 import { useCandidateAuthStore } from '@/stores';
 import {
@@ -36,9 +36,10 @@ const RECOMMENDED_JOBS_CAROUSEL_LIMIT = 8;
 
 export default function CandidateDashboardPage() {
   const candidate = useCandidateAuthStore((state) => state.candidate);
+  const { data: resumes } = useCandidateResumes(candidate?.id);
 
-  // Show "Build your resume first" only when candidate has no resume (profile not complete)
-  const hasResume = candidate?.profile_status === 'complete';
+  // "Has resume" = at least one resume built/uploaded in AIVI (not just profile complete)
+  const hasResume = (resumes?.length ?? 0) > 0;
 
   // Recommended jobs for carousel (only fetched when user has resume)
   const jobFilters = useMemo(() => {
@@ -83,7 +84,7 @@ export default function CandidateDashboardPage() {
     },
     {
       label: 'Resume',
-      value: candidate?.profile_status === 'complete' ? '1' : '0',
+      value: (resumes?.length ?? 0) > 0 ? '1' : '0',
       sublabel: 'Active resume',
       icon: FileText,
       cardBg:
