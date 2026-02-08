@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError as PydanticValidationError
 
 from app.config import settings
+from app.shared.utils.sanitize import redact_sensitive_dict
 from app.shared.exceptions.base import (
     BaseAppException,
     InfraError,
@@ -99,7 +100,7 @@ async def app_exception_handler(
     }
     
     if exc.context:
-        log_data["error_context"] = exc.context  # Changed from 'context'
+        log_data["error_context"] = redact_sensitive_dict(exc.context)
     
     # Log 5xx as error, others as warning
     if exc.status_code >= 500:
@@ -117,19 +118,30 @@ async def app_exception_handler(
     )
 
 
+def _is_sensitive_loc(loc: list) -> bool:
+    """True if validation location refers to a sensitive field (e.g. password, token)."""
+    from app.shared.utils.sanitize import is_sensitive_key
+    return any(is_sensitive_key(str(p)) for p in loc if isinstance(p, str))
+
+
 def _serialize_validation_errors(errors: list) -> list:
     """
     Serialize validation errors to ensure they are JSON-compatible.
-    
+
     Pydantic errors may contain non-serializable objects like ValueError.
+    Sensitive field values (password, token, etc.) are redacted from 'input'.
     """
     serialized = []
     for error in errors:
+        loc = list(error.get("loc", []))
+        raw_input = str(error.get("input", ""))[:100]
+        if _is_sensitive_loc(loc):
+            raw_input = "[REDACTED]"
         serialized_error = {
             "type": error.get("type", "unknown"),
-            "loc": list(error.get("loc", [])),
+            "loc": loc,
             "msg": str(error.get("msg", "")),
-            "input": str(error.get("input", ""))[:100],  # Truncate long inputs
+            "input": raw_input,
         }
         # Don't include 'ctx' as it may contain non-serializable objects
         serialized.append(serialized_error)

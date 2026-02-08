@@ -67,9 +67,9 @@ async def lifespan(app: FastAPI):
     
     # Initialize Redis (optional - graceful if not available)
     try:
-        from app.shared.cache import init_redis
+        from app.shared.cache import init_redis, mask_redis_url
         await init_redis()
-        logger.info("Redis connected", extra={"redis_url": settings.redis_url})
+        logger.info("Redis connected", extra={"redis_url": mask_redis_url(settings.redis_url)})
     except Exception as e:
         logger.warning(f"Redis not available: {e}")
     

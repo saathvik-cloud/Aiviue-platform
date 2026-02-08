@@ -32,7 +32,7 @@ from datetime import datetime
 from typing import Any, Generic, Optional, TypeVar
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # Type variable for generic paginated response
@@ -113,9 +113,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
         description="Total count of items (optional, expensive to compute)",
     )
     
-    class Config:
-        """Pydantic config for generic model."""
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 def encode_cursor(

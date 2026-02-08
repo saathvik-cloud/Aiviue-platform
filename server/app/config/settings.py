@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     supabase_url: str | None = None
     supabase_service_role_key: str | None = None
     supabase_resume_bucket: str = "resumes"
+    # Allowed origins for resume PDF URLs (SSRF protection). Comma-separated; if empty and supabase_url set, uses that host.
+    allowed_pdf_origins: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -55,6 +57,18 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         """Convert comma-separated CORS origins to list."""
         return [origin.strip() for origin in self.cors_origins.split(",")]
+
+    @property
+    def allowed_pdf_origins_list(self) -> list[str]:
+        """Origins allowed for resume PDF URLs (SSRF protection). Defaults to supabase_url host if set."""
+        if self.allowed_pdf_origins:
+            return [o.strip() for o in self.allowed_pdf_origins.split(",") if o.strip()]
+        if self.supabase_url:
+            from urllib.parse import urlparse
+            parsed = urlparse(self.supabase_url)
+            if parsed.scheme and parsed.netloc:
+                return [f"{parsed.scheme}://{parsed.netloc}"]
+        return []
     
     @property
     def is_development(self) -> bool:

@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 from uuid import UUID
 
+from app.config import get_settings, RESUME_PDF_MAX_SIZE_MB
 from app.domains.job_master.models import RoleQuestionTemplate
 from app.shared.llm.client import GeminiClient, LLMError, get_gemini_client
 from app.shared.llm.prompts import (
@@ -26,6 +27,7 @@ from app.shared.llm.prompts import (
     build_resume_parse_prompt,
 )
 from app.shared.logging import get_logger
+from app.shared.utils.pdf_fetch import fetch_pdf_from_url_async
 
 
 logger = get_logger(__name__)
@@ -235,51 +237,6 @@ class PDFTextExtractor:
 
         return full_text
 
-    @staticmethod
-    def extract_from_url(pdf_url: str) -> str:
-        """
-        Download PDF from URL and extract text.
-
-        NOTE: This is a synchronous method. For async, use extract_from_url_async.
-
-        Args:
-            pdf_url: URL to the PDF file
-
-        Returns:
-            Extracted text string
-        """
-        import httpx
-
-        try:
-            response = httpx.get(pdf_url, timeout=30.0, follow_redirects=True)
-            response.raise_for_status()
-        except httpx.HTTPError as e:
-            raise ValueError(f"Could not download PDF from URL: {str(e)}")
-
-        return PDFTextExtractor.extract_from_bytes(response.content)
-
-    @staticmethod
-    async def extract_from_url_async(pdf_url: str) -> str:
-        """
-        Async download PDF from URL and extract text.
-
-        Args:
-            pdf_url: URL to the PDF file
-
-        Returns:
-            Extracted text string
-        """
-        import httpx
-
-        try:
-            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-                response = await client.get(pdf_url)
-                response.raise_for_status()
-        except httpx.HTTPError as e:
-            raise ValueError(f"Could not download PDF from URL: {str(e)}")
-
-        return PDFTextExtractor.extract_from_bytes(response.content)
-
 
 # ==================== RESUME EXTRACTION SERVICE ====================
 
@@ -333,11 +290,19 @@ class ResumeExtractionService:
         Returns:
             ResumeExtractionResult with extracted data and missing keys
         """
-        # Step 1: Extract text from PDF
+        # Step 1: Safe fetch (origin, size, content-type) then extract text
         try:
-            raw_text = await PDFTextExtractor.extract_from_url_async(pdf_url)
+            settings = get_settings()
+            allowed = settings.allowed_pdf_origins_list
+            max_bytes = RESUME_PDF_MAX_SIZE_MB * 1024 * 1024
+            pdf_bytes = await fetch_pdf_from_url_async(
+                pdf_url,
+                max_size_bytes=max_bytes,
+                allowed_origins=allowed,
+            )
+            raw_text = PDFTextExtractor.extract_from_bytes(pdf_bytes)
         except ValueError as e:
-            logger.error(f"PDF text extraction failed: {e}")
+            logger.error(f"PDF fetch or extraction failed: {e}")
             return ResumeExtractionResult(
                 success=False,
                 error_message=str(e),
@@ -371,12 +336,20 @@ class ResumeExtractionService:
         Full extraction pipeline from PDF bytes.
 
         Args:
-            pdf_bytes: Raw PDF file content
+            pdf_bytes: Raw PDF file content (must not exceed RESUME_PDF_MAX_SIZE_MB).
             role_name, job_type, question_templates: Same as extract_from_pdf_url
 
         Returns:
             ResumeExtractionResult
         """
+        max_bytes = RESUME_PDF_MAX_SIZE_MB * 1024 * 1024
+        if len(pdf_bytes) > max_bytes:
+            return ResumeExtractionResult(
+                success=False,
+                error_message=f"PDF is too large (max {RESUME_PDF_MAX_SIZE_MB}MB allowed)",
+                error_type="pdf_extraction_error",
+                retryable=False,
+            )
         try:
             raw_text = PDFTextExtractor.extract_from_bytes(pdf_bytes)
         except (ValueError, ImportError) as e:

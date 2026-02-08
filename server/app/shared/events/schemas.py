@@ -22,7 +22,7 @@ from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ==================== BASE EVENT SCHEMAS ====================
@@ -34,13 +34,11 @@ class BaseEvent(BaseModel):
     Every event has these common fields.
     """
     
+    model_config = ConfigDict(from_attributes=True)
+    
     event_id: str = Field(..., description="Unique event identifier")
     event_type: str = Field(..., description="Type of event (e.g., job.published)")
     timestamp: datetime = Field(..., description="When event was created")
-    
-    class Config:
-        """Pydantic config."""
-        from_attributes = True
 
 
 class EventMetadata(BaseModel):
@@ -237,12 +235,10 @@ class EventEnvelope(BaseModel):
     This is the full structure stored in Redis Streams.
     """
     
+    model_config = ConfigDict(from_attributes=True)
+    
     event_id: str = Field(..., description="Unique event identifier")
     event_type: str = Field(..., description="Type of event")
     timestamp: datetime = Field(..., description="When event was created")
     data: dict[str, Any] = Field(..., description="Event payload")
     metadata: Optional[EventMetadata] = Field(None, description="Optional metadata")
-    
-    class Config:
-        """Pydantic config."""
-        from_attributes = True

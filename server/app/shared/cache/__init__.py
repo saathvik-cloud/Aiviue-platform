@@ -27,6 +27,7 @@ from app.shared.cache.redis_client import (
     get_redis_client,
     init_redis,
     close_redis,
+    mask_redis_url,
 )
 from app.shared.cache.cache import (
     CacheService,
@@ -42,6 +43,7 @@ __all__ = [
     "get_redis_client",
     "init_redis",
     "close_redis",
+    "mask_redis_url",
     # Cache service
     "CacheService",
     "CacheTTL",

@@ -68,7 +68,7 @@ async def init_redis() -> Redis:
         
         logger.info(
             "Redis connection established",
-            extra={"redis_url": _mask_redis_url(settings.redis_url)},
+            extra={"redis_url": mask_redis_url(settings.redis_url)},
         )
         
         return _redis_client
@@ -76,7 +76,7 @@ async def init_redis() -> Redis:
     except redis.ConnectionError as e:
         logger.error(
             f"Failed to connect to Redis: {str(e)}",
-            extra={"redis_url": _mask_redis_url(settings.redis_url)},
+            extra={"redis_url": mask_redis_url(settings.redis_url)},
         )
         raise
 
@@ -132,10 +132,12 @@ async def get_redis() -> Redis:
     return await get_redis_client()
 
 
-def _mask_redis_url(url: str) -> str:
-    """Mask password in Redis URL for logging."""
+def mask_redis_url(url: str) -> str:
+    """Mask password in Redis URL for logging (avoids leaking secrets)."""
+    if not url:
+        return url
     if "@" in url:
-        # URL format: redis://:password@host:port/db
+        # URL format: redis://:password@host:port/db or redis://user:password@host:port/db
         parts = url.split("@")
         return f"redis://***@{parts[-1]}"
     return url

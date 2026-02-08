@@ -202,6 +202,44 @@ def sanitize_list(
     return result
 
 
+# Keys whose values must not appear in logs (case-insensitive)
+_SENSITIVE_KEYS = frozenset({
+    "password", "token", "api_key", "apikey", "secret", "authorization",
+    "secret_key", "encryption_key", "service_role_key", "private_key",
+})
+
+
+def is_sensitive_key(key: str) -> bool:
+    """Return True if the key is a known sensitive field name (for redaction)."""
+    return key.lower() in _SENSITIVE_KEYS
+
+
+def redact_sensitive_dict(data: Any) -> Any:
+    """
+    Return a copy of data with sensitive field values redacted for logging.
+
+    Recursively redacts dict keys that match _SENSITIVE_KEYS (case-insensitive).
+    Lists are processed element-wise. Other types are returned as-is.
+
+    Use when logging exception context or request metadata to avoid leaking
+    passwords, API keys, or tokens.
+    """
+    if data is None:
+        return None
+    if isinstance(data, dict):
+        out = {}
+        for k, v in data.items():
+            key_lower = k.lower() if isinstance(k, str) else k
+            if isinstance(key_lower, str) and key_lower in _SENSITIVE_KEYS:
+                out[k] = "[REDACTED]"
+            else:
+                out[k] = redact_sensitive_dict(v)
+        return out
+    if isinstance(data, list):
+        return [redact_sensitive_dict(item) for item in data]
+    return data
+
+
 def sanitize_email(email: Optional[str]) -> Optional[str]:
     """
     Sanitize email address.
