@@ -8,8 +8,8 @@ import { QuickReplyButtons } from './QuickReplyButtons';
 interface ChatMessageProps {
     message: ChatMessageType;
     onButtonClick?: (button: ChatButton) => void;
-    onCreateJob?: (data?: any) => void;
-    onEditJob?: (data?: any) => void;
+    onCreateJob?: (data?: Record<string, unknown>) => void;
+    onEditJob?: (data?: Record<string, unknown>) => void;
     isLatest?: boolean;
     showAvatar?: boolean;
 }
@@ -178,7 +178,7 @@ export function ChatMessage({
                                 <div className="flex items-center gap-2 text-sm">
                                     <Users className="w-4 h-4" style={{ color: 'var(--primary)' }} />
                                     <span style={{ color: 'var(--neutral-dark)' }}>
-                                        {jobData.openings_count} opening{jobData.openings_count > 1 ? 's' : ''}
+                                        {jobData.openings_count} opening{Number(jobData.openings_count) > 1 ? 's' : ''}
                                     </span>
                                 </div>
                             )}
