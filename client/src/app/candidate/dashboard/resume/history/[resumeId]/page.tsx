@@ -3,7 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useCandidateResumeById } from '@/lib/hooks';
 import { useCandidateAuthStore } from '@/stores';
-import { ROUTES } from '@/constants';
+import { ROUTES, PRIMARY_GRADIENT } from '@/constants';
 import { ArrowLeft, Download, FileText } from 'lucide-react';
 import Link from 'next/link';
 
@@ -14,8 +14,6 @@ const RESUME_CARD_STYLE = {
   border: '1px solid rgba(255, 255, 255, 0.7)',
   boxShadow: '0 8px 32px rgba(124, 58, 237, 0.1), inset 0 1px 0 rgba(255,255,255,0.6)',
 } as const;
-
-const ACCENT_GRADIENT = 'linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)';
 const BULLET_COLOR = '#7C3AED';
 const TEXT_DARK = '#374151';
 const TEXT_MUTED = '#6B7280';
@@ -186,7 +184,7 @@ export default function ResumeViewPage() {
                     <div className="flex items-center gap-2 mb-3 sm:mb-4">
                       <div
                         className="w-2 h-6 rounded-full shrink-0"
-                        style={{ background: ACCENT_GRADIENT }}
+                        style={{ background: PRIMARY_GRADIENT }}
                       />
                       <h2
                         className="text-base sm:text-lg font-bold capitalize"
@@ -210,7 +208,7 @@ export default function ResumeViewPage() {
                 <div className="flex items-center gap-2 mb-2">
                   <div
                     className="w-2 h-5 rounded-full shrink-0"
-                    style={{ background: ACCENT_GRADIENT }}
+                    style={{ background: PRIMARY_GRADIENT }}
                   />
                   <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: TEXT_MUTED }}>
                     Meta

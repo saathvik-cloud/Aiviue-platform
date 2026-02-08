@@ -4,6 +4,7 @@
 
 export * from './api-endpoints';
 export * from './routes';
+export * from './ui';
 
 // App-wide constants
 export const APP_NAME = 'AIVIUE';

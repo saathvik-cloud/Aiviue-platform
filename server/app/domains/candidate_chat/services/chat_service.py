@@ -895,6 +895,38 @@ class CandidateChatService:
             job_type = ctx.get("job_type", "")
             method = ctx.get("method", "aivi_bot")
 
+            # ==================== IDEMPOTENCY: session already has a resume ====================
+            if session.resume_id:
+                existing_resume = await self._candidate_repo.get_resume_by_id(session.resume_id)
+                if existing_resume and existing_resume.resume_data:
+                    summary = self._resume_builder.get_resume_summary(existing_resume.resume_data)
+                    return [
+                        {
+                            "role": CandidateMessageRole.BOT,
+                            "content": f"🎉 Your resume (v{existing_resume.version_number}) has already been saved.",
+                            "message_type": CandidateMessageType.TEXT,
+                            "message_data": {
+                                "resume_id": str(existing_resume.id),
+                                "version": existing_resume.version_number,
+                            },
+                        },
+                        {
+                            "role": CandidateMessageRole.BOT,
+                            "content": "Here's a quick summary of your resume:",
+                            "message_type": CandidateMessageType.RESUME_PREVIEW,
+                            "message_data": {
+                                "summary": summary,
+                                "resume_id": str(existing_resume.id),
+                            },
+                        },
+                        {
+                            "role": CandidateMessageRole.BOT,
+                            "content": "You can now view job recommendations on your dashboard. You can also update your resume anytime by starting a new chat.",
+                            "message_type": CandidateMessageType.TEXT,
+                            "message_data": {},
+                        },
+                    ]
+
             # Determine resume source and uploaded PDF URL (for download link)
             source = "pdf_upload" if method == "pdf_upload" else "aivi_bot"
             uploaded_pdf_url = ctx.get("uploaded_pdf_url") if source == "pdf_upload" else None

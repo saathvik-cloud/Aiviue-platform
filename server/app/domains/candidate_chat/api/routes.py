@@ -82,7 +82,9 @@ async def get_repository(
     Create a new chat session for a candidate.
     
     **Idempotent**: If an active resume session already exists, returns it
-    instead of creating a duplicate (resume-from-where-you-left-off).
+    instead of creating a duplicate (resume-from-where-you-left-off). Saving
+    the resume (confirm in chat) is also idempotent: repeated confirm returns
+    the same resume without creating a duplicate.
     
     Session types:
     - `resume_creation`: Interactive resume building with AIVI bot
