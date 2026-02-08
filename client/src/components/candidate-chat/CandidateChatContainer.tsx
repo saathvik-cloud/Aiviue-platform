@@ -411,6 +411,13 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
             return;
         }
 
+        // Determine question key from last FILE input message
+        const lastFileRequest = [...localMessages]
+            .reverse()
+            .find(m => m.role === 'bot' && m.message_type === 'input_file');
+
+        const questionKey = (lastFileRequest?.message_data?.question_key as string) || 'resume_pdf';
+
         // Show processing state
         setIsProcessing(true);
         setLocalMessages((prev) => [
@@ -435,13 +442,15 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
 
         try {
             // 1. Upload file to Supabase Storage
+            // TODO: Ideally use different buckets based on questionKey (e.g. documents vs resumes)
+            // For now, we use the existing uploadResume which goes to 'resumes' bucket
             const publicUrl = await uploadResume(file, currentSessionId);
 
             // 2. Send message to backend with the file URL
             // This will trigger the backend extraction pipeline
             handleSendMessage(`Uploaded: ${file.name}`, {
                 file_url: publicUrl,
-                question_key: 'resume_pdf',
+                question_key: questionKey,
                 message_type: 'file_upload'
             });
 

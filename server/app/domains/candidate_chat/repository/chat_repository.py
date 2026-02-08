@@ -230,8 +230,15 @@ class CandidateChatRepository:
         session_id: UUID,
         messages: List[dict],
     ) -> List[CandidateChatMessage]:
-        """Add multiple messages to a session atomically."""
+        """
+        Add multiple messages to a session atomically, preserving insertion order.
+        
+        IMPORTANT: Messages are returned in the exact order they were passed in.
+        This is critical because "Got it!" acknowledgments must appear before
+        the next question in the conversation.
+        """
         created_messages = []
+        message_ids = []  # Track IDs in insertion order
 
         for msg_data in messages:
             message = CandidateChatMessage(
@@ -251,18 +258,22 @@ class CandidateChatRepository:
             .values(updated_at=datetime.utcnow())
         )
 
+        # Flush to assign database-generated IDs before commit
+        await self.db.flush()
+        
+        # Capture IDs in insertion order (before commit potentially reorders)
+        message_ids = [msg.id for msg in created_messages]
+
         await self.db.commit()
 
-        # Single query to load the messages we just inserted (avoids N round-trips from refresh)
-        result = await self.db.execute(
-            select(CandidateChatMessage)
-            .where(CandidateChatMessage.session_id == session_id)
-            .order_by(CandidateChatMessage.created_at.desc())
-            .limit(len(messages))
-        )
-        created_messages = list(result.scalars().all())[::-1]
+        # Refresh each message to ensure we have the final DB state
+        # We iterate in original order and refresh individually to preserve order
+        refreshed_messages = []
+        for msg in created_messages:
+            await self.db.refresh(msg)
+            refreshed_messages.append(msg)
 
-        return created_messages
+        return refreshed_messages
 
     async def get_messages_by_session(
         self,
