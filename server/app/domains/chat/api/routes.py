@@ -75,8 +75,10 @@ async def get_service(
     description="""
     Create a new chat session for job creation.
     
-    Returns the session with initial welcome messages from AIVI bot.
-    The bot will greet the user and offer options: Paste JD or Use AIVI Bot.
+    **Idempotent** when force_new is false: if an active session exists, returns it
+    (resume where you left off). When force_new is true (e.g. user clicked "New chat"),
+    always creates a new session.
+    Returns the session with messages (welcome messages for new sessions).
     """,
 )
 async def create_session(
@@ -99,6 +101,7 @@ async def create_session(
         employer_id=request.employer_id,
         session_type=request.session_type,
         title=request.title,
+        force_new=request.force_new,
     )
 
 

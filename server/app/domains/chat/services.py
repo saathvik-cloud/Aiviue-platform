@@ -53,19 +53,34 @@ class ChatService:
         employer_id: UUID,
         session_type: str = SessionType.JOB_CREATION,
         title: Optional[str] = None,
+        force_new: bool = False,
     ) -> ChatSessionWithMessagesResponse:
         """
-        Create a new chat session and add welcome message.
+        Create a new chat session, or return existing active one (idempotent).
+        
+        If force_new is False and an active session already exists for this employer/type,
+        returns it ("resume where you left off"). If force_new is True (e.g. user clicked "New"),
+        always creates a new session.
         
         Args:
             employer_id: Employer UUID
-            session_type: Type of session
+            session_type: Type of session (job_creation, general)
             title: Optional session title
+            force_new: If True, always create new; if False, return existing active if any
             
         Returns:
-            Created session with welcome messages
+            Session with messages (existing or newly created)
         """
-        # Create session with step set to choose_method (welcome buttons ask this question)
+        # Idempotency: return existing active session unless force_new
+        if not force_new:
+            existing = await self.repo.get_active_session(employer_id, session_type)
+            if existing:
+                logger.info(
+                    f"Returning existing active session: {existing.id}",
+                    extra={"session_id": str(existing.id), "employer_id": str(employer_id)},
+                )
+                return self._to_session_with_messages_response(existing)
+        # Create new session with step set to choose_method (welcome buttons ask this question)
         session = await self.repo.create_session(
             employer_id=employer_id,
             session_type=session_type,

@@ -77,3 +77,61 @@ export const JOB_CARD_GRADIENTS = [
     iconBg: 'linear-gradient(135deg, rgba(244, 63, 94, 0.12) 0%, rgba(236, 72, 153, 0.12) 100%)',
   },
 ] as const;
+
+// ==================== EMPLOYER DASHBOARD LAYOUT ====================
+
+/** Employer sidebar: extreme light pink → light purple gradient (vertical). */
+export const EMPLOYER_SIDEBAR_BG =
+  'linear-gradient(180deg, rgba(253, 242, 248, 0.98) 0%, rgba(250, 245, 255, 0.98) 50%, rgba(243, 232, 255, 0.95) 100%)';
+
+/** Employer navbar: light pink + violet gradient (stream/light). */
+export const EMPLOYER_NAVBAR_BG =
+  'linear-gradient(135deg, rgba(236, 72, 153, 0.08) 0%, rgba(124, 58, 237, 0.12) 100%)';
+
+/** Glass card style for employer dashboard (cards/tiles). Use with backdrop blur. */
+export const EMPLOYER_GLASS_CARD = {
+  background: 'rgba(255, 255, 255, 0.75)',
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)' as const,
+  border: '1px solid rgba(255, 255, 255, 0.6)',
+  boxShadow: '0 8px 32px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255,255,255,0.5)',
+} as const;
+
+/**
+ * Employer dashboard stat card styles (Total Jobs, Published, Drafts, Closed).
+ * Each has cardBg (glass-like gradient bg), gradient (accent), bgLight (icon bg), iconColor.
+ */
+export const EMPLOYER_STAT_CARD_GRADIENTS = [
+  {
+    cardBg: 'linear-gradient(145deg, rgba(250, 245, 255, 0.95) 0%, rgba(243, 232, 255, 0.85) 50%, rgba(237, 233, 254, 0.8) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.7)',
+    shadow: '0 8px 32px rgba(124, 58, 237, 0.1), inset 0 1px 0 rgba(255,255,255,0.6)',
+    gradient: 'linear-gradient(135deg, #7C3AED 0%, #A78BFA 100%)',
+    bgLight: 'rgba(124, 58, 237, 0.12)',
+    iconColor: '#7C3AED',
+  },
+  {
+    cardBg: 'linear-gradient(145deg, rgba(240, 253, 244, 0.95) 0%, rgba(220, 252, 231, 0.85) 50%, rgba(187, 247, 208, 0.8) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.7)',
+    shadow: '0 8px 32px rgba(34, 197, 94, 0.1), inset 0 1px 0 rgba(255,255,255,0.6)',
+    gradient: 'linear-gradient(135deg, #22C55E 0%, #4ADE80 100%)',
+    bgLight: 'rgba(34, 197, 94, 0.12)',
+    iconColor: '#22C55E',
+  },
+  {
+    cardBg: 'linear-gradient(145deg, rgba(255, 251, 235, 0.95) 0%, rgba(254, 243, 199, 0.85) 50%, rgba(253, 230, 138, 0.5) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.6)',
+    shadow: '0 8px 32px rgba(245, 158, 11, 0.08), inset 0 1px 0 rgba(255,255,255,0.5)',
+    gradient: 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)',
+    bgLight: 'rgba(245, 158, 11, 0.12)',
+    iconColor: '#F59E0B',
+  },
+  {
+    cardBg: 'linear-gradient(145deg, rgba(253, 242, 242, 0.95) 0%, rgba(252, 226, 226, 0.85) 50%, rgba(254, 202, 202, 0.5) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.6)',
+    shadow: '0 8px 32px rgba(236, 72, 153, 0.08), inset 0 1px 0 rgba(255,255,255,0.5)',
+    gradient: 'linear-gradient(135deg, #EC4899 0%, #F472B6 100%)',
+    bgLight: 'rgba(236, 72, 153, 0.12)',
+    iconColor: '#EC4899',
+  },
+] as const;

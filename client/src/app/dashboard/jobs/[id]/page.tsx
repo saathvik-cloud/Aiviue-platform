@@ -342,7 +342,7 @@ export default function JobDetailsPage() {
                 <div className="min-w-0">
                   <p className="text-xs font-medium uppercase tracking-wide" style={{ color: '#22C55E' }}>Salary</p>
                   <p className="text-sm font-semibold truncate mt-0.5" style={{ color: 'var(--neutral-dark)' }}>
-                    {formatSalaryRange(job.salary_range_min, job.salary_range_max) || 'Not specified'}
+                    {formatSalaryRange(job.salary_range_min, job.salary_range_max, job.currency) || 'Not specified'}
                   </p>
                 </div>
               </div>

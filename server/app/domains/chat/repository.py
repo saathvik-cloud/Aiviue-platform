@@ -90,6 +90,31 @@ class ChatRepository:
         
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
+
+    async def get_active_session(
+        self,
+        employer_id: UUID,
+        session_type: str = "job_creation",
+    ) -> Optional[ChatSession]:
+        """
+        Get the most recent active chat session for an employer and type.
+        Used for idempotency: "resume where you left off" when creating session without force_new.
+        """
+        query = (
+            select(ChatSession)
+            .where(
+                and_(
+                    ChatSession.employer_id == employer_id,
+                    ChatSession.session_type == session_type,
+                    ChatSession.is_active == True,
+                )
+            )
+            .options(selectinload(ChatSession.messages))
+            .order_by(ChatSession.updated_at.desc())
+            .limit(1)
+        )
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
     
     async def get_sessions_by_employer(
         self,

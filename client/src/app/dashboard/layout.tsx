@@ -1,6 +1,7 @@
 'use client';
 
 import { NAV_ITEMS, ROUTES } from '@/constants';
+import { EMPLOYER_NAVBAR_BG, EMPLOYER_SIDEBAR_BG } from '@/constants/ui';
 import { getInitials } from '@/lib/utils';
 import { useAuthStore } from '@/stores';
 import {
@@ -70,16 +71,19 @@ export default function DashboardLayout({
         />
       )}
 
-      {/* White Sidebar */}
+      {/* Sidebar - light pink → purple gradient */}
       <aside
         className={`
           fixed lg:static inset-y-0 left-0 z-50
-          w-64 flex flex-col bg-white
+          w-64 flex flex-col
           transform transition-transform duration-300 ease-out
           lg:transform-none shadow-xl
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
-        style={{ borderRight: '1px solid var(--neutral-border)' }}
+        style={{
+          background: EMPLOYER_SIDEBAR_BG,
+          borderRight: '1px solid rgba(124, 58, 237, 0.08)',
+        }}
       >
         {/* Logo */}
         <div className="p-5 flex items-center justify-between">
@@ -191,8 +195,17 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-        {/* Top Header - Compact */}
-        <header className="glass-navbar sticky top-0 z-30 px-4 sm:px-6 py-2 flex items-center justify-between">
+        {/* Top Header - pink + violet gradient, glass */}
+        <header
+          className="sticky top-0 z-30 px-4 sm:px-6 py-2 flex items-center justify-between"
+          style={{
+            background: EMPLOYER_NAVBAR_BG,
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderBottom: '1px solid rgba(236, 72, 153, 0.08)',
+            boxShadow: '0 4px 30px rgba(124, 58, 237, 0.06)',
+          }}
+        >
           {/* Mobile Menu Button */}
           <button
             onClick={() => setSidebarOpen(true)}

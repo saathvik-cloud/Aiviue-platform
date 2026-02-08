@@ -9,7 +9,7 @@ import { Briefcase, Building, Building2, Landmark, Users } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 // Company size options with icons
@@ -27,7 +27,7 @@ const COMPANY_SIZE_OPTIONS = [
  */
 export default function RegisterPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, setEmployer } = useAuthStore();
+  const { setEmployer, isLoading: authLoading } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -39,12 +39,8 @@ export default function RegisterPage() {
     industry: '',
   });
 
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      router.push(ROUTES.DASHBOARD);
-    }
-  }, [isAuthenticated, authLoading, router]);
+  // Do not redirect when already authenticated: allow signing up a new employer
+  // (persisted auth in localStorage was sending users to dashboard when they clicked Sign up)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -85,11 +81,6 @@ export default function RegisterPage() {
         <div className="w-10 h-10 rounded-full border-4 border-t-transparent animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
       </div>
     );
-  }
-
-  // Don't render register form if already authenticated (will redirect)
-  if (isAuthenticated) {
-    return null;
   }
 
   return (

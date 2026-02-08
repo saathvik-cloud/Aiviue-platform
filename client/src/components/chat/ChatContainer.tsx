@@ -217,14 +217,14 @@ export function ChatContainer() {
     const inputType = lastBotMessage?.message_type === 'input_textarea' ? 'textarea' :
         lastBotMessage?.message_type === 'input_number' ? 'number' : 'text';
 
-    // Handle creating a new chat session
-    const handleNewChat = useCallback(async () => {
+    // Create or get session. forceNew=true when user clicks "New"; false on mount (resume where you left off).
+    const handleNewChat = useCallback(async (forceNew: boolean = false) => {
         if (!employer?.id) {
             toast.error('Please login first');
             return;
         }
 
-        console.log('[ChatContainer] Creating new session for employer:', employer.id);
+        console.log('[ChatContainer] Create session for employer:', employer.id, 'force_new:', forceNew);
         
         // Show welcome messages immediately (optimistic UI)
         setLocalMessages(STATIC_WELCOME_MESSAGES);
@@ -235,6 +235,7 @@ export function ChatContainer() {
             const session = await createSession.mutateAsync({
                 employer_id: employer.id,
                 session_type: 'job_creation',
+                force_new: forceNew,
             });
 
             console.log('[ChatContainer] Session created:', session);
@@ -249,18 +250,17 @@ export function ChatContainer() {
             // The static messages match the backend welcome messages, so we just
             // update the session_id on them instead of replacing.
             setLocalMessages(prev => {
-                // If we have static welcome messages (id starts with 'welcome-'),
-                // keep them but update session_id for consistency
+                // If backend returned existing session with more than welcome, use its messages (resume where you left off)
+                if (session.messages && session.messages.length > 2) {
+                    return session.messages;
+                }
+                // If we have static welcome messages and backend has only welcome, keep them and update session_id
                 const hasStaticWelcome = prev.some(m => m.id.startsWith('welcome-'));
                 const backendHasOnlyWelcome = session.messages?.length === 2 && 
                     session.messages.every(m => m.message_type === 'text' || m.message_type === 'buttons');
-                
                 if (hasStaticWelcome && backendHasOnlyWelcome) {
-                    // Keep static messages, just update session_id
                     return prev.map(m => ({ ...m, session_id: session.id }));
                 }
-                
-                // If backend has different messages, use those
                 return session.messages || prev;
             });
             setIsInitializing(false);
@@ -692,9 +692,9 @@ export function ChatContainer() {
                 employerId: employer.id,
             });
 
-            // If deleted current session, create new one
+            // If deleted current session, start a new one
             if (sessionId === currentSessionId) {
-                handleNewChat();
+                handleNewChat(true);
             }
 
             refetchSessions();
@@ -724,7 +724,7 @@ export function ChatContainer() {
             <ChatHeader
                 title="AIVI Assistant"
                 sessionReady={Boolean(currentSessionId) && !isInitializing && !createSession.isPending}
-                onNewChat={handleNewChat}
+                onNewChat={() => handleNewChat(true)}
                 onToggleHistory={() => setViewMode(viewMode === 'chat' ? 'history' : 'chat')}
                 showHistoryButton={true}
             />

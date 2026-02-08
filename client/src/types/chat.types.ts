@@ -72,6 +72,8 @@ export interface CreateChatSessionRequest {
     employer_id: string;
     session_type?: SessionType;
     title?: string;
+    /** When true, always create a new session (e.g. "New chat"). When false, return existing active session if any. */
+    force_new?: boolean;
 }
 
 export interface SendMessageRequest {

@@ -2,20 +2,24 @@
 
 import Link from 'next/link';
 import { ROUTES } from '@/constants';
+import {
+  EMPLOYER_GLASS_CARD,
+  EMPLOYER_STAT_CARD_GRADIENTS,
+} from '@/constants/ui';
 import { useAuthStore } from '@/stores';
 import { useJobStats, useJobs } from '@/lib/hooks';
 import { formatDate, capitalize } from '@/lib/utils';
-import { 
-  Briefcase, 
-  CheckCircle, 
-  FileText, 
+import {
+  Briefcase,
+  CheckCircle,
+  FileText,
   XCircle,
   Plus,
   ArrowRight,
   TrendingUp,
   MapPin,
   ArrowUpRight,
-  Clock
+  Clock,
 } from 'lucide-react';
 
 /**
@@ -38,8 +42,6 @@ export default function DashboardPage() {
       icon: Briefcase,
       trend: '+12%',
       trendUp: true,
-      gradient: 'linear-gradient(135deg, #7C3AED 0%, #A78BFA 100%)',
-      bgLight: 'rgba(124, 58, 237, 0.1)',
     },
     {
       label: 'Published',
@@ -47,8 +49,6 @@ export default function DashboardPage() {
       icon: CheckCircle,
       trend: '+8%',
       trendUp: true,
-      gradient: 'linear-gradient(135deg, #22C55E 0%, #4ADE80 100%)',
-      bgLight: 'rgba(34, 197, 94, 0.1)',
     },
     {
       label: 'Drafts',
@@ -56,8 +56,6 @@ export default function DashboardPage() {
       icon: FileText,
       trend: '3 pending',
       trendUp: null,
-      gradient: 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)',
-      bgLight: 'rgba(245, 158, 11, 0.1)',
     },
     {
       label: 'Closed',
@@ -65,8 +63,6 @@ export default function DashboardPage() {
       icon: XCircle,
       trend: '-5%',
       trendUp: false,
-      gradient: 'linear-gradient(135deg, #EC4899 0%, #F472B6 100%)',
-      bgLight: 'rgba(236, 72, 153, 0.1)',
     },
   ];
 
@@ -82,28 +78,34 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Stats Cards - Nexus Style */}
+      {/* Stats Cards - glassmorphic + light gradients from constants */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((stat) => {
+        {statCards.map((stat, index) => {
           const Icon = stat.icon;
+          const cardStyle = EMPLOYER_STAT_CARD_GRADIENTS[index];
           return (
-            <div 
+            <div
               key={stat.label}
-              className="stat-card rounded-2xl p-5 relative overflow-hidden"
+              className="rounded-2xl p-5 relative overflow-hidden transition-all duration-300 hover:translate-y-[-3px]"
+              style={{
+                background: cardStyle.cardBg,
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                border: cardStyle.border,
+                boxShadow: cardStyle.shadow,
+              }}
             >
-              {/* Background decoration */}
-              <div 
-                className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-10 blur-2xl transform translate-x-8 -translate-y-8"
-                style={{ background: stat.gradient }}
+              <div
+                className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-20 blur-2xl transform translate-x-8 -translate-y-8"
+                style={{ background: cardStyle.gradient }}
               />
-              
               <div className="relative">
                 <div className="flex items-start justify-between mb-4">
-                  <div 
+                  <div
                     className="w-11 h-11 rounded-xl flex items-center justify-center"
-                    style={{ background: stat.bgLight }}
+                    style={{ background: cardStyle.bgLight }}
                   >
-                    <Icon className="w-5 h-5" style={{ color: stat.gradient.includes('#7C3AED') ? 'var(--primary)' : stat.gradient.includes('#22C55E') ? 'var(--status-published)' : stat.gradient.includes('#F59E0B') ? 'var(--status-draft)' : 'var(--accent)' }} />
+                    <Icon className="w-5 h-5" style={{ color: cardStyle.iconColor }} />
                   </div>
                   {stat.trendUp !== null && (
                     <div className={`flex items-center gap-1 text-xs font-medium ${stat.trendUp ? 'text-green-600' : 'text-red-500'}`}>
@@ -133,7 +135,10 @@ export default function DashboardPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Quick Actions */}
         <div className="lg:col-span-1">
-          <div className="glass-card rounded-2xl p-5 h-full">
+          <div
+            className="rounded-2xl p-5 h-full transition-all duration-300 hover:shadow-[0_8px_32px_rgba(124,58,237,0.12)]"
+            style={EMPLOYER_GLASS_CARD}
+          >
             <h2 className="text-base font-semibold mb-4" style={{ color: 'var(--neutral-dark)' }}>
               Quick Actions
             </h2>
@@ -206,7 +211,10 @@ export default function DashboardPage() {
 
         {/* Recent Jobs */}
         <div className="lg:col-span-2">
-          <div className="glass-card rounded-2xl p-5">
+          <div
+            className="rounded-2xl p-5 transition-all duration-300 hover:shadow-[0_8px_32px_rgba(124,58,237,0.12)]"
+            style={EMPLOYER_GLASS_CARD}
+          >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold" style={{ color: 'var(--neutral-dark)' }}>
                 Recent Jobs

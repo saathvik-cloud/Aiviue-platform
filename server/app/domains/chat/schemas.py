@@ -73,6 +73,10 @@ class ChatSessionCreate(BaseModel):
         None,
         description="Session context data",
     )
+    force_new: bool = Field(
+        default=False,
+        description="If True, always create a new session (e.g. user clicked 'New chat'). If False, return existing active session if any.",
+    )
 
 
 class ChatSessionResponse(BaseModel):
