@@ -172,7 +172,8 @@ class CandidateChatRepository:
         )
         await self.db.commit()
 
-        return await self.get_session_by_id(session_id)
+        # Return session without loading messages (callers only need context/step for send_message flow)
+        return await self.get_session_by_id(session_id, include_messages=False)
 
     async def delete_session(self, session_id: UUID) -> bool:
         """Soft delete a chat session."""
@@ -245,8 +246,14 @@ class CandidateChatRepository:
 
         await self.db.commit()
 
-        for msg in created_messages:
-            await self.db.refresh(msg)
+        # Single query to load the messages we just inserted (avoids N round-trips from refresh)
+        result = await self.db.execute(
+            select(CandidateChatMessage)
+            .where(CandidateChatMessage.session_id == session_id)
+            .order_by(CandidateChatMessage.created_at.desc())
+            .limit(len(messages))
+        )
+        created_messages = list(result.scalars().all())[::-1]
 
         return created_messages
 
