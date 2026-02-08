@@ -1,5 +1,6 @@
 'use client';
 
+import { LoadingContent } from '@/components/ui/loading-content';
 import { useCandidateResumes } from '@/lib/hooks';
 import { useCandidateAuthStore } from '@/stores';
 import { formatDate } from '@/lib/utils';
@@ -13,6 +14,44 @@ import Link from 'next/link';
 export default function ResumeHistoryPage() {
   const candidate = useCandidateAuthStore((state) => state.candidate);
   const { data: resumes, isLoading } = useCandidateResumes(candidate?.id);
+  const isEmpty = !resumes || resumes.length === 0;
+
+  const skeleton = (
+    <div className="space-y-3">
+      {[1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className="flex items-center gap-4 p-4 rounded-xl border animate-pulse"
+          style={{ borderColor: 'var(--neutral-border)', background: 'rgba(255,255,255,0.5)' }}
+        >
+          <div className="w-12 h-12 rounded-xl flex-shrink-0" style={{ background: 'var(--neutral-light)' }} />
+          <div className="flex-1">
+            <div className="h-4 rounded w-1/3 mb-2" style={{ background: 'var(--neutral-light)' }} />
+            <div className="h-3 rounded w-1/2" style={{ background: 'var(--neutral-light)' }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const emptyContent = (
+    <div className="text-center py-12 rounded-2xl border" style={{ borderColor: 'var(--neutral-border)' }}>
+      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: 'rgba(124, 58, 237, 0.1)' }}>
+        <FileText className="w-7 h-7" style={{ color: 'var(--primary)' }} />
+      </div>
+      <p className="text-sm font-medium mb-1" style={{ color: 'var(--neutral-dark)' }}>No resumes yet</p>
+      <p className="text-xs mb-4" style={{ color: 'var(--neutral-gray)' }}>
+        Build or upload a resume from the Resume page to see it here.
+      </p>
+      <Link
+        href={ROUTES.CANDIDATE_DASHBOARD_RESUME}
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
+        style={{ background: 'var(--primary)', color: 'white' }}
+      >
+        Go to Resume
+      </Link>
+    </div>
+  );
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-8">
@@ -28,28 +67,14 @@ export default function ResumeHistoryPage() {
         </p>
       </div>
 
-      {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="flex items-center gap-4 p-4 rounded-xl border animate-pulse"
-              style={{ borderColor: 'var(--neutral-border)', background: 'rgba(255,255,255,0.5)' }}
-            >
-              <div
-                className="w-12 h-12 rounded-xl flex-shrink-0"
-                style={{ background: 'var(--neutral-light)' }}
-              />
-              <div className="flex-1">
-                <div className="h-4 rounded w-1/3 mb-2" style={{ background: 'var(--neutral-light)' }} />
-                <div className="h-3 rounded w-1/2" style={{ background: 'var(--neutral-light)' }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : resumes && resumes.length > 0 ? (
+      <LoadingContent
+        isLoading={isLoading}
+        isEmpty={isEmpty}
+        renderSkeleton={skeleton}
+        emptyContent={emptyContent}
+      >
         <ul className="space-y-3">
-          {resumes.map((resume) => (
+          {(resumes ?? []).map((resume) => (
             <li
               key={resume.id}
               className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl border"
@@ -119,29 +144,7 @@ export default function ResumeHistoryPage() {
             </li>
           ))}
         </ul>
-      ) : (
-        <div className="text-center py-12 rounded-2xl border" style={{ borderColor: 'var(--neutral-border)' }}>
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
-            style={{ background: 'rgba(124, 58, 237, 0.1)' }}
-          >
-            <FileText className="w-7 h-7" style={{ color: 'var(--primary)' }} />
-          </div>
-          <p className="text-sm font-medium mb-1" style={{ color: 'var(--neutral-dark)' }}>
-            No resumes yet
-          </p>
-          <p className="text-xs mb-4" style={{ color: 'var(--neutral-gray)' }}>
-            Build or upload a resume from the Resume page to see it here.
-          </p>
-          <Link
-            href={ROUTES.CANDIDATE_DASHBOARD_RESUME}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
-            style={{ background: 'var(--primary)', color: 'white' }}
-          >
-            Go to Resume
-          </Link>
-        </div>
-      )}
+      </LoadingContent>
     </div>
   );
 }

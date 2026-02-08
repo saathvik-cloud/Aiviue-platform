@@ -10,6 +10,13 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.chat.formatting import (
+    format_experience_range,
+    format_salary_range,
+    format_shift_preference,
+    get_welcome_messages,
+    safe_string,
+)
 from app.domains.chat.models import ChatSession, ChatMessage, MessageRole, MessageType, SessionType
 from app.domains.chat.repository import ChatRepository
 from app.domains.chat.schemas import (
@@ -258,25 +265,7 @@ class ChatService:
     
     def _get_welcome_messages(self) -> List[dict]:
         """Get welcome messages for a new session."""
-        return [
-            {
-                "role": MessageRole.BOT,
-                "content": "Hi! I'm AIVI, your AI recruiting expert!...",
-                "message_type": MessageType.TEXT,
-            },
-            {
-                "role": MessageRole.BOT,
-                "content": "I'm here to help you create a job posting.\n\nHow would you like to proceed?",
-                "message_type": MessageType.BUTTONS,
-                "message_data": {
-                    "buttons": [
-                        {"id": "paste_jd", "label": "📋 Paste JD", "value": "paste_jd"},
-                        {"id": "use_aivi", "label": "💬 Use AIVI Bot", "value": "use_aivi"},
-                    ],
-                    "step": "choose_method",
-                },
-            },
-        ]
+        return get_welcome_messages()
     
     async def _process_user_input(
         self,
@@ -462,15 +451,15 @@ class ChatService:
             "city": extracted_data.get("city"),
             "work_type": extracted_data.get("work_type"),
             "currency": extracted_data.get("currency", "INR"),  # Default currency
-            "salary_range": self._format_salary_range(
+            "salary_range": format_salary_range(
                 extracted_data.get("salary_range_min"),
                 extracted_data.get("salary_range_max")
             ),
-            "experience_range": self._format_experience_range(
+            "experience_range": format_experience_range(
                 extracted_data.get("experience_min"),
                 extracted_data.get("experience_max")
             ),
-            "shift_preference": self._format_shift_preference(
+            "shift_preference": format_shift_preference(
                 extracted_data.get("shift_preferences")
             ),
             "openings_count": str(extracted_data.get("openings_count", "1")),
@@ -543,70 +532,6 @@ class ChatService:
             bot_responses=[self._to_message_response(m) for m in created_bot_messages],
         )
     
-    def _format_salary_range(self, min_val: any, max_val: any) -> Optional[str]:
-        """Format salary range as 'min-max' string."""
-        if min_val is not None and max_val is not None:
-            return f"{min_val}-{max_val}"
-        elif min_val is not None:
-            return f"{min_val}-0"
-        return None
-    
-    def _format_experience_range(self, min_val: any, max_val: any) -> Optional[str]:
-        """Format experience range as 'min-max' string."""
-        if min_val is not None and max_val is not None:
-            return f"{min_val}-{max_val}"
-        elif min_val is not None:
-            return f"{min_val}-0"
-        return None
-    
-    def _format_shift_preference(self, shift_data: any) -> Optional[str]:
-        """
-        Convert shift_preferences (object or string) to a simple string.
-        
-        LLM may return:
-        - {'shifts': ['day', 'night'], 'hours': '9-5'}
-        - {'hours': '8-10 hours per day'}
-        - 'day shift'
-        - None
-        
-        We need to convert to a simple string like 'day', 'night', 'flexible', etc.
-        """
-        if shift_data is None:
-            return None
-        
-        # Already a string - return as is
-        if isinstance(shift_data, str):
-            return shift_data
-        
-        # It's a dict - extract meaningful info
-        if isinstance(shift_data, dict):
-            parts = []
-            
-            # Check for 'shifts' array
-            shifts = shift_data.get("shifts")
-            if shifts and isinstance(shifts, list):
-                parts.extend(shifts)
-            
-            # Check for 'hours'
-            hours = shift_data.get("hours")
-            if hours:
-                parts.append(str(hours))
-            
-            # Check for 'shift' (singular)
-            shift = shift_data.get("shift")
-            if shift:
-                parts.append(str(shift))
-            
-            # If we got something, join it
-            if parts:
-                return ", ".join(parts)
-            
-            # Fallback: convert entire dict to string
-            return str(shift_data)
-        
-        # Fallback for any other type
-        return str(shift_data) if shift_data else None
-    
     def _normalize_extracted_data(self, collected_data: dict) -> dict:
         """
         Normalize and validate all extracted data to ensure proper string formats.
@@ -627,17 +552,17 @@ class ChatService:
             
             # Handle each field type
             if key == "title":
-                normalized[key] = self._safe_string(value)
+                normalized[key] = safe_string(value)
             
             elif key == "requirements":
-                normalized[key] = self._safe_string(value)
+                normalized[key] = safe_string(value)
             
             elif key in ("country", "state", "city"):
-                normalized[key] = self._safe_string(value)
+                normalized[key] = safe_string(value)
             
             elif key == "work_type":
                 # Ensure it's one of: remote, hybrid, onsite
-                val = self._safe_string(value).lower()
+                val = safe_string(value).lower()
                 if val in ("remote", "hybrid", "onsite"):
                     normalized[key] = val
                 else:
@@ -652,66 +577,29 @@ class ChatService:
                         normalized[key] = val  # Keep as-is
             
             elif key == "currency":
-                normalized[key] = self._safe_string(value).upper()
+                normalized[key] = safe_string(value).upper()
             
             elif key == "salary_range":
                 # Should already be formatted as "min-max" string
-                normalized[key] = self._safe_string(value)
+                normalized[key] = safe_string(value)
             
             elif key == "experience_range":
                 # Should already be formatted as "min-max" string
-                normalized[key] = self._safe_string(value)
+                normalized[key] = safe_string(value)
             
             elif key == "shift_preference":
-                # Should already be converted to string by _format_shift_preference
-                normalized[key] = self._safe_string(value)
+                # Should already be converted to string by format_shift_preference
+                normalized[key] = safe_string(value)
             
             elif key == "openings_count":
                 # Ensure it's a string number
-                normalized[key] = self._safe_string(value, default="1")
+                normalized[key] = safe_string(value, default="1")
             
             else:
                 # Unknown field - convert to string
-                normalized[key] = self._safe_string(value)
+                normalized[key] = safe_string(value)
         
         return normalized
-    
-    def _safe_string(self, value: any, default: str = "") -> Optional[str]:
-        """
-        Safely convert any value to a string.
-        
-        Handles:
-        - None → returns None (or default if provided)
-        - str → returns as-is (stripped)
-        - dict → converts to readable string
-        - list → joins with comma
-        - number → converts to string
-        """
-        if value is None:
-            return default if default else None
-        
-        if isinstance(value, str):
-            stripped = value.strip()
-            return stripped if stripped else (default if default else None)
-        
-        if isinstance(value, dict):
-            # Try to extract meaningful info from dict
-            if not value:
-                return default if default else None
-            # Convert dict to readable format
-            parts = []
-            for k, v in value.items():
-                if v:
-                    parts.append(str(v))
-            return ", ".join(parts) if parts else (default if default else None)
-        
-        if isinstance(value, list):
-            # Join list items
-            str_items = [str(item) for item in value if item]
-            return ", ".join(str_items) if str_items else (default if default else None)
-        
-        # Numbers, booleans, etc.
-        return str(value)
     
     def _get_first_missing_step(self, collected_data: dict) -> str:
         """
@@ -838,7 +726,7 @@ class ChatService:
             # Store the user's answer (ensure it's a string for safety)
             field_name = step_to_field[current_step]
             # Safety: Convert value to string (manual flow values should already be strings)
-            safe_value = self._safe_string(value) if value else None
+            safe_value = safe_string(value) if value else None
             if safe_value:
                 collected_data[field_name] = safe_value
             

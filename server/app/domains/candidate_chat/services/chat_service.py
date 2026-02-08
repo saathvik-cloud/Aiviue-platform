@@ -16,13 +16,19 @@ Conversation Flow:
 """
 
 import copy
-import re
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.candidate.repository import CandidateRepository
+from app.domains.candidate_chat.services.chat_constants import (
+    EDIT_FIELD_ALIASES,
+    JOB_TYPE_CHOICE_BUTTONS,
+    WELCOME_MESSAGES,
+    normalize_for_match,
+)
+from app.domains.candidate_chat.services.chat_message_builders import build_preview_messages
 from app.domains.candidate_chat.models.db_models import (
     CandidateChatSession,
     CandidateMessageRole,
@@ -51,90 +57,6 @@ from app.shared.logging import get_logger
 
 
 logger = get_logger(__name__)
-
-
-# ==================== STATIC WELCOME MESSAGES ====================
-
-WELCOME_MESSAGES = [
-    {
-        "role": CandidateMessageRole.BOT,
-        "content": "👋 Hello! I'm AIVI, your personal resume assistant.",
-        "message_type": CandidateMessageType.TEXT,
-        "message_data": {},
-    },
-    {
-        "role": CandidateMessageRole.BOT,
-        "content": "I'll help you create a professional resume that gets you noticed by employers. How would you like to proceed?",
-        "message_type": CandidateMessageType.BUTTONS,
-        "message_data": {
-            "buttons": [
-                {
-                    "id": "upload_pdf",
-                    "label": "📄 Upload Resume PDF",
-                    "description": "I already have a resume PDF",
-                },
-                {
-                    "id": "create_with_bot",
-                    "label": "🤖 Create with AIVI Bot",
-                    "description": "Help me build my resume step by step",
-                },
-            ],
-        },
-    },
-]
-
-
-# Fallback flow: job type choice (when candidate has no role in DB)
-JOB_TYPE_CHOICE_BUTTONS = [
-    {
-        "id": "blue_collar",
-        "label": "Blue Collar",
-        "description": "Manual/physical work: delivery, driver, warehouse, labour, field work.",
-    },
-    {
-        "id": "white_collar",
-        "label": "White Collar",
-        "description": "Office/managerial: tech, sales manager, bank manager, desk-based roles.",
-    },
-    {
-        "id": "grey_collar",
-        "label": "Grey Collar",
-        "description": "In between: service sector, junior devs, skilled technical roles.",
-    },
-]
-
-# User-friendly field names → question_key when editing resume (e.g. "salary" → "salary_expectation")
-EDIT_FIELD_ALIASES: Dict[str, str] = {
-    "name": "full_name",
-    "full name": "full_name",
-    "salary": "salary_expectation",
-    "salary expectation": "salary_expectation",
-    "expected salary": "salary_expectation",
-    "skills": "skills",
-    "technical skills": "skills",
-    "about": "about",
-    "experience": "experience_years",
-    "years of experience": "experience_years",
-    "location": "preferred_location",
-    "preferred location": "preferred_location",
-    "dob": "date_of_birth",
-    "date of birth": "date_of_birth",
-    "birth": "date_of_birth",
-    "education": "education",
-    "portfolio": "portfolio_url",
-    "work type": "preferred_work_type",
-    "work arrangement": "preferred_work_type",
-    "shift": "preferred_shift",
-    "experience details": "experience_details",
-    "languages": "languages_known",
-}
-
-
-def _normalize_for_match(text: str) -> str:
-    """Normalize for matching: lowercase, hyphens to spaces, collapse spaces, trim."""
-    if not text:
-        return ""
-    return re.sub(r"\s+", " ", text.strip().lower().replace("-", " ")).strip()
 
 
 # ==================== CHAT SERVICE ====================
@@ -587,12 +509,12 @@ class CandidateChatService:
                 # Engine says nothing to ask — go to preview
                 ctx["step"] = ChatStep.RESUME_PREVIEW
                 await self._chat_repo.update_session(session.id, context_data=ctx)
-                processing_msgs.extend(self._build_preview_messages(ctx))
+                processing_msgs.extend(build_preview_messages(ctx))
         else:
             # All fields extracted — go to preview
             ctx["step"] = ChatStep.RESUME_PREVIEW
             await self._chat_repo.update_session(session.id, context_data=ctx)
-            processing_msgs.extend(self._build_preview_messages(ctx))
+            processing_msgs.extend(build_preview_messages(ctx))
 
         return processing_msgs
 
@@ -672,7 +594,7 @@ class CandidateChatService:
                     "message_type": CandidateMessageType.TEXT,
                     "message_data": {},
                 }]
-            field_name = _normalize_for_match(field_name_raw)
+            field_name = normalize_for_match(field_name_raw)
             field_name_underscore = field_name.replace(" ", "_")
             question_key = (
                 EDIT_FIELD_ALIASES.get(field_name)
@@ -747,7 +669,7 @@ class CandidateChatService:
                     )
                     ctx["collected_data"] = polished
                     await self._chat_repo.update_session(session.id, context_data=ctx)
-                return self._build_preview_messages(ctx)
+                return build_preview_messages(ctx)
 
             engine = QuestionEngine(type_templates, collected_data)
             next_template = engine.get_next_question()
@@ -762,7 +684,7 @@ class CandidateChatService:
                     )
                     ctx["collected_data"] = polished
                     await self._chat_repo.update_session(session.id, context_data=ctx)
-                return self._build_preview_messages(ctx)
+                return build_preview_messages(ctx)
             ctx["current_question_key"] = next_template.question_key
             await self._chat_repo.update_session(session.id, context_data=ctx)
             return [engine.build_question_message(next_template)]
@@ -1250,33 +1172,6 @@ class CandidateChatService:
         await self._chat_repo.update_session(session.id, context_data=ctx)
 
         return [engine.build_question_message(next_q)]
-
-    def _build_preview_messages(self, ctx: dict) -> List[dict]:
-        """Build resume preview messages (reusable across flows)."""
-        collected_data = ctx.get("collected_data", {})
-        return [
-            {
-                "role": CandidateMessageRole.BOT,
-                "content": "Here's a preview of your resume. Would you like to confirm and save it?",
-                "message_type": CandidateMessageType.RESUME_PREVIEW,
-                "message_data": {
-                    "resume_data": collected_data,
-                    "role_name": ctx.get("role_name", ""),
-                    "job_type": ctx.get("job_type", ""),
-                },
-            },
-            {
-                "role": CandidateMessageRole.BOT,
-                "content": "Would you like to save this resume?",
-                "message_type": CandidateMessageType.BUTTONS,
-                "message_data": {
-                    "buttons": [
-                        {"id": "confirm_resume", "label": "✅ Yes, save my resume"},
-                        {"id": "edit_resume", "label": "✏️ No, let me make changes"},
-                    ],
-                },
-            },
-        ]
 
     def _copy_context(self, session: CandidateChatSession) -> dict:
         """Deep copy context_data to avoid mutation issues."""

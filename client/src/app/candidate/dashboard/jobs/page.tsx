@@ -7,6 +7,7 @@
  * category and location. Gradient + glass cards aligned with employer module.
  */
 
+import { LoadingContent } from '@/components/ui/loading-content';
 import { ROUTES } from '@/constants';
 import { useJobs } from '@/lib/hooks';
 import { useCandidateAuthStore } from '@/stores';
@@ -170,58 +171,58 @@ export default function CandidateJobsPage() {
       )}
 
       {/* Job cards grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div
-              key={i}
-              className="rounded-2xl p-5 animate-pulse relative overflow-hidden"
-              style={{
-                background: CARD_GRADIENTS[i % CARD_GRADIENTS.length].bg,
-                border: CARD_GRADIENTS[i % CARD_GRADIENTS.length].border,
-                boxShadow: CARD_GRADIENTS[i % CARD_GRADIENTS.length].shadow,
-                backdropFilter: 'blur(16px)',
-              }}
-            >
-              <div className="h-5 rounded w-3/4 mb-3" style={{ background: 'rgba(124, 58, 237, 0.1)' }} />
-              <div className="h-4 rounded w-1/2 mb-2" style={{ background: 'rgba(124, 58, 237, 0.08)' }} />
-              <div className="h-4 rounded w-1/3" style={{ background: 'rgba(124, 58, 237, 0.08)' }} />
-            </div>
-          ))}
-        </div>
-      ) : !hasMatches ? (
-        <div
-          className="glass-card rounded-2xl p-8 sm:p-10 text-center"
-          style={{ maxWidth: '28rem', margin: '0 auto' }}
-        >
-          <div
-            className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-4"
-            style={{
-              background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, rgba(20, 184, 166, 0.15) 100%)',
-            }}
-          >
-            <Briefcase className="w-10 h-10" style={{ color: 'var(--primary)' }} />
+      <LoadingContent
+        isLoading={isLoading}
+        isEmpty={!hasMatches}
+        renderSkeleton={
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div
+                key={i}
+                className="rounded-2xl p-5 animate-pulse relative overflow-hidden"
+                style={{
+                  background: CARD_GRADIENTS[i % CARD_GRADIENTS.length].bg,
+                  border: CARD_GRADIENTS[i % CARD_GRADIENTS.length].border,
+                  boxShadow: CARD_GRADIENTS[i % CARD_GRADIENTS.length].shadow,
+                  backdropFilter: 'blur(16px)',
+                }}
+              >
+                <div className="h-5 rounded w-3/4 mb-3" style={{ background: 'rgba(124, 58, 237, 0.1)' }} />
+                <div className="h-4 rounded w-1/2 mb-2" style={{ background: 'rgba(124, 58, 237, 0.08)' }} />
+                <div className="h-4 rounded w-1/3" style={{ background: 'rgba(124, 58, 237, 0.08)' }} />
+              </div>
+            ))}
           </div>
-          <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--neutral-dark)' }}>
-            {showAll ? 'No jobs published yet' : 'No matching jobs right now'}
-          </h3>
-          <p className="text-sm mb-6" style={{ color: 'var(--neutral-gray)' }}>
-            {showAll
-              ? 'Check back later for new opportunities.'
-              : 'Try "Explore All Jobs" or complete your profile (category & location) for better recommendations.'}
-          </p>
-          {hasFilters && !showAll && (
-            <button
-              type="button"
-              onClick={() => setShowAll(true)}
-              className="btn-gradient inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold"
+        }
+        emptyContent={
+          <div className="glass-card rounded-2xl p-8 sm:p-10 text-center" style={{ maxWidth: '28rem', margin: '0 auto' }}>
+            <div
+              className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-4"
+              style={{ background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, rgba(20, 184, 166, 0.15) 100%)' }}
             >
-              <Sparkles className="w-4 h-4" />
-              Explore All Jobs
-            </button>
-          )}
-        </div>
-      ) : (
+              <Briefcase className="w-10 h-10" style={{ color: 'var(--primary)' }} />
+            </div>
+            <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--neutral-dark)' }}>
+              {showAll ? 'No jobs published yet' : 'No matching jobs right now'}
+            </h3>
+            <p className="text-sm mb-6" style={{ color: 'var(--neutral-gray)' }}>
+              {showAll
+                ? 'Check back later for new opportunities.'
+                : 'Try "Explore All Jobs" or complete your profile (category & location) for better recommendations.'}
+            </p>
+            {hasFilters && !showAll && (
+              <button
+                type="button"
+                onClick={() => setShowAll(true)}
+                className="btn-gradient inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold"
+              >
+                <Sparkles className="w-4 h-4" />
+                Explore All Jobs
+              </button>
+            )}
+          </div>
+        }
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {items.map((job, index) => {
             const style = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
@@ -288,7 +289,7 @@ export default function CandidateJobsPage() {
             );
           })}
         </div>
-      )}
+      </LoadingContent>
     </div>
   );
 }

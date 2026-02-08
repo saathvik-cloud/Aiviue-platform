@@ -30,7 +30,12 @@ export interface Candidate extends BaseEntity {
   current_monthly_salary?: number;
   aadhaar_number_encrypted?: string;
   pan_number_encrypted?: string;
+  /** Profile/onboarding completion (basic | complete). Distinct from has_resume. */
   profile_status: ProfileStatus;
+  /** True if candidate has at least one completed resume. From API when available. */
+  has_resume?: boolean;
+  /** Version of latest resume, if any. From API when available. */
+  latest_resume_version?: number;
 }
 
 // ==================== CANDIDATE RESUME ====================

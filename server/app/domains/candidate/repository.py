@@ -207,6 +207,33 @@ class CandidateRepository:
         result = await self.session.execute(query)
         return result.scalar() or 0
 
+    async def get_resume_stats(
+        self, candidate_id: UUID
+    ) -> tuple[int, Optional[int]]:
+        """
+        Get resume stats for API: (count of completed resumes, latest version number).
+
+        Used to populate has_resume and latest_resume_version on CandidateResponse.
+        """
+        query = (
+            select(
+                func.count().label("count"),
+                func.max(CandidateResume.version_number).label("max_version"),
+            )
+            .select_from(CandidateResume)
+            .where(
+                and_(
+                    CandidateResume.candidate_id == candidate_id,
+                    CandidateResume.status == ResumeStatus.COMPLETED,
+                )
+            )
+        )
+        result = await self.session.execute(query)
+        row = result.one()
+        count = row.count or 0
+        max_ver = row.max_version
+        return (count, int(max_ver) if max_ver is not None else None)
+
     async def invalidate_old_resumes(self, candidate_id: UUID) -> int:
         """Invalidate all existing completed resumes for a candidate."""
         stmt = (

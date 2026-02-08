@@ -107,9 +107,17 @@ def _mask_pan(pan: str) -> str:
 def _candidate_response_with_masked(
     candidate: Candidate,
     response: Optional[CandidateResponse] = None,
+    *,
+    has_resume: Optional[bool] = None,
+    latest_resume_version: Optional[int] = None,
 ) -> CandidateResponse:
-    """Attach aadhaar_masked and pan_masked to CandidateResponse from encrypted fields."""
+    """Build CandidateResponse with masked sensitive fields and optional resume stats."""
     r = response or CandidateResponse.model_validate(candidate)
+    updates: dict = {}
+    if has_resume is not None:
+        updates["has_resume"] = has_resume
+    if latest_resume_version is not None:
+        updates["latest_resume_version"] = latest_resume_version
     aadhaar_masked = None
     pan_masked = None
     if getattr(candidate, "aadhaar_number_encrypted", None):
@@ -120,7 +128,9 @@ def _candidate_response_with_masked(
         plain = _decrypt_sensitive(candidate.pan_number_encrypted)
         if plain:
             pan_masked = _mask_pan(plain)
-    return r.model_copy(update={"aadhaar_masked": aadhaar_masked, "pan_masked": pan_masked})
+    updates["aadhaar_masked"] = aadhaar_masked
+    updates["pan_masked"] = pan_masked
+    return r.model_copy(update=updates)
 
 
 # ==================== SERVICE ====================
@@ -195,7 +205,7 @@ class CandidateService:
     # ==================== PROFILE OPERATIONS ====================
 
     async def get_by_id(self, candidate_id: UUID) -> CandidateResponse:
-        """Get candidate by ID."""
+        """Get candidate by ID with resume stats (has_resume, latest_resume_version)."""
         candidate = await self.repository.get_by_id(candidate_id)
         if not candidate:
             raise NotFoundError(
@@ -203,7 +213,12 @@ class CandidateService:
                 error_code="CANDIDATE_NOT_FOUND",
                 context={"candidate_id": str(candidate_id)},
             )
-        return _candidate_response_with_masked(candidate)
+        count, max_version = await self.repository.get_resume_stats(candidate_id)
+        return _candidate_response_with_masked(
+            candidate,
+            has_resume=count > 0,
+            latest_resume_version=max_version,
+        )
 
     async def create_basic_profile(
         self,

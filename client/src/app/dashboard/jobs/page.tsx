@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores';
 import { useJobs } from '@/lib/hooks';
 import { formatDate, capitalize } from '@/lib/utils';
 import { SelectDropdown } from '@/components';
+import { LoadingContent } from '@/components/ui/loading-content';
 import type { JobStatus, WorkType } from '@/types';
 import { 
   Briefcase, 
@@ -159,51 +160,57 @@ export default function JobsPage() {
 
       {/* Jobs List */}
       <div className="glass-card rounded-2xl overflow-hidden">
-        {isLoading ? (
-          <div className="p-5 space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="animate-pulse flex items-center gap-4 p-4 rounded-xl bg-white/50">
-                <div className="w-12 h-12 bg-gray-200 rounded-xl" />
-                <div className="flex-1">
-                  <div className="h-4 bg-gray-200 rounded w-1/2 mb-2" />
-                  <div className="h-3 bg-gray-200 rounded w-1/3" />
+        <LoadingContent
+          isLoading={isLoading}
+          isEmpty={(jobs?.items.length ?? 0) === 0}
+          skeletonCount={5}
+          renderSkeleton={
+            <div className="p-5 space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="animate-pulse flex items-center gap-4 p-4 rounded-xl bg-white/50">
+                  <div className="w-12 h-12 bg-gray-200 rounded-xl" />
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-200 rounded w-1/2 mb-2" />
+                    <div className="h-3 bg-gray-200 rounded w-1/3" />
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : jobs?.items.length === 0 ? (
-          <div className="text-center py-16 px-4">
-            <div 
-              className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4"
-              style={{ background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%)' }}
-            >
-              <Briefcase className="w-10 h-10" style={{ color: 'var(--primary)' }} />
+              ))}
             </div>
-            <p className="text-lg font-medium mb-1" style={{ color: 'var(--neutral-dark)' }}>
-              {hasFilters ? 'No jobs match your filters' : 'No jobs yet'}
-            </p>
-            <p className="text-sm mb-6" style={{ color: 'var(--neutral-gray)' }}>
-              {hasFilters ? 'Try adjusting your filters' : 'Create your first job posting'}
-            </p>
-            {hasFilters ? (
-              <button
-                onClick={clearFilters}
-                className="btn-glass px-5 py-2.5 rounded-xl text-sm font-medium"
-                style={{ color: 'var(--primary)' }}
+          }
+          emptyContent={
+            <div className="text-center py-16 px-4">
+              <div
+                className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                style={{ background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%)' }}
               >
-                Clear Filters
-              </button>
-            ) : (
-              <Link
-                href={ROUTES.JOB_NEW}
-                className="btn-gradient inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium"
-              >
-                <Plus className="w-4 h-4" />
-                Post a Job
-              </Link>
-            )}
-          </div>
-        ) : (
+                <Briefcase className="w-10 h-10" style={{ color: 'var(--primary)' }} />
+              </div>
+              <p className="text-lg font-medium mb-1" style={{ color: 'var(--neutral-dark)' }}>
+                {hasFilters ? 'No jobs match your filters' : 'No jobs yet'}
+              </p>
+              <p className="text-sm mb-6" style={{ color: 'var(--neutral-gray)' }}>
+                {hasFilters ? 'Try adjusting your filters' : 'Create your first job posting'}
+              </p>
+              {hasFilters ? (
+                <button
+                  onClick={clearFilters}
+                  className="btn-glass px-5 py-2.5 rounded-xl text-sm font-medium"
+                  style={{ color: 'var(--primary)' }}
+                >
+                  Clear Filters
+                </button>
+              ) : (
+                <Link
+                  href={ROUTES.JOB_NEW}
+                  className="btn-gradient inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium"
+                >
+                  <Plus className="w-4 h-4" />
+                  Post a Job
+                </Link>
+              )}
+            </div>
+          }
+        >
           <div className="divide-y" style={{ borderColor: 'rgba(226, 232, 240, 0.5)' }}>
             {jobs?.items.map((job) => (
               <Link
@@ -269,7 +276,7 @@ export default function JobsPage() {
               </Link>
             ))}
           </div>
-        )}
+        </LoadingContent>
       </div>
     </div>
   );

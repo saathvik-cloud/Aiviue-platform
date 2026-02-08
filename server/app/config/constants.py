@@ -1,6 +1,11 @@
 # API Constants
 API_V1_PREFIX = "/api/v1"
 
+# Optional fields convention (API and internal DTOs):
+# - Optional scalars: use None when not set; response schemas use Optional[T] = None so the key is always present.
+# - Optional lists: use [] when not set (never use None for "no items" in list fields).
+# - Do not use empty string "" for "not set"; use None.
+
 # Database
 DB_POOL_SIZE = 5
 DB_MAX_OVERFLOW = 10
@@ -26,7 +31,7 @@ class ShiftType:
     NIGHT = "night"
     FLEXIBLE = "flexible"
 
-# Candidate Profile Status
+# Candidate Profile Status (profile/onboarding completion; distinct from "has resume")
 class CandidateProfileStatus:
     BASIC = "basic"
     COMPLETE = "complete"

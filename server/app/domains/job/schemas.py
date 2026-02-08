@@ -237,81 +237,83 @@ class JobCloseRequest(BaseModel):
 class JobResponse(BaseModel):
     """
     Full job response schema.
-    
-    Used in: GET, POST, PUT responses
+
+    Used in: GET, POST, PUT responses.
+    Optional fields use default None so API always returns the key (value may be null).
     """
     
     id: UUID
     employer_id: UUID
-    employer_name: Optional[str] = None  # Company/employer name for candidate job detail
+    employer_name: Optional[str] = None
 
     # Basic Info
     title: str
     description: str
-    requirements: Optional[str]
-    
+    requirements: Optional[str] = None
+
     # Location
-    location: Optional[str]
-    city: Optional[str]
-    state: Optional[str]
-    country: Optional[str]
-    
+    location: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = None
+
     # Work Type
-    work_type: Optional[str]
-    
+    work_type: Optional[str] = None
+
     # Compensation
-    salary_range_min: Optional[float]
-    salary_range_max: Optional[float]
-    currency: Optional[str]
+    salary_range_min: Optional[float] = None
+    salary_range_max: Optional[float] = None
+    currency: Optional[str] = None
     salary_range: Optional[str] = Field(None, description="Formatted salary range")
-    
+
     # Experience
-    experience_min: Optional[float]
-    experience_max: Optional[float]
+    experience_min: Optional[float] = None
+    experience_max: Optional[float] = None
     experience_range: Optional[str] = Field(None, description="Formatted experience range")
-    
+
     # Shifts
-    shift_preferences: Optional[dict]
-    
+    shift_preferences: Optional[dict] = None
+
     # Openings
     openings_count: int
-    
+
     # Categorization
-    category_id: Optional[UUID]
-    role_id: Optional[UUID]
-    
+    category_id: Optional[UUID] = None
+    role_id: Optional[UUID] = None
+
     # Status
     status: str
     is_published: bool
     is_draft: bool
-    
+
     # Timestamps
-    published_at: Optional[datetime]
-    closed_at: Optional[datetime]
-    close_reason: Optional[str]
-    
+    published_at: Optional[datetime] = None
+    closed_at: Optional[datetime] = None
+    close_reason: Optional[str] = None
+
     # Metadata
     is_active: bool
     version: int
     created_at: datetime
     updated_at: datetime
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class JobSummaryResponse(BaseModel):
     """
     Minimal job response for lists.
+    Optional fields default to None so list responses have a consistent shape.
     """
     
     id: UUID
     employer_id: UUID
-    employer_name: Optional[str] = None  # Company/employer name for candidate job cards
+    employer_name: Optional[str] = None
     title: str
-    location: Optional[str]
-    work_type: Optional[str]
-    salary_range: Optional[str]
-    currency: Optional[str] = None  # Salary currency: INR, USD, GBP, etc. for correct symbol in UI
+    location: Optional[str] = None
+    work_type: Optional[str] = None
+    salary_range: Optional[str] = None
+    currency: Optional[str] = None
     status: str
     openings_count: int
     created_at: datetime

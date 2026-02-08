@@ -348,7 +348,8 @@ class ResumeBuilderService:
         resume data against job requirements.
 
         Returns:
-            Dict with normalized matching fields
+            Dict with normalized matching fields. Optional scalars are None when
+            missing; list fields (skills, languages) are [] when missing.
         """
         sections = resume_data.get("sections", {})
         meta = resume_data.get("meta", {})

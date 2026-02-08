@@ -170,11 +170,12 @@ class Candidate(Base, FullAuditMixin):
     )
 
     # ==================== STATUS ====================
+    # profile_status = profile/onboarding completion (basic | complete). Not "has resume".
     profile_status: Mapped[str] = mapped_column(
         String(50),
         default=ProfileStatus.BASIC,
         nullable=False,
-        comment="Profile status: basic, complete",
+        comment="Profile onboarding: basic, complete (distinct from having a resume)",
     )
 
     # ==================== RELATIONSHIPS ====================

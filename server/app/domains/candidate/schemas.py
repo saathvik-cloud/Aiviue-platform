@@ -196,7 +196,12 @@ class CandidateResponse(BaseModel):
     """
     Full candidate response schema.
 
-    Used in: GET, POST, PUT responses
+    Used in: GET, POST, PUT responses.
+
+    Semantics:
+    - profile_status: Profile/onboarding completion ("basic" | "complete"), not resume.
+    - has_resume: True if candidate has at least one completed resume.
+    - latest_resume_version: Version number of latest resume, if any.
     """
     id: UUID
     mobile: str
@@ -212,6 +217,8 @@ class CandidateResponse(BaseModel):
     about: Optional[str] = None
     current_monthly_salary: Optional[float] = None
     profile_status: str
+    has_resume: bool = False
+    latest_resume_version: Optional[int] = None
     is_active: bool
     version: int
     created_at: datetime
