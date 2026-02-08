@@ -1,13 +1,21 @@
 """
 WebSocket endpoint for Candidate Chat - Real-time AIVI Bot Communication.
 
-Hybrid approach: WebSocket for real-time chat, REST for history/session management.
+CURRENTLY NOT USED BY THE CLIENT. Chat uses HTTP request–response
+(POST /sessions/{id}/messages) as the primary flow. This WebSocket module is kept
+for future use, e.g.:
+- Streaming bot reply token-by-token (ChatGPT-style)
+- Server-initiated push (e.g. "Resume ready" without user sending a message)
 
-Architecture:
+When re-enabling: ensure the client connects to this endpoint and sends messages
+via the socket; consider decoupling the receive loop from message processing so
+long-running work (LLM) doesn't block ping/pong and cause connection drops.
+
+Architecture (for when re-enabled):
 - ConnectionManager: Tracks active WebSocket connections per session
-- WebSocket endpoint: Receives messages, processes via CandidateChatService, streams responses
+- WebSocket endpoint: Receives messages, processes via CandidateChatService
 - All messages persisted to DB via the same service layer (DB = source of truth)
-- REST endpoints remain as fallback + history fetching + session creation
+- REST endpoints for session creation, history, and (currently) sending messages
 
 Production patterns:
 - Connection manager with thread-safe connection tracking
@@ -223,6 +231,7 @@ manager = ConnectionManager()
 
 
 # ==================== WEBSOCKET ROUTER ====================
+# Kept for future use (streaming / server push). Client currently uses HTTP only.
 
 ws_router = APIRouter(
     prefix=f"{API_V1_PREFIX}/candidate-chat",

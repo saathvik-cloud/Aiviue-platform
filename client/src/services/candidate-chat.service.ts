@@ -1,9 +1,8 @@
 /**
- * Candidate Chat Service - API calls + WebSocket for AIVI Resume Builder Bot.
+ * Candidate Chat Service - API client for AIVI Resume Builder Bot.
  *
- * Dual communication:
- * - REST: Session management, history, fallback messaging
- * - WebSocket: Real-time chat during active conversation
+ * Chat messaging uses REST only (POST /sessions/:id/messages).
+ * WebSocket helpers below are kept for future use (e.g. streaming, server push).
  */
 
 import { API_ENDPOINTS, buildQueryParams } from '@/constants';
@@ -80,7 +79,7 @@ export async function getActiveCandidateResumeSession(
 }
 
 /**
- * Send a message via REST (fallback when WebSocket not available).
+ * Send a message via REST. Returns user_message + bot_messages (request–response).
  */
 export async function sendCandidateChatMessage(
   sessionId: string,

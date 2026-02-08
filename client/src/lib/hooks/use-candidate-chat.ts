@@ -101,10 +101,7 @@ export function useCreateCandidateChatSession() {
 }
 
 /**
- * Mutation hook to send a message via REST (fallback).
- *
- * Note: Primary communication should use WebSocket.
- * This is the REST fallback for when WebSocket is unavailable.
+ * Mutation hook to send a message via REST (POST /sessions/:id/messages).
  *
  * Don't invalidate session query to avoid duplicate messages.
  * The chat component manages local state optimistically.

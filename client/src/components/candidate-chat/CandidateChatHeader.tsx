@@ -4,17 +4,18 @@
  * CandidateChatHeader - Header for the resume builder chat.
  *
  * Features:
- * - Title display with connection status
+ * - Title display with status (Ready when HTTP; Connected/Reconnecting/etc. when WebSocket)
  * - New Chat button
  * - History toggle button
- * - Reconnecting/disconnected indicators
  */
 
 import type { ConnectionStatus } from '@/lib/websocket/candidate-chat-socket';
-import { History, Plus, Wifi, WifiOff } from 'lucide-react';
+import { CheckCircle, History, Plus, Wifi, WifiOff } from 'lucide-react';
 
 interface CandidateChatHeaderProps {
     title?: string;
+    /** When 'http', shows "Ready" (no WebSocket). When 'websocket', uses connectionStatus. */
+    transport?: 'http' | 'websocket';
     connectionStatus?: ConnectionStatus;
     onNewChat: () => void;
     onToggleHistory: () => void;
@@ -23,7 +24,8 @@ interface CandidateChatHeaderProps {
 
 export function CandidateChatHeader({
     title = 'AIVI Resume Builder',
-    connectionStatus = 'connected',
+    transport = 'http',
+    connectionStatus = 'disconnected',
     onNewChat,
     onToggleHistory,
     showHistoryButton = true,
@@ -36,7 +38,10 @@ export function CandidateChatHeader({
         error: { color: 'var(--status-closed)', icon: WifiOff, text: 'Connection Error' },
     };
 
-    const status = statusConfig[connectionStatus];
+    const status =
+        transport === 'http'
+            ? { color: '#10B981', icon: CheckCircle, text: 'Ready' }
+            : statusConfig[connectionStatus];
     const StatusIcon = status.icon;
 
     return (
@@ -64,7 +69,7 @@ export function CandidateChatHeader({
                         {title}
                     </h2>
 
-                    {/* Connection Status */}
+                    {/* Status: "Ready" for HTTP, or WebSocket connection status when transport is websocket */}
                     <div className="flex items-center gap-1.5 mt-0.5">
                         <StatusIcon className="w-3 h-3" style={{ color: status.color }} />
                         <span className="text-xs" style={{ color: status.color }}>

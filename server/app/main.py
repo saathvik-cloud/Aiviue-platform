@@ -165,7 +165,7 @@ app.include_router(job_router)
 app.include_router(chat_router)
 app.include_router(candidate_router)
 app.include_router(candidate_chat_router)
-app.include_router(candidate_chat_ws_router)  # WebSocket for real-time chat
+app.include_router(candidate_chat_ws_router)  # WebSocket kept for future use (streaming/server push); client uses HTTP
 app.include_router(job_master_router)
 
 

@@ -1,12 +1,18 @@
 /**
  * Candidate Chat WebSocket Manager.
  *
- * Handles real-time communication for the AIVI Resume Builder Bot.
- * Features:
+ * NOT USED IN CURRENT FLOW. Chat uses HTTP request–response (POST /sessions/:id/messages).
+ * This module is kept for future use, e.g.:
+ * - Streaming bot reply token-by-token (ChatGPT-style)
+ * - Server-initiated push (e.g. "Resume ready" notification)
+ *
+ * When re-enabled: CandidateChatContainer will call setupWebSocket() after session create
+ * and use sendMessage() when the socket is connected.
+ *
+ * Features (for when re-enabled):
  * - Auto-reconnection with exponential backoff
  * - Heartbeat (ping/pong) for connection health
  * - Message queue for offline resilience
- * - TypeScript-first with full type safety
  *
  * Pattern: Singleton per session (one connection per chat session).
  */

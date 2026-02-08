@@ -115,7 +115,7 @@ export interface CreateCandidateChatSessionRequest {
 export interface CandidateSendMessageRequest {
   content: string;
   message_type?: string;
-  message_data?: Record<string, any>;
+  message_data?: Record<string, unknown>;
 }
 
 // ==================== API RESPONSES ====================

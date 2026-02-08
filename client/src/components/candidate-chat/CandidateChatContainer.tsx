@@ -3,12 +3,13 @@
 /**
  * CandidateChatContainer - Main chat interface for the AIVI Resume Builder Bot.
  *
- * This is the primary component for the candidate chat experience.
+ * Transport: HTTP request–response (POST /sessions/:id/messages). WebSocket code
+ * is kept in the codebase for future use (e.g. streaming, server push) but is not used.
+ *
  * Features:
- * - WebSocket-based real-time communication with REST fallback
+ * - REST-based send message with full response (user_message + bot_messages)
  * - Optimistic UI updates for instant feedback
- * - Auto-reconnection with exponential backoff
- * - Session persistence (resume from where you left off)
+ * - Session persistence (resume from where you left off; New Resume = new session)
  * - PDF upload with drag-and-drop
  * - Responsive design
  *
@@ -186,71 +187,49 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
         });
     }, [progressMsgIndex, isProcessing]);
 
-    // ==================== WEBSOCKET SETUP ====================
+    // ==================== WEBSOCKET SETUP (NOT USED – KEPT FOR LATER) ====================
+    // Chat currently uses HTTP request–response only. WebSocket code is kept for future use, e.g.:
+    // - Streaming bot reply token-by-token (ChatGPT-style)
+    // - Server-initiated push (e.g. "Resume ready" without user sending a message)
+    // When re-enabling: call setupWebSocket(session.id, candidate.id) after session create and
+    // use wsManagerRef.current.sendMessage() in handleSendMessage when isConnected().
 
     const setupWebSocket = useCallback((sessionId: string, candidateId: string) => {
-        // Cleanup existing connection
         if (wsManagerRef.current) {
             wsManagerRef.current.disconnect();
         }
-
         const manager = createCandidateChatSocket(sessionId, candidateId, {
-            onConnected: (sid, cid) => {
-                console.log('[CandidateChat] WebSocket connected:', sid, cid);
-                setConnectionStatus('connected');
-            },
-            onDisconnected: (reason) => {
-                console.log('[CandidateChat] WebSocket disconnected:', reason);
-                setConnectionStatus('disconnected');
-            },
-            onReconnecting: (attempt, max) => {
-                console.log(`[CandidateChat] Reconnecting ${attempt}/${max}`);
-                setConnectionStatus('reconnecting');
-                // Reconnecting state shown in chat header only; no global toast so it doesn't appear on other pages.
-            },
-            onTyping: (typing) => {
-                setIsTyping(typing);
-            },
+            onConnected: () => setConnectionStatus('connected'),
+            onDisconnected: () => setConnectionStatus('disconnected'),
+            onReconnecting: () => setConnectionStatus('reconnecting'),
+            onTyping: (typing) => setIsTyping(typing),
             onUserMessageAck: (message) => {
-                // Replace optimistic message with server-confirmed message
                 setLocalMessages((prev) => {
                     const filtered = prev.filter((m) => !m.id.startsWith('temp-'));
                     return [...filtered, message];
                 });
             },
             onBotMessage: (message) => {
-                // Remove loading message and add bot message
                 setLocalMessages((prev) => {
                     const filtered = prev.filter((m) => !m.id.startsWith('loading-'));
                     return [...filtered, message];
                 });
                 setIsTyping(false);
             },
-            onSessionUpdate: (session) => {
-                console.log('[CandidateChat] Session updated:', session);
-            },
+            onSessionUpdate: () => {},
             onError: (error, code) => {
-                console.error('[CandidateChat] WebSocket error:', error, code);
                 setConnectionStatus('error');
-                if (code === 'MAX_RECONNECT_REACHED') {
-                    toast.error('Connection lost. Please refresh the page.');
-                }
+                if (code === 'MAX_RECONNECT_REACHED') toast.error('Connection lost. Please refresh the page.');
             },
-            onStatusChange: (status) => {
-                setConnectionStatus(status);
-            },
+            onStatusChange: (status) => setConnectionStatus(status),
         });
-
         wsManagerRef.current = manager;
         manager.connect();
     }, []);
 
-    // Cleanup WebSocket on unmount
     useEffect(() => {
         return () => {
-            if (wsManagerRef.current) {
-                wsManagerRef.current.disconnect();
-            }
+            if (wsManagerRef.current) wsManagerRef.current.disconnect();
         };
     }, []);
 
@@ -273,10 +252,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
         setViewMode('chat');
         setIsInitializing(true);
 
-        // Disconnect existing WebSocket
-        if (wsManagerRef.current) {
-            wsManagerRef.current.disconnect();
-        }
+        if (wsManagerRef.current) wsManagerRef.current.disconnect();
 
         try {
             const session = await createSession.mutateAsync({
@@ -285,18 +261,15 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
                 force_new: forceNew,
             });
 
-            console.log('[CandidateChat] Session created:', session.id);
-
             setCurrentSessionId(session.id);
             sessionIdRef.current = session.id;
 
-            // Update session_id on static messages
             setLocalMessages((prev) =>
                 prev.map((m) => ({ ...m, session_id: session.id }))
             );
 
-            // Setup WebSocket
-            setupWebSocket(session.id, candidate.id);
+            // WebSocket disabled: chat uses HTTP only. To re-enable later (streaming / server push), uncomment:
+            // setupWebSocket(session.id, candidate.id);
 
             setIsInitializing(false);
         } catch (error) {
@@ -304,7 +277,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
             toast.error('Failed to start chat. Please try again.');
             setIsInitializing(false);
         }
-    }, [candidate?.id, createSession, setupWebSocket]);
+    }, [candidate?.id, createSession]);
 
     // Initialize first session on mount
     useEffect(() => {
@@ -333,9 +306,18 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialFlow, currentSessionId, isInitializing]);
 
-    // Send a message (via WebSocket, with REST fallback)
-    const handleSendMessage = async (content: string, messageData?: Record<string, any>) => {
+    // Send a message via HTTP (POST /sessions/:id/messages).
+    // Second param: messageData (e.g. button_id, question_key) or File when called from CandidateChatInput.onSend(value, file?).
+    const handleSendMessage = async (
+        content: string,
+        messageDataOrFile?: Record<string, unknown> | File
+    ) => {
         if (!currentSessionId || !candidate?.id) return;
+
+        const messageData =
+            messageDataOrFile !== undefined && !(messageDataOrFile instanceof File)
+                ? messageDataOrFile
+                : undefined;
 
         // Add optimistic user message
         const optimisticUserMsg: CandidateChatMessageType = {
@@ -359,36 +341,33 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
         setLocalMessages((prev) => [...prev, optimisticUserMsg, loadingMsg]);
         setIsTyping(true);
 
-        const messageType = messageData?.message_type || 'text';
+        const messageType =
+            typeof messageData?.message_type === 'string' ? messageData.message_type : 'text';
 
-        // Try WebSocket first
-        if (wsManagerRef.current?.isConnected()) {
-            wsManagerRef.current.sendMessage(content, messageType, messageData);
-        } else {
-            // REST fallback
-            try {
-                const response = await sendMessageRest.mutateAsync({
-                    sessionId: currentSessionId,
-                    data: {
-                        content,
-                        message_type: messageType,
-                        message_data: messageData,
-                    },
-                });
+        // HTTP request–response: all messages go through REST (POST /sessions/:id/messages).
+        // WebSocket path reserved for future use (e.g. streaming bot reply token-by-token, or server push).
+        try {
+            const response = await sendMessageRest.mutateAsync({
+                sessionId: currentSessionId,
+                data: {
+                    content,
+                    message_type: messageType,
+                    message_data: messageData,
+                },
+            });
 
-                setLocalMessages((prev) => {
-                    const filtered = prev.filter(
-                        (m) => !m.id.startsWith('temp-') && !m.id.startsWith('loading-')
-                    );
-                    return [...filtered, response.user_message, ...response.bot_messages];
-                });
-            } catch (error) {
-                console.error('[CandidateChat] Failed to send message:', error);
-                toast.error('Failed to send message');
-                setLocalMessages((prev) => prev.filter((m) => !m.id.startsWith('loading-')));
-            } finally {
-                setIsTyping(false);
-            }
+            setLocalMessages((prev) => {
+                const filtered = prev.filter(
+                    (m) => !m.id.startsWith('temp-') && !m.id.startsWith('loading-')
+                );
+                return [...filtered, response.user_message, ...response.bot_messages];
+            });
+        } catch (error) {
+            console.error('[CandidateChat] Failed to send message:', error);
+            toast.error('Failed to send message');
+            setLocalMessages((prev) => prev.filter((m) => !m.id.startsWith('loading-')));
+        } finally {
+            setIsTyping(false);
         }
     };
 
@@ -485,10 +464,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
         sessionIdRef.current = sessionId;
         setViewMode('chat');
 
-        // Setup WebSocket for this session
-        if (candidate?.id) {
-            setupWebSocket(sessionId, candidate.id);
-        }
+        // When re-enabling WebSocket: call setupWebSocket(sessionId, candidate.id) here.
     };
 
     // Handle session deletion
@@ -561,6 +537,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
             {/* Header */}
             <CandidateChatHeader
                 title="AIVI Resume Builder"
+                transport="http"
                 connectionStatus={connectionStatus}
                 onNewChat={() => handleNewChat(true)}
                 onToggleHistory={() => setViewMode(viewMode === 'chat' ? 'history' : 'chat')}
