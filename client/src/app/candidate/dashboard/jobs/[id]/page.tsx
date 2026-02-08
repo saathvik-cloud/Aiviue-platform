@@ -7,7 +7,7 @@
 
 import { ROUTES, WORK_TYPES } from '@/constants';
 import { useJob } from '@/lib/hooks';
-import { formatDate, formatSalaryRange, getCurrencySymbol } from '@/lib/utils';
+import { formatDate, formatSalaryRange, getCurrencySymbol, stripSalaryRangeCurrency } from '@/lib/utils';
 import {
   ArrowLeft,
   Briefcase,
@@ -120,7 +120,7 @@ export default function CandidateJobDetailPage() {
   const currency = job.currency || undefined;
   const salaryStr =
     job.salary_range
-      ? `${getCurrencySymbol(currency)} ${job.salary_range}`
+      ? `${getCurrencySymbol(currency)} ${stripSalaryRangeCurrency(job.salary_range)}`
       : formatSalaryRange(job.salary_range_min, job.salary_range_max, currency) ||
         'Not specified';
   const experienceStr =

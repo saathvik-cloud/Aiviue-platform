@@ -246,13 +246,13 @@ class Job(Base, FullAuditMixin):
     
     @property
     def salary_range(self) -> str | None:
-        """Get formatted salary range."""
-        if self.salary_range_min and self.salary_range_max:
-            return f"${self.salary_range_min:,.0f} - ${self.salary_range_max:,.0f}"
-        elif self.salary_range_min:
-            return f"${self.salary_range_min:,.0f}+"
-        elif self.salary_range_max:
-            return f"Up to ${self.salary_range_max:,.0f}"
+        """Formatted salary range (numbers only; UI adds currency symbol from job.currency)."""
+        if self.salary_range_min is not None and self.salary_range_max is not None:
+            return f"{self.salary_range_min:,.0f} - {self.salary_range_max:,.0f}"
+        elif self.salary_range_min is not None:
+            return f"{self.salary_range_min:,.0f}+"
+        elif self.salary_range_max is not None:
+            return f"Up to {self.salary_range_max:,.0f}"
         return None
     
     @property

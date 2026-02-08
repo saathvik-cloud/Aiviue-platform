@@ -76,6 +76,12 @@ export function getCurrencySymbol(currency: string | undefined | null): string {
   return CURRENCY_SYMBOLS[code] ?? currency;
 }
 
+/** Strip currency symbols from backend salary_range so UI can show a single symbol from getCurrencySymbol(currency). */
+export function stripSalaryRangeCurrency(salaryRange: string | undefined | null): string {
+  if (!salaryRange || typeof salaryRange !== 'string') return salaryRange ?? '';
+  return salaryRange.replace(/[$₹£€]/g, '').replace(/\s+/g, ' ').trim();
+}
+
 /**
  * Format currency
  */

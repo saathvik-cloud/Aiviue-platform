@@ -1,18 +1,30 @@
 'use client';
 
+import { Skeleton } from '@/components/ui/skeleton';
 import { ROUTES } from '@/constants';
+import { useJobs } from '@/lib/hooks';
+import { formatDate, getCurrencySymbol, stripSalaryRangeCurrency } from '@/lib/utils';
 import { useCandidateAuthStore } from '@/stores';
 import {
-    ArrowRight,
-    Briefcase,
-    CheckCircle,
-    Clock,
-    FileText,
-    History,
-    Sparkles,
-    User
+  ArrowRight,
+  Briefcase,
+  Building2,
+  CheckCircle,
+  Clock,
+  DollarSign,
+  FileText,
+  History,
+  MapPin,
+  Sparkles,
+  User
 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
+import { useMemo } from 'react';
+
+// Faded background for Recommended Jobs tile (when carousel is shown). Lazy-loaded.
+const RECOMMENDED_JOBS_TILE_BG_IMAGE =
+  'https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=800&q=80';
 
 /**
  * Candidate Dashboard Home Page
@@ -20,8 +32,27 @@ import Link from 'next/link';
  * Shows welcome message, profile completion status, quick actions,
  * and a placeholder for job recommendations (Step 3.8).
  */
+const RECOMMENDED_JOBS_CAROUSEL_LIMIT = 8;
+
 export default function CandidateDashboardPage() {
   const candidate = useCandidateAuthStore((state) => state.candidate);
+
+  // Show "Build your resume first" only when candidate has no resume (profile not complete)
+  const hasResume = candidate?.profile_status === 'complete';
+
+  // Recommended jobs for carousel (only fetched when user has resume)
+  const jobFilters = useMemo(() => {
+    const base: { status: 'published'; category_id?: string; city?: string } = { status: 'published' };
+    if (candidate?.preferred_job_category_id) base.category_id = candidate.preferred_job_category_id;
+    if (candidate?.preferred_job_location?.trim()) base.city = candidate.preferred_job_location.trim();
+    return base;
+  }, [candidate]);
+  const { data: jobList, isLoading: jobsLoading } = useJobs(
+    jobFilters,
+    undefined,
+    RECOMMENDED_JOBS_CAROUSEL_LIMIT
+  );
+  const recommendedJobs = jobList?.items ?? [];
 
   // Profile completion calculation
   const profileFields = [
@@ -274,7 +305,7 @@ export default function CandidateDashboardPage() {
           </div>
         </div>
 
-        {/* Job Recommendations – soft purple/pink gradient */}
+        {/* Job Recommendations – soft purple/pink gradient; when hasResume, faded BG image behind carousel */}
         <div className="lg:col-span-2">
           <div
             className="rounded-2xl p-4 sm:p-5 relative overflow-hidden"
@@ -286,11 +317,25 @@ export default function CandidateDashboardPage() {
               boxShadow: '0 4px 24px rgba(124, 58, 237, 0.08)',
             }}
           >
+            {/* Faded background image (lazy-loaded) – only when showing carousel */}
+            {hasResume && (
+              <Image
+                src={RECOMMENDED_JOBS_TILE_BG_IMAGE}
+                alt=""
+                fill
+                sizes="(max-width: 1024px) 100vw, 66vw"
+                className="object-cover opacity-[0.7] pointer-events-none select-none"
+                style={{ zIndex: 0 }}
+                placeholder="blur"
+                blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAIAAoDASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAAUH/8QAIhAAAgEDBAMBAAAAAAAAAAAAAQIDAAQRBRIhMQYTQVFh/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAZEQACAwEAAAAAAAAAAAAAAAABAgADESH/2gAMAwEAAhEDEEA/AN+iiirnMZ//2Q=="
+              />
+            )}
             <div
               className="absolute top-0 right-0 w-32 h-32 opacity-20 blur-3xl pointer-events-none"
-              style={{ background: 'radial-gradient(circle, rgba(236, 72, 153, 0.4) 0%, rgba(124, 58, 237, 0.3) 50%, transparent 70%)' }}
+              style={{ background: 'radial-gradient(circle, rgba(236, 72, 153, 0.4) 0%, rgba(124, 58, 237, 0.3) 50%, transparent 70%)', zIndex: 1 }}
             />
-            <div className="relative flex items-center justify-between mb-3 sm:mb-4">
+            <div className="relative z-10">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
               <h2 className="text-base font-semibold" style={{ color: 'var(--neutral-dark)' }}>
                 Recommended Jobs
               </h2>
@@ -304,30 +349,120 @@ export default function CandidateDashboardPage() {
               </Link>
             </div>
 
-            {/* Placeholder */}
-            <div className="relative text-center py-8 sm:py-10">
-              <div
-                className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mx-auto mb-3 sm:mb-4"
-                style={{
-                  background:
-                    'linear-gradient(135deg, rgba(236, 72, 153, 0.15) 0%, rgba(124, 58, 237, 0.15) 100%)',
-                }}
-              >
-                <Briefcase className="w-7 h-7 sm:w-8 sm:h-8" style={{ color: 'var(--primary)' }} />
+            {/* No resume: show CTA. Has resume: show job carousel */}
+            {!hasResume ? (
+              <div className="relative text-center py-8 sm:py-10">
+                <div
+                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mx-auto mb-3 sm:mb-4"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, rgba(236, 72, 153, 0.15) 0%, rgba(124, 58, 237, 0.15) 100%)',
+                  }}
+                >
+                  <Briefcase className="w-7 h-7 sm:w-8 sm:h-8" style={{ color: 'var(--primary)' }} />
+                </div>
+                <p className="text-sm font-medium mb-1" style={{ color: 'var(--neutral-dark)' }}>
+                  Build your resume first
+                </p>
+                <p className="text-xs mb-4 px-2" style={{ color: 'var(--neutral-gray)' }}>
+                  Complete your resume to get personalized job recommendations
+                </p>
+                <Link
+                  href={ROUTES.CANDIDATE_DASHBOARD_RESUME}
+                  className="btn-gradient inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Build Resume
+                </Link>
               </div>
-              <p className="text-sm font-medium mb-1" style={{ color: 'var(--neutral-dark)' }}>
-                Build your resume first
-              </p>
-              <p className="text-xs mb-4 px-2" style={{ color: 'var(--neutral-gray)' }}>
-                Complete your resume to get personalized job recommendations
-              </p>
-              <Link
-                href={ROUTES.CANDIDATE_DASHBOARD_RESUME}
-                className="btn-gradient inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
-              >
-                <Sparkles className="w-4 h-4" />
-                Build Resume
-              </Link>
+            ) : jobsLoading ? (
+              <div className="relative flex gap-3 overflow-x-auto overflow-y-hidden py-2 -mx-1 px-1 snap-x snap-mandatory scrollbar-thin">
+                {[1, 2, 3, 4].map((i) => (
+                  <div
+                    key={i}
+                    className="flex-shrink-0 w-[260px] sm:w-[280px] rounded-xl p-4 border border-white/70 snap-center"
+                    style={{
+                      background: 'linear-gradient(145deg, rgba(245, 243, 255, 0.9) 0%, rgba(237, 233, 254, 0.6) 100%)',
+                    }}
+                  >
+                    <Skeleton className="h-4 w-3/4 mb-3 rounded" />
+                    <Skeleton className="h-3 w-1/2 mb-2 rounded" />
+                    <Skeleton className="h-3 w-1/3 rounded" />
+                  </div>
+                ))}
+              </div>
+            ) : recommendedJobs.length === 0 ? (
+              <div className="relative text-center py-6">
+                <p className="text-sm" style={{ color: 'var(--neutral-gray)' }}>
+                  No recommendations right now. Complete your profile for better matches.
+                </p>
+                <Link
+                  href={ROUTES.CANDIDATE_DASHBOARD_JOBS}
+                  className="inline-flex items-center gap-1.5 mt-2 text-sm font-medium"
+                  style={{ color: 'var(--primary)' }}
+                >
+                  Browse all jobs
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            ) : (
+              <div className="relative flex gap-3 overflow-x-auto overflow-y-hidden pb-2 -mx-1 px-1 scrollbar-thin snap-x snap-mandatory">
+                {recommendedJobs.map((job) => (
+                  <Link
+                    key={job.id}
+                    href={`/candidate/dashboard/jobs/${job.id}`}
+                    className="flex-shrink-0 w-[260px] sm:w-[280px] rounded-xl p-4 flex flex-col transition-all hover:scale-[1.02] hover:shadow-lg snap-center touch-pan-x"
+                    style={{
+                      background:
+                        'linear-gradient(145deg, rgba(250, 245, 255, 0.98) 0%, rgba(243, 232, 255, 0.7) 50%, rgba(237, 233, 254, 0.6) 100%)',
+                      border: '1px solid rgba(255, 255, 255, 0.7)',
+                      boxShadow: '0 4px 16px rgba(124, 58, 237, 0.08)',
+                    }}
+                  >
+                    <div className="flex items-start gap-2 mb-2">
+                      <div
+                        className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{
+                          background:
+                            'linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, rgba(236, 72, 153, 0.1) 100%)',
+                        }}
+                      >
+                        <Briefcase className="w-5 h-5" style={{ color: 'var(--primary)' }} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-bold truncate" style={{ color: 'var(--neutral-dark)' }}>
+                          {job.title}
+                        </h3>
+                        <p className="text-xs truncate flex items-center gap-1 mt-0.5" style={{ color: 'var(--neutral-gray)' }}>
+                          <Building2 className="w-3 h-3 flex-shrink-0" />
+                          {job.employer_name ?? 'Company'}
+                        </p>
+                      </div>
+                    </div>
+                    {job.location && (
+                      <p className="flex items-center gap-1.5 text-xs mt-1 truncate" style={{ color: 'var(--neutral-gray)' }}>
+                        <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                        {job.location}
+                      </p>
+                    )}
+                    {job.salary_range && (
+                      <p className="flex items-center gap-1.5 text-xs mt-0.5" style={{ color: 'var(--neutral-gray)' }}>
+                        <DollarSign className="w-3.5 h-3.5 flex-shrink-0" />
+                        {getCurrencySymbol(job.currency)} {stripSalaryRangeCurrency(job.salary_range)}
+                      </p>
+                    )}
+                    <p className="flex items-center gap-1.5 text-xs mt-1" style={{ color: 'var(--neutral-gray)' }}>
+                      <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                      {formatDate(job.created_at)}
+                    </p>
+                    <span className="inline-flex items-center gap-1 mt-3 text-xs font-semibold" style={{ color: 'var(--primary)' }}>
+                      View details
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
             </div>
           </div>
 

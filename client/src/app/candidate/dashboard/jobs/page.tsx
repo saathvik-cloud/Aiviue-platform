@@ -10,7 +10,7 @@
 import { ROUTES } from '@/constants';
 import { useJobs } from '@/lib/hooks';
 import { useCandidateAuthStore } from '@/stores';
-import { formatDate, getCurrencySymbol } from '@/lib/utils';
+import { formatDate, getCurrencySymbol, stripSalaryRangeCurrency } from '@/lib/utils';
 import {
   Briefcase,
   MapPin,
@@ -25,8 +25,9 @@ import { useMemo, useState } from 'react';
 
 const RECOMMENDED_LIMIT = 12;
 
-// Gradient card styles (rotate per card for variety, employer-style)
+// Gradient card styles – 8 variants for better visual variety (purple/violet, pink/violet, teal, amber, etc.)
 const CARD_GRADIENTS = [
+  // 1. Purple + Violet (lavender)
   {
     bg: 'linear-gradient(145deg, rgba(250, 245, 255, 0.98) 0%, rgba(243, 232, 255, 0.9) 50%, rgba(237, 233, 254, 0.85) 100%)',
     border: '1px solid rgba(255, 255, 255, 0.7)',
@@ -34,6 +35,7 @@ const CARD_GRADIENTS = [
     accent: '#7C3AED',
     iconBg: 'linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, rgba(236, 72, 153, 0.12) 100%)',
   },
+  // 2. Teal + Mint
   {
     bg: 'linear-gradient(145deg, rgba(240, 253, 250, 0.98) 0%, rgba(220, 245, 238, 0.9) 50%, rgba(204, 251, 241, 0.85) 100%)',
     border: '1px solid rgba(255, 255, 255, 0.6)',
@@ -41,12 +43,53 @@ const CARD_GRADIENTS = [
     accent: '#14B8A6',
     iconBg: 'linear-gradient(135deg, rgba(20, 184, 166, 0.15) 0%, rgba(45, 212, 191, 0.12) 100%)',
   },
+  // 3. Amber + Peach
   {
     bg: 'linear-gradient(145deg, rgba(255, 251, 243, 0.98) 0%, rgba(254, 243, 219, 0.9) 50%, rgba(253, 230, 198, 0.85) 100%)',
     border: '1px solid rgba(255, 255, 255, 0.6)',
     shadow: '0 8px 32px rgba(245, 158, 11, 0.08), inset 0 1px 0 rgba(255,255,255,0.5)',
     accent: '#D97706',
     iconBg: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(251, 191, 36, 0.12) 100%)',
+  },
+  // 4. Pink + Violet
+  {
+    bg: 'linear-gradient(145deg, rgba(253, 242, 248, 0.98) 0%, rgba(252, 231, 243, 0.9) 50%, rgba(249, 168, 212, 0.2) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.7)',
+    shadow: '0 8px 32px rgba(236, 72, 153, 0.1), inset 0 1px 0 rgba(255,255,255,0.6)',
+    accent: '#DB2777',
+    iconBg: 'linear-gradient(135deg, rgba(236, 72, 153, 0.15) 0%, rgba(168, 85, 247, 0.12) 100%)',
+  },
+  // 5. Purple + Pink
+  {
+    bg: 'linear-gradient(145deg, rgba(245, 243, 255, 0.98) 0%, rgba(237, 233, 254, 0.9) 50%, rgba(243, 232, 255, 0.85) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.7)',
+    shadow: '0 8px 32px rgba(139, 92, 246, 0.1), inset 0 1px 0 rgba(255,255,255,0.6)',
+    accent: '#8B5CF6',
+    iconBg: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(244, 114, 182, 0.12) 100%)',
+  },
+  // 6. Indigo + Violet
+  {
+    bg: 'linear-gradient(145deg, rgba(238, 242, 255, 0.98) 0%, rgba(224, 231, 255, 0.9) 50%, rgba(199, 210, 254, 0.85) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.6)',
+    shadow: '0 8px 32px rgba(99, 102, 241, 0.1), inset 0 1px 0 rgba(255,255,255,0.5)',
+    accent: '#6366F1',
+    iconBg: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.12) 100%)',
+  },
+  // 7. Amber + Yellow (warm gold)
+  {
+    bg: 'linear-gradient(145deg, rgba(255, 253, 231, 0.98) 0%, rgba(254, 249, 195, 0.9) 50%, rgba(253, 224, 71, 0.15) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.6)',
+    shadow: '0 8px 32px rgba(234, 179, 8, 0.08), inset 0 1px 0 rgba(255,255,255,0.5)',
+    accent: '#EAB308',
+    iconBg: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(234, 179, 8, 0.12) 100%)',
+  },
+  // 8. Rose + Pink (soft rose)
+  {
+    bg: 'linear-gradient(145deg, rgba(255, 241, 242, 0.98) 0%, rgba(254, 226, 226, 0.9) 50%, rgba(253, 164, 175, 0.2) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.7)',
+    shadow: '0 8px 32px rgba(244, 63, 94, 0.08), inset 0 1px 0 rgba(255,255,255,0.6)',
+    accent: '#F43F5E',
+    iconBg: 'linear-gradient(135deg, rgba(244, 63, 94, 0.12) 0%, rgba(236, 72, 153, 0.12) 100%)',
   },
 ] as const;
 
@@ -134,9 +177,9 @@ export default function CandidateJobsPage() {
               key={i}
               className="rounded-2xl p-5 animate-pulse relative overflow-hidden"
               style={{
-                background: CARD_GRADIENTS[i % 3].bg,
-                border: CARD_GRADIENTS[i % 3].border,
-                boxShadow: CARD_GRADIENTS[i % 3].shadow,
+                background: CARD_GRADIENTS[i % CARD_GRADIENTS.length].bg,
+                border: CARD_GRADIENTS[i % CARD_GRADIENTS.length].border,
+                boxShadow: CARD_GRADIENTS[i % CARD_GRADIENTS.length].shadow,
                 backdropFilter: 'blur(16px)',
               }}
             >
@@ -221,7 +264,7 @@ export default function CandidateJobsPage() {
                   {job.salary_range && (
                     <p className="flex items-center gap-2 text-sm font-medium" style={{ color: '#4B5563' }}>
                       <DollarSign className="w-4 h-4 flex-shrink-0" style={{ color: style.accent }} />
-                      {getCurrencySymbol(job.currency)} {job.salary_range}
+                      {getCurrencySymbol(job.currency)} {stripSalaryRangeCurrency(job.salary_range)}
                     </p>
                   )}
                   <p className="flex items-center gap-2 text-xs font-medium" style={{ color: '#6B7280' }}>
