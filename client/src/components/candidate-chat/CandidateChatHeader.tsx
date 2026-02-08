@@ -40,7 +40,7 @@ export function CandidateChatHeader({
 
     const status =
         transport === 'http'
-            ? { color: '#10B981', icon: CheckCircle, text: 'Ready' }
+            ? { color: '#10B981', icon: CheckCircle, text: 'connected' }
             : statusConfig[connectionStatus];
     const StatusIcon = status.icon;
 
