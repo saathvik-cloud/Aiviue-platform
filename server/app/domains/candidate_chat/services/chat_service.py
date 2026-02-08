@@ -139,8 +139,10 @@ class CandidateChatService:
             )
 
         # ==================== IDEMPOTENCY CHECK ====================
-        # If there's an active resume session and not force_new, return it
-        existing_session = None if force_new else await self._chat_repo.get_active_resume_session(candidate_id)
+        # If there's an active resume session and not force_new, return it (no message load)
+        existing_session = None if force_new else await self._chat_repo.get_active_resume_session(
+            candidate_id, include_messages=False
+        )
         if existing_session:
             logger.info(
                 f"Returning existing active session: {existing_session.id}",
@@ -223,8 +225,8 @@ class CandidateChatService:
         Returns:
             CandidateSendMessageResponse with user message, bot messages, and session
         """
-        # Fetch session
-        session = await self._chat_repo.get_session_by_id(session_id)
+        # Fetch session (no messages – we only need context_data/current_step for processing)
+        session = await self._chat_repo.get_session_by_id(session_id, include_messages=False)
         if not session:
             raise NotFoundError(
                 message="Chat session not found",
@@ -268,8 +270,8 @@ class CandidateChatService:
                 session_id, bot_messages
             )
 
-        # Re-fetch session to get updated context_data
-        updated_session = await self._chat_repo.get_session_by_id(session_id)
+        # Re-fetch session for response (no messages – response schema does not include message list)
+        updated_session = await self._chat_repo.get_session_by_id(session_id, include_messages=False)
 
         return CandidateSendMessageResponse(
             user_message=CandidateChatMessageResponse.model_validate(user_msg),

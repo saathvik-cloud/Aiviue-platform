@@ -116,10 +116,12 @@ class CandidateChatRepository:
     async def get_active_resume_session(
         self,
         candidate_id: UUID,
+        include_messages: bool = True,
     ) -> Optional[CandidateChatSession]:
         """
         Get the most recent active resume creation session.
         Used for idempotency check and "resume from where you left off".
+        Pass include_messages=False when only session/context is needed (e.g. create_session).
         """
         query = (
             select(CandidateChatSession)
@@ -131,10 +133,11 @@ class CandidateChatRepository:
                     CandidateChatSession.is_active == True,
                 )
             )
-            .options(selectinload(CandidateChatSession.messages))
             .order_by(CandidateChatSession.updated_at.desc())
             .limit(1)
         )
+        if include_messages:
+            query = query.options(selectinload(CandidateChatSession.messages))
 
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
