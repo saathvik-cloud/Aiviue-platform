@@ -7,8 +7,8 @@
 
 import * as candidateChatService from '@/services/candidate-chat.service';
 import type {
-    CandidateSendMessageRequest,
-    CreateCandidateChatSessionRequest,
+  CandidateSendMessageRequest,
+  CreateCandidateChatSessionRequest,
 } from '@/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -28,17 +28,21 @@ export const candidateChatKeys = {
 
 /**
  * Hook to fetch list of chat sessions for history sidebar.
+ * 
+ * PERF: Pass enabled=false to defer fetching until user opens history panel.
  */
 export function useCandidateChatSessions(
   candidateId: string | undefined,
   limit: number = 20,
-  offset: number = 0
+  offset: number = 0,
+  enabled: boolean = true
 ) {
   return useQuery({
     queryKey: candidateChatKeys.sessions(candidateId || ''),
     queryFn: () =>
       candidateChatService.listCandidateChatSessions(candidateId!, limit, offset),
-    enabled: !!candidateId,
+    enabled: enabled && !!candidateId,
+    staleTime: 30000, // Don't refetch for 30 seconds (history doesn't change often)
   });
 }
 

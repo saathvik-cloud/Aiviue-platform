@@ -195,7 +195,12 @@ class JobMasterRepository:
         role_id: UUID,
         active_only: bool = True,
     ) -> List[RoleQuestionTemplate]:
-        """Get question templates for a specific role."""
+        """
+        Get question templates for a specific role.
+        
+        PERF: Preloads all attributes to prevent MissingGreenlet errors
+        when accessing template attributes outside async context.
+        """
         query = (
             select(RoleQuestionTemplate)
             .where(RoleQuestionTemplate.role_id == role_id)
@@ -207,7 +212,16 @@ class JobMasterRepository:
         query = query.order_by(RoleQuestionTemplate.display_order)
 
         result = await self.db.execute(query)
-        return list(result.scalars().all())
+        templates = list(result.scalars().all())
+        
+        # PERF: Force-load all attributes now (while in async context) to prevent
+        # lazy loading errors later when accessed in sync code (QuestionEngine)
+        for t in templates:
+            _ = t.id, t.question_key, t.question_text, t.question_type
+            _ = t.options, t.is_required, t.display_order, t.condition
+            _ = t.validation_rules, t.is_active
+        
+        return templates
 
     # ==================== SEARCH ====================
 
@@ -242,6 +256,8 @@ class JobMasterRepository:
         """
         Get fallback resume questions (for no-role flow).
         Both job_type and experience_level None = general questions.
+        
+        PERF: Preloads all attributes to prevent MissingGreenlet errors.
         """
         conditions = []
         if job_type is None:
@@ -257,4 +273,12 @@ class JobMasterRepository:
             query = query.where(FallbackResumeQuestion.is_active == True)
         query = query.order_by(FallbackResumeQuestion.display_order)
         result = await self.db.execute(query)
-        return list(result.scalars().all())
+        templates = list(result.scalars().all())
+        
+        # PERF: Force-load all attributes now (while in async context)
+        for t in templates:
+            _ = t.id, t.question_key, t.question_text, t.question_type
+            _ = t.options, t.is_required, t.display_order, t.condition
+            _ = t.validation_rules, t.is_active
+        
+        return templates

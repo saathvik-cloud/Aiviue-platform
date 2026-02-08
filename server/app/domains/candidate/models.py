@@ -179,20 +179,24 @@ class Candidate(Base, FullAuditMixin):
     )
 
     # ==================== RELATIONSHIPS ====================
+    # PERF: Use lazy="noload" to prevent automatic eager loading.
+    # These were causing massive cascades: JobRole loads categories + question_templates,
+    # JobCategory loads roles, resumes loads all historical resumes.
+    # Load explicitly via selectinload() in repository when needed.
     preferred_category: Mapped[Optional["JobCategory"]] = relationship(
         "JobCategory",
-        lazy="selectin",
+        lazy="noload",
         foreign_keys=[preferred_job_category_id],
     )
     preferred_role: Mapped[Optional["JobRole"]] = relationship(
         "JobRole",
-        lazy="selectin",
+        lazy="noload",
         foreign_keys=[preferred_job_role_id],
     )
     resumes: Mapped[List["CandidateResume"]] = relationship(
         "CandidateResume",
         back_populates="candidate",
-        lazy="selectin",
+        lazy="noload",
         cascade="all, delete-orphan",
         order_by="CandidateResume.created_at.desc()",
     )

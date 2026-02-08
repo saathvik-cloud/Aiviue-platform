@@ -167,22 +167,30 @@ class CandidateChatSession(Base):
     )
 
     # Relationships
+    # PERF: Use lazy="noload" to prevent automatic eager loading (was causing N+1 cascades).
+    # Load explicitly via selectinload() in repository when needed.
     messages: Mapped[List["CandidateChatMessage"]] = relationship(
         "CandidateChatMessage",
         back_populates="session",
-        lazy="selectin",
+        lazy="noload",
         order_by="CandidateChatMessage.created_at",
         cascade="all, delete-orphan",
     )
 
     candidate: Mapped["Candidate"] = relationship(
         "Candidate",
-        lazy="selectin",
+        lazy="noload",
     )
 
     # Table indexes
+    # PERF: Composite indexes for common query patterns
     __table_args__ = (
+        # For get_sessions_by_candidate: WHERE candidate_id = ? AND is_active = true ORDER BY updated_at DESC
         Index("idx_candidate_chat_sessions_candidate_active", "candidate_id", "is_active"),
+        Index("idx_candidate_chat_sessions_candidate_updated", "candidate_id", "is_active", "updated_at"),
+        # For get_active_resume_session: WHERE candidate_id = ? AND session_type IN (...) AND session_status = 'active' AND is_active = true
+        Index("idx_candidate_chat_sessions_active_resume", "candidate_id", "session_type", "session_status", "is_active"),
+        # Single column indexes for filtering
         Index("idx_candidate_chat_sessions_status", "session_status"),
     )
 

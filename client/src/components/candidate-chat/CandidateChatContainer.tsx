@@ -113,12 +113,16 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
     const sendMessageRest = useSendCandidateChatMessage();
     const deleteSession = useDeleteCandidateChatSession();
 
+    // PERF: Only fetch session history when user opens history panel (viewMode === 'history')
+    // This eliminates the redundant API call on initial page load
     const { data: sessions, isLoading: sessionsLoading, refetch: refetchSessions } = useCandidateChatSessions(
         candidate?.id,
         20,
-        historyOffset
+        historyOffset,
+        viewMode === 'history' // Only fetch when history panel is open
     );
 
+    // PERF: Session data from createSession is already in cache; this hook syncs it
     const { data: sessionData, isLoading: sessionLoading } = useCandidateChatSession(
         currentSessionId || undefined
     );
@@ -217,7 +221,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
                 });
                 setIsTyping(false);
             },
-            onSessionUpdate: () => {},
+            onSessionUpdate: () => { },
             onError: (error, code) => {
                 setConnectionStatus('error');
                 if (code === 'MAX_RECONNECT_REACHED') toast.error('Connection lost. Please refresh the page.');
@@ -432,7 +436,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
         try {
             // 1. Upload file to Supabase Storage
             const publicUrl = await uploadResume(file, currentSessionId);
- 
+
             // 2. Send message to backend with the file URL
             // This will trigger the backend extraction pipeline
             handleSendMessage(`Uploaded: ${file.name}`, {

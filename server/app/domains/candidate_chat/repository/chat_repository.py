@@ -69,7 +69,9 @@ class CandidateChatRepository:
         include_messages: bool = True,
     ) -> Optional[CandidateChatSession]:
         """Get a chat session by ID."""
-        self.db.expire_all()
+        # NOTE: Removed expire_all() - it was expiring ALL objects in session
+        # (including RoleQuestionTemplates), causing MissingGreenlet errors
+        # when accessing attributes outside async context.
 
         query = select(CandidateChatSession).where(CandidateChatSession.id == session_id)
 
@@ -86,7 +88,12 @@ class CandidateChatRepository:
         offset: int = 0,
         active_only: bool = True,
     ) -> tuple[List[CandidateChatSession], int]:
-        """Get chat sessions for a candidate (for history sidebar)."""
+        """
+        Get chat sessions for a candidate (for history sidebar).
+        
+        PERF: Does NOT load messages. History sidebar only needs session metadata.
+        Use get_session_by_id(include_messages=True) to load messages for a specific session.
+        """
         base_query = select(CandidateChatSession).where(
             CandidateChatSession.candidate_id == candidate_id
         )
@@ -100,9 +107,9 @@ class CandidateChatRepository:
         total_count = count_result.scalar() or 0
 
         # Get sessions with pagination, ordered by most recent
+        # PERF: No selectinload for messages - would load 20+ messages per session = N+1 cascade
         query = (
             base_query
-            .options(selectinload(CandidateChatSession.messages))
             .order_by(CandidateChatSession.updated_at.desc())
             .offset(offset)
             .limit(limit)
