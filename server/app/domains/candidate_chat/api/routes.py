@@ -17,10 +17,11 @@ Endpoints:
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import API_V1_PREFIX
+from app.shared.auth import get_current_candidate_id
 from app.domains.candidate_chat.models.schemas import (
     CandidateChatMessageResponse,
     CandidateChatSessionCreate,
@@ -90,9 +91,12 @@ async def get_repository(
 )
 async def create_session(
     request: CandidateChatSessionCreate,
+    current_candidate_id: UUID = Depends(get_current_candidate_id),
     service: CandidateChatService = Depends(get_service),
 ) -> CandidateChatSessionWithMessagesResponse:
-    """Create a new candidate chat session with welcome messages."""
+    """Create a new candidate chat session. Caller can only create for themselves."""
+    if current_candidate_id != request.candidate_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     session, welcome_msgs = await service.create_session(
         candidate_id=request.candidate_id,
         session_type=request.session_type,
@@ -116,9 +120,12 @@ async def list_sessions(
     limit: int = Query(20, ge=1, le=100, description="Max sessions"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
     active_only: bool = Query(True, description="Only active sessions"),
+    current_candidate_id: UUID = Depends(get_current_candidate_id),
     repo: CandidateChatRepository = Depends(get_repository),
 ) -> CandidateChatSessionListResponse:
-    """List chat sessions for a candidate (history)."""
+    """List chat sessions for a candidate. Caller can only list their own."""
+    if current_candidate_id != candidate_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     sessions, total_count = await repo.get_sessions_by_candidate(
         candidate_id=candidate_id,
         limit=limit,
@@ -147,9 +154,12 @@ async def list_sessions(
 )
 async def get_active_resume_session(
     candidate_id: UUID,
+    current_candidate_id: UUID = Depends(get_current_candidate_id),
     repo: CandidateChatRepository = Depends(get_repository),
 ) -> CandidateChatSessionWithMessagesResponse:
-    """Get active resume creation session."""
+    """Get active resume creation session. Caller can only access their own."""
+    if current_candidate_id != candidate_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     session = await repo.get_active_resume_session(candidate_id)
     if not session:
         raise NotFoundError(
@@ -166,15 +176,18 @@ async def get_active_resume_session(
 )
 async def get_session(
     session_id: UUID,
+    current_candidate_id: UUID = Depends(get_current_candidate_id),
     repo: CandidateChatRepository = Depends(get_repository),
 ) -> CandidateChatSessionWithMessagesResponse:
-    """Get a chat session with its messages."""
+    """Get a chat session with its messages. Caller can only access their own sessions."""
     session = await repo.get_session_by_id(session_id, include_messages=True)
     if not session:
         raise NotFoundError(
             message="Chat session not found",
             error_code="SESSION_NOT_FOUND",
         )
+    if session.candidate_id != current_candidate_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     return CandidateChatSessionWithMessagesResponse.model_validate(session)
 
 
@@ -186,9 +199,18 @@ async def get_session(
 async def get_messages(
     session_id: UUID,
     limit: Optional[int] = Query(None, ge=1, le=500, description="Max messages"),
+    current_candidate_id: UUID = Depends(get_current_candidate_id),
     repo: CandidateChatRepository = Depends(get_repository),
 ) -> List[CandidateChatMessageResponse]:
-    """Get messages for a chat session."""
+    """Get messages for a chat session. Caller can only access their own sessions."""
+    session = await repo.get_session_by_id(session_id, include_messages=False)
+    if not session:
+        raise NotFoundError(
+            message="Chat session not found",
+            error_code="SESSION_NOT_FOUND",
+        )
+    if session.candidate_id != current_candidate_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     messages = await repo.get_messages_by_session(session_id, limit=limit)
     return [CandidateChatMessageResponse.model_validate(m) for m in messages]
 
@@ -212,9 +234,19 @@ async def get_messages(
 async def send_message(
     session_id: UUID,
     request: CandidateSendMessageRequest,
+    current_candidate_id: UUID = Depends(get_current_candidate_id),
+    repo: CandidateChatRepository = Depends(get_repository),
     service: CandidateChatService = Depends(get_service),
 ) -> CandidateSendMessageResponse:
-    """Send a message and get bot response."""
+    """Send a message and get bot response. Caller can only send to their own sessions."""
+    session = await repo.get_session_by_id(session_id, include_messages=False)
+    if not session:
+        raise NotFoundError(
+            message="Chat session not found",
+            error_code="SESSION_NOT_FOUND",
+        )
+    if session.candidate_id != current_candidate_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     return await service.send_message(
         session_id=session_id,
         content=request.content,
@@ -230,9 +262,18 @@ async def send_message(
 )
 async def delete_session(
     session_id: UUID,
+    current_candidate_id: UUID = Depends(get_current_candidate_id),
     repo: CandidateChatRepository = Depends(get_repository),
 ) -> None:
-    """Soft delete a chat session."""
+    """Soft delete a chat session. Caller can only delete their own sessions."""
+    session = await repo.get_session_by_id(session_id, include_messages=False)
+    if not session:
+        raise NotFoundError(
+            message="Chat session not found",
+            error_code="SESSION_NOT_FOUND",
+        )
+    if session.candidate_id != current_candidate_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     deleted = await repo.delete_session(session_id)
     if not deleted:
         raise NotFoundError(

@@ -16,10 +16,11 @@ Endpoints:
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import API_V1_PREFIX
+from app.shared.auth import get_current_candidate_id
 from app.domains.candidate.schemas import (
     CandidateAuthResponse,
     CandidateBasicProfileRequest,
@@ -109,9 +110,12 @@ async def login(
 )
 async def get_candidate(
     candidate_id: UUID,
+    current_candidate_id: UUID = Depends(get_current_candidate_id),
     service: CandidateService = Depends(get_service),
 ) -> CandidateResponse:
-    """Get candidate profile by ID."""
+    """Get candidate profile by ID. Caller can only access their own resource."""
+    if current_candidate_id != candidate_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     return await service.get_by_id(candidate_id)
 
 
@@ -129,9 +133,12 @@ async def get_candidate(
 async def create_basic_profile(
     candidate_id: UUID,
     request: CandidateBasicProfileRequest,
+    current_candidate_id: UUID = Depends(get_current_candidate_id),
     service: CandidateService = Depends(get_service),
 ) -> CandidateResponse:
-    """Create basic profile for candidate."""
+    """Create basic profile for candidate. Caller can only update their own resource."""
+    if current_candidate_id != candidate_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     return await service.create_basic_profile(candidate_id, request)
 
 
@@ -150,9 +157,12 @@ async def create_basic_profile(
 async def update_candidate(
     candidate_id: UUID,
     request: CandidateUpdateRequest,
+    current_candidate_id: UUID = Depends(get_current_candidate_id),
     service: CandidateService = Depends(get_service),
 ) -> CandidateResponse:
-    """Update candidate profile."""
+    """Update candidate profile. Caller can only update their own resource."""
+    if current_candidate_id != candidate_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     return await service.update_profile(candidate_id, request)
 
 
@@ -167,9 +177,12 @@ async def update_candidate(
 )
 async def get_latest_resume(
     candidate_id: UUID,
+    current_candidate_id: UUID = Depends(get_current_candidate_id),
     service: CandidateService = Depends(get_service),
 ) -> CandidateResumeResponse:
-    """Get latest completed resume."""
+    """Get latest completed resume. Caller can only access their own resource."""
+    if current_candidate_id != candidate_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     resume = await service.get_latest_resume(candidate_id)
     if not resume:
         from app.shared.exceptions import NotFoundError
@@ -188,9 +201,12 @@ async def get_latest_resume(
 )
 async def list_resumes(
     candidate_id: UUID,
+    current_candidate_id: UUID = Depends(get_current_candidate_id),
     service: CandidateService = Depends(get_service),
 ) -> list[CandidateResumeResponse]:
-    """List all resumes for the candidate."""
+    """List all resumes for the candidate. Caller can only access their own resource."""
+    if current_candidate_id != candidate_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     return await service.list_resumes(candidate_id)
 
 
@@ -202,9 +218,12 @@ async def list_resumes(
 async def get_resume(
     candidate_id: UUID,
     resume_id: UUID,
+    current_candidate_id: UUID = Depends(get_current_candidate_id),
     service: CandidateService = Depends(get_service),
 ) -> CandidateResumeResponse:
-    """Get a specific resume by ID (must belong to candidate)."""
+    """Get a specific resume by ID. Caller can only access their own resource."""
+    if current_candidate_id != candidate_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     return await service.get_resume_by_id(candidate_id, resume_id)
 
 

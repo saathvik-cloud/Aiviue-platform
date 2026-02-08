@@ -26,6 +26,8 @@ from tests.test_data import (
     INVALID_EMPLOYER_PAYLOADS,
     EMPLOYER_RESPONSE_FIELDS,
     generate_unique_email,
+    generate_unique_phone,
+    generate_uuid,
 )
 from tests.conftest import assert_response_success, assert_response_error, assert_has_fields
 
@@ -60,9 +62,12 @@ class TestCreateEmployer:
         assert data["is_active"] == True
         assert data["version"] == 1
         
-        # Cleanup
-        api_client.delete(f"{API_PREFIX}/{data['id']}?version=1")
-    
+        # Cleanup (ownership header required for delete)
+        api_client.delete(
+            f"{API_PREFIX}/{data['id']}?version=1",
+            headers={"X-Employer-Id": data["id"]},
+        )
+
     def test_create_employer_success_minimal_data(self, api_client):
         """
         Test creating an employer with only required fields.
@@ -70,6 +75,7 @@ class TestCreateEmployer:
         """
         data = SAMPLE_EMPLOYER_MINIMAL.copy()
         data["email"] = generate_unique_email("minimal")
+        data["phone"] = generate_unique_phone()
         
         response = api_client.post(API_PREFIX, json=data)
         
@@ -79,14 +85,17 @@ class TestCreateEmployer:
         assert result["name"] == data["name"]
         assert result["email"] == data["email"]
         assert result["company_name"] == data["company_name"]
+        assert result.get("phone") == data["phone"]
         
-        # Optional fields should be None
-        assert result.get("phone") is None
+        # Other optional fields should be None
         assert result.get("company_website") is None
         
         # Cleanup
-        api_client.delete(f"{API_PREFIX}/{result['id']}?version=1")
-    
+        api_client.delete(
+            f"{API_PREFIX}/{result['id']}?version=1",
+            headers={"X-Employer-Id": result["id"]},
+        )
+
     def test_create_employer_duplicate_email(self, api_client, sample_employer_data):
         """
         Test creating employer with duplicate email.
@@ -102,8 +111,11 @@ class TestCreateEmployer:
         assert_response_error(response2, 409)
         
         # Cleanup
-        api_client.delete(f"{API_PREFIX}/{employer1['id']}?version=1")
-    
+        api_client.delete(
+            f"{API_PREFIX}/{employer1['id']}?version=1",
+            headers={"X-Employer-Id": employer1["id"]},
+        )
+
     @pytest.mark.parametrize("invalid_data", [
         {"name": "Test"},  # Missing email and company
         {"email": "test@test.com"},  # Missing name and company
@@ -136,8 +148,11 @@ class TestGetEmployer:
         create_response = api_client.post(API_PREFIX, json=sample_employer_data)
         employer = create_response.json()
         
-        # Get by ID
-        response = api_client.get(f"{API_PREFIX}/{employer['id']}")
+        # Get by ID (ownership header required)
+        response = api_client.get(
+            f"{API_PREFIX}/{employer['id']}",
+            headers={"X-Employer-Id": employer["id"]},
+        )
         
         assert_response_success(response, 200)
         data = response.json()
@@ -146,24 +161,32 @@ class TestGetEmployer:
         assert data["email"] == sample_employer_data["email"]
         
         # Cleanup
-        api_client.delete(f"{API_PREFIX}/{employer['id']}?version=1")
-    
+        api_client.delete(
+            f"{API_PREFIX}/{employer['id']}?version=1",
+            headers={"X-Employer-Id": employer["id"]},
+        )
+
     def test_get_employer_not_found(self, api_client):
         """
         Test getting non-existent employer.
-        Expected: 404 Not Found.
+        Expected: 404 Not Found (or 403 if header does not match).
         """
         fake_id = "00000000-0000-0000-0000-000000000000"
-        response = api_client.get(f"{API_PREFIX}/{fake_id}")
-        
+        response = api_client.get(
+            f"{API_PREFIX}/{fake_id}",
+            headers={"X-Employer-Id": fake_id},
+        )
         assert_response_error(response, 404)
     
     def test_get_employer_invalid_uuid(self, api_client):
         """
         Test getting employer with invalid UUID format.
-        Expected: 422 Validation Error.
+        Expected: 422 Validation Error (send header so auth passes, then path validation fails).
         """
-        response = api_client.get(f"{API_PREFIX}/invalid-uuid")
+        response = api_client.get(
+            f"{API_PREFIX}/invalid-uuid",
+            headers={"X-Employer-Id": generate_uuid()},
+        )
         
         assert response.status_code == 422
     
@@ -176,7 +199,7 @@ class TestGetEmployer:
         create_response = api_client.post(API_PREFIX, json=sample_employer_data)
         employer = create_response.json()
         
-        # Get by email
+        # Get by email (no ownership header for email lookup)
         response = api_client.get(f"{API_PREFIX}/email/{sample_employer_data['email']}")
         
         assert_response_success(response, 200)
@@ -185,8 +208,11 @@ class TestGetEmployer:
         assert data["email"] == sample_employer_data["email"]
         
         # Cleanup
-        api_client.delete(f"{API_PREFIX}/{employer['id']}?version=1")
-    
+        api_client.delete(
+            f"{API_PREFIX}/{employer['id']}?version=1",
+            headers={"X-Employer-Id": employer["id"]},
+        )
+
     def test_get_employer_by_email_not_found(self, api_client):
         """
         Test getting employer by non-existent email.
@@ -237,8 +263,11 @@ class TestListEmployers:
         assert sample_employer_data["email"] in emails
         
         # Cleanup
-        api_client.delete(f"{API_PREFIX}/{employer['id']}?version=1")
-    
+        api_client.delete(
+            f"{API_PREFIX}/{employer['id']}?version=1",
+            headers={"X-Employer-Id": employer["id"]},
+        )
+
     def test_list_employers_pagination(self, api_client):
         """
         Test pagination parameters.
@@ -266,7 +295,10 @@ class TestListEmployers:
         assert_response_success(response, 200)
         
         # Cleanup
-        api_client.delete(f"{API_PREFIX}/{employer['id']}?version=1")
+        api_client.delete(
+            f"{API_PREFIX}/{employer['id']}?version=1",
+            headers={"X-Employer-Id": employer["id"]},
+        )
 
 
 # =============================================================================
@@ -292,7 +324,11 @@ class TestUpdateEmployer:
             "version": employer["version"],
         }
         
-        response = api_client.put(f"{API_PREFIX}/{employer['id']}", json=update_data)
+        response = api_client.put(
+            f"{API_PREFIX}/{employer['id']}",
+            json=update_data,
+            headers={"X-Employer-Id": employer["id"]},
+        )
         
         assert_response_success(response, 200)
         data = response.json()
@@ -302,8 +338,11 @@ class TestUpdateEmployer:
         assert data["version"] == employer["version"] + 1
         
         # Cleanup
-        api_client.delete(f"{API_PREFIX}/{employer['id']}?version={data['version']}")
-    
+        api_client.delete(
+            f"{API_PREFIX}/{employer['id']}?version={data['version']}",
+            headers={"X-Employer-Id": employer["id"]},
+        )
+
     def test_update_employer_version_conflict(self, api_client, sample_employer_data):
         """
         Test updating with wrong version (optimistic locking).
@@ -319,13 +358,20 @@ class TestUpdateEmployer:
             "version": 999,  # Wrong version
         }
         
-        response = api_client.put(f"{API_PREFIX}/{employer['id']}", json=update_data)
+        response = api_client.put(
+            f"{API_PREFIX}/{employer['id']}",
+            json=update_data,
+            headers={"X-Employer-Id": employer["id"]},
+        )
         
         assert_response_error(response, 409)
         
         # Cleanup
-        api_client.delete(f"{API_PREFIX}/{employer['id']}?version=1")
-    
+        api_client.delete(
+            f"{API_PREFIX}/{employer['id']}?version=1",
+            headers={"X-Employer-Id": employer["id"]},
+        )
+
     def test_update_employer_not_found(self, api_client):
         """
         Test updating non-existent employer.
@@ -334,7 +380,11 @@ class TestUpdateEmployer:
         fake_id = "00000000-0000-0000-0000-000000000000"
         update_data = {"name": "Test", "version": 1}
         
-        response = api_client.put(f"{API_PREFIX}/{fake_id}", json=update_data)
+        response = api_client.put(
+            f"{API_PREFIX}/{fake_id}",
+            json=update_data,
+            headers={"X-Employer-Id": fake_id},
+        )
         
         assert_response_error(response, 404)
 
@@ -356,24 +406,33 @@ class TestDeleteEmployer:
         employer = create_response.json()
         
         # Delete
-        response = api_client.delete(f"{API_PREFIX}/{employer['id']}?version=1")
+        response = api_client.delete(
+            f"{API_PREFIX}/{employer['id']}?version=1",
+            headers={"X-Employer-Id": employer["id"]},
+        )
         
         assert response.status_code == 204
         
         # Verify employer is not returned in normal GET
-        get_response = api_client.get(f"{API_PREFIX}/{employer['id']}")
+        get_response = api_client.get(
+            f"{API_PREFIX}/{employer['id']}",
+            headers={"X-Employer-Id": employer["id"]},
+        )
         assert get_response.status_code == 404
-    
+
     def test_delete_employer_not_found(self, api_client):
         """
         Test deleting non-existent employer.
         Expected: 404 Not Found.
         """
         fake_id = "00000000-0000-0000-0000-000000000000"
-        response = api_client.delete(f"{API_PREFIX}/{fake_id}?version=1")
+        response = api_client.delete(
+            f"{API_PREFIX}/{fake_id}?version=1",
+            headers={"X-Employer-Id": fake_id},
+        )
         
         assert_response_error(response, 404)
-    
+
     def test_delete_employer_version_required(self, api_client, sample_employer_data):
         """
         Test deleting without version parameter.
@@ -384,9 +443,15 @@ class TestDeleteEmployer:
         employer = create_response.json()
         
         # Delete without version
-        response = api_client.delete(f"{API_PREFIX}/{employer['id']}")
+        response = api_client.delete(
+            f"{API_PREFIX}/{employer['id']}",
+            headers={"X-Employer-Id": employer["id"]},
+        )
         
         assert response.status_code == 422
         
         # Cleanup
-        api_client.delete(f"{API_PREFIX}/{employer['id']}?version=1")
+        api_client.delete(
+            f"{API_PREFIX}/{employer['id']}?version=1",
+            headers={"X-Employer-Id": employer["id"]},
+        )

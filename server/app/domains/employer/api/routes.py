@@ -14,10 +14,11 @@ Endpoints:
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import API_V1_PREFIX
+from app.shared.auth import get_current_employer_id
 from app.domains.employer.schemas import (
     EmployerCreateRequest,
     EmployerFilters,
@@ -186,9 +187,12 @@ async def list_employers(
 )
 async def get_employer(
     employer_id: UUID,
+    current_employer_id: UUID = Depends(get_current_employer_id),
     service: EmployerService = Depends(get_service),
 ) -> EmployerResponse:
-    """Get employer by ID."""
+    """Get employer by ID. Caller can only access their own resource."""
+    if current_employer_id != employer_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     return await service.get_by_id(employer_id)
 
 
@@ -222,9 +226,12 @@ async def get_employer(
 async def update_employer(
     employer_id: UUID,
     request: EmployerUpdateRequest,
+    current_employer_id: UUID = Depends(get_current_employer_id),
     service: EmployerService = Depends(get_service),
 ) -> EmployerResponse:
-    """Update employer."""
+    """Update employer. Caller can only update their own resource."""
+    if current_employer_id != employer_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     return await service.update(employer_id, request)
 
 
@@ -253,9 +260,12 @@ async def update_employer(
 async def delete_employer(
     employer_id: UUID,
     version: int = Query(..., description="Current version for optimistic locking"),
+    current_employer_id: UUID = Depends(get_current_employer_id),
     service: EmployerService = Depends(get_service),
 ) -> None:
-    """Delete employer (soft delete)."""
+    """Delete employer (soft delete). Caller can only delete their own resource."""
+    if current_employer_id != employer_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     await service.delete(employer_id, version)
 
 

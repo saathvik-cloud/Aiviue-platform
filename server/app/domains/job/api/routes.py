@@ -20,10 +20,11 @@ Extraction Endpoints:
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import API_V1_PREFIX
+from app.shared.auth import get_current_employer_id, get_optional_employer_id
 from app.domains.job.schemas import (
     ExtractionRequest,
     ExtractionResponse,
@@ -194,9 +195,12 @@ async def get_extraction(
 )
 async def create_job(
     request: JobCreateRequest,
+    current_employer_id: UUID = Depends(get_current_employer_id),
     service: JobService = Depends(get_job_service),
 ) -> JobResponse:
-    """Create a new job."""
+    """Create a new job. Caller can only create jobs for themselves."""
+    if current_employer_id != request.employer_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     return await service.create(request)
 
 
@@ -230,9 +234,12 @@ async def list_jobs(
     cursor: Optional[str] = Query(None, description="Pagination cursor"),
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
     include_total: bool = Query(False, description="Include total count"),
+    current_employer_id: Optional[UUID] = Depends(get_optional_employer_id),
     service: JobService = Depends(get_job_service),
 ) -> JobListResponse:
-    """List jobs with filters."""
+    """List jobs with filters. When filtering by employer_id, caller must be that employer."""
+    if employer_id is not None and (current_employer_id is None or current_employer_id != employer_id):
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     filters = JobFilters(
         employer_id=employer_id,
         status=status,
@@ -259,10 +266,14 @@ async def list_jobs(
 )
 async def get_job(
     job_id: UUID,
+    current_employer_id: Optional[UUID] = Depends(get_optional_employer_id),
     service: JobService = Depends(get_job_service),
 ) -> JobResponse:
-    """Get job by ID."""
-    return await service.get_by_id(job_id)
+    """Get job by ID. Non-published jobs only visible to owning employer."""
+    job = await service.get_by_id(job_id)
+    if job.status != "published" and (current_employer_id is None or job.employer_id != current_employer_id):
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
+    return job
 
 
 @router.put(
@@ -283,9 +294,13 @@ async def get_job(
 async def update_job(
     job_id: UUID,
     request: JobUpdateRequest,
+    current_employer_id: UUID = Depends(get_current_employer_id),
     service: JobService = Depends(get_job_service),
 ) -> JobResponse:
-    """Update job."""
+    """Update job. Caller must own the job."""
+    job = await service.get_by_id(job_id)
+    if job.employer_id != current_employer_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     return await service.update(job_id, request)
 
 
@@ -303,9 +318,13 @@ async def update_job(
 async def delete_job(
     job_id: UUID,
     version: int = Query(..., description="Current version"),
+    current_employer_id: UUID = Depends(get_current_employer_id),
     service: JobService = Depends(get_job_service),
 ) -> None:
-    """Delete job (soft delete)."""
+    """Delete job (soft delete). Caller must own the job."""
+    job = await service.get_by_id(job_id)
+    if job.employer_id != current_employer_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     await service.delete(job_id, version)
 
 
@@ -333,9 +352,13 @@ async def delete_job(
 async def publish_job(
     job_id: UUID,
     request: JobPublishRequest,
+    current_employer_id: UUID = Depends(get_current_employer_id),
     service: JobService = Depends(get_job_service),
 ) -> JobResponse:
-    """Publish job."""
+    """Publish job. Caller must own the job."""
+    job = await service.get_by_id(job_id)
+    if job.employer_id != current_employer_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     return await service.publish(job_id, request.version)
 
 
@@ -361,7 +384,11 @@ async def publish_job(
 async def close_job(
     job_id: UUID,
     request: JobCloseRequest,
+    current_employer_id: UUID = Depends(get_current_employer_id),
     service: JobService = Depends(get_job_service),
 ) -> JobResponse:
-    """Close job."""
+    """Close job. Caller must own the job."""
+    job = await service.get_by_id(job_id)
+    if job.employer_id != current_employer_id:
+        raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     return await service.close(job_id, request.version, request.reason)

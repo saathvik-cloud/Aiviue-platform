@@ -1,9 +1,13 @@
 /**
  * API Client - Axios based HTTP client
+ *
+ * Sets X-Employer-Id / X-Candidate-Id from auth stores for ownership checks (MVP).
  */
 
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
 import type { ApiError } from '@/types';
+import { useAuthStore } from '@/stores/auth.store';
+import { useCandidateAuthStore } from '@/stores/candidate-auth.store';
 
 // API Base URL
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -23,12 +27,20 @@ apiClient.interceptors.request.use(
   (config) => {
     // Add request ID
     config.headers['X-Request-ID'] = crypto.randomUUID();
-    
+
+    // Ownership headers for backend auth (MVP: caller can only access their own resources)
+    if (typeof window !== 'undefined') {
+      const employerId = useAuthStore.getState().employer?.id;
+      const candidateId = useCandidateAuthStore.getState().candidate?.id;
+      if (employerId) config.headers['X-Employer-Id'] = employerId;
+      if (candidateId) config.headers['X-Candidate-Id'] = candidateId;
+    }
+
     // Debug logging
     if (process.env.NEXT_PUBLIC_DEBUG_MODE === 'true') {
       console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, config.data);
     }
-    
+
     return config;
   },
   (error) => Promise.reject(error)
