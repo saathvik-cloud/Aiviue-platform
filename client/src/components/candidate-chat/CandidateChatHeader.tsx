@@ -4,9 +4,9 @@
  * CandidateChatHeader - Header for the resume builder chat.
  *
  * Features:
- * - Title display with status (Ready when HTTP; Connected/Reconnecting/etc. when WebSocket)
- * - New Chat button
- * - History toggle button
+ * - Title display with status: session not ready → "Connecting..." (animated); ready → "Connected" (green)
+ * - When WebSocket is used: uses connectionStatus (connecting/connected/reconnecting/etc.)
+ * - New Chat button, History toggle button
  */
 
 import type { ConnectionStatus } from '@/lib/websocket/candidate-chat-socket';
@@ -14,8 +14,10 @@ import { CheckCircle, History, Plus, Wifi, WifiOff } from 'lucide-react';
 
 interface CandidateChatHeaderProps {
     title?: string;
-    /** When 'http', shows "Ready" (no WebSocket). When 'websocket', uses connectionStatus. */
+    /** When 'http', status is driven by sessionReady. When 'websocket', uses connectionStatus. */
     transport?: 'http' | 'websocket';
+    /** For HTTP: true when session is created and ready (so user can send messages / upload). */
+    sessionReady?: boolean;
     connectionStatus?: ConnectionStatus;
     onNewChat: () => void;
     onToggleHistory: () => void;
@@ -25,24 +27,32 @@ interface CandidateChatHeaderProps {
 export function CandidateChatHeader({
     title = 'AIVI Resume Builder',
     transport = 'http',
+    sessionReady = false,
     connectionStatus = 'disconnected',
     onNewChat,
     onToggleHistory,
     showHistoryButton = true,
 }: CandidateChatHeaderProps) {
-    const statusConfig = {
-        connecting: { color: 'var(--status-draft)', icon: Wifi, text: 'Connecting...' },
+    const statusConfig: Record<
+        ConnectionStatus | 'sessionConnecting',
+        { color: string; icon: typeof Wifi; text: string; animate?: boolean }
+    > = {
+        connecting: { color: 'var(--status-draft)', icon: Wifi, text: 'Connecting...', animate: true },
         connected: { color: '#10B981', icon: Wifi, text: 'Connected' },
-        reconnecting: { color: 'var(--status-draft)', icon: Wifi, text: 'Reconnecting...' },
+        reconnecting: { color: 'var(--status-draft)', icon: Wifi, text: 'Reconnecting...', animate: true },
         disconnected: { color: 'var(--neutral-gray)', icon: WifiOff, text: 'Disconnected' },
         error: { color: 'var(--status-closed)', icon: WifiOff, text: 'Connection Error' },
+        sessionConnecting: { color: 'var(--status-draft)', icon: Wifi, text: 'Connecting...', animate: true },
     };
 
     const status =
         transport === 'http'
-            ? { color: '#10B981', icon: CheckCircle, text: 'connected' }
+            ? sessionReady
+                ? { color: '#10B981', icon: CheckCircle, text: 'Connected', animate: false as const }
+                : statusConfig.sessionConnecting
             : statusConfig[connectionStatus];
     const StatusIcon = status.icon;
+    const isAnimated = 'animate' in status && status.animate;
 
     return (
         <div
@@ -69,9 +79,12 @@ export function CandidateChatHeader({
                         {title}
                     </h2>
 
-                    {/* Status: "Ready" for HTTP, or WebSocket connection status when transport is websocket */}
+                    {/* Status: Connecting (animated) until session ready, then Connected (green) */}
                     <div className="flex items-center gap-1.5 mt-0.5">
-                        <StatusIcon className="w-3 h-3" style={{ color: status.color }} />
+                        <StatusIcon
+                            className={`w-3 h-3 ${isAnimated ? 'animate-pulse' : ''}`}
+                            style={{ color: status.color }}
+                        />
                         <span className="text-xs" style={{ color: status.color }}>
                             {status.text}
                         </span>

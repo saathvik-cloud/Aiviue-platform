@@ -538,6 +538,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
             <CandidateChatHeader
                 title="AIVI Resume Builder"
                 transport="http"
+                sessionReady={Boolean(currentSessionId) && !isInitializing && !createSession.isPending}
                 connectionStatus={connectionStatus}
                 onNewChat={() => handleNewChat(true)}
                 onToggleHistory={() => setViewMode(viewMode === 'chat' ? 'history' : 'chat')}
