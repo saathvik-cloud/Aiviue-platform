@@ -1,6 +1,7 @@
 'use client';
 
 import { ROUTES, WORK_TYPES } from '@/constants';
+import { getJobHeroImage } from '@/lib/job-hero-image';
 import { useCloseJob, useJob, usePublishJob } from '@/lib/hooks';
 import { capitalize, formatDate, formatSalaryRange } from '@/lib/utils';
 import {
@@ -22,9 +23,10 @@ import {
   Video,
   XCircle
 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 /**
@@ -43,6 +45,9 @@ export default function JobDetailsPage() {
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [closeReason, setCloseReason] = useState('');
+  const [heroImageLoaded, setHeroImageLoaded] = useState(false);
+
+  const heroImage = useMemo(() => getJobHeroImage(job?.title), [job?.title]);
 
   const handlePublish = async () => {
     if (!job) return;
@@ -251,44 +256,52 @@ export default function JobDetailsPage() {
       {/* Main Content Grid - Left: Video, Right: Details */}
       <div className="grid lg:grid-cols-6 gap-4">
 
-        {/* Left Column - Video Card (3 cols) */}
+        {/* Left Column - Job video placeholder with title-based Unsplash hero image */}
         <div className="lg:col-span-3">
-          <div
-            className="rounded-2xl p-6 h-full min-h-[400px] flex flex-col items-center justify-center relative overflow-hidden"
-            style={{
-              background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%)',
-              backdropFilter: 'blur(20px)',
-              border: '2px solid rgba(255,255,255,0.4)',
-              boxShadow: '0 8px 32px rgba(124, 58, 237, 0.1)',
-            }}
-          >
-            {/* Decorative circles */}
-            <div className="absolute top-4 right-4 w-32 h-32 rounded-full opacity-20 blur-2xl" style={{ background: 'var(--gradient-primary)' }} />
-            <div className="absolute bottom-4 left-4 w-24 h-24 rounded-full opacity-10 blur-xl" style={{ background: 'var(--gradient-accent)' }} />
-
-            <div className="relative z-10 text-center">
+          <div className="rounded-2xl overflow-hidden h-full min-h-[280px] sm:min-h-[360px] lg:min-h-[400px] relative bg-neutral-100 border border-white/60 shadow-lg">
+            {/* Skeleton while image loads */}
+            {!heroImageLoaded && (
+              <div className="absolute inset-0 z-[1] flex items-center justify-center bg-gradient-to-br from-neutral-100 to-neutral-200 animate-pulse">
+                <div className="w-16 h-16 rounded-2xl bg-neutral-300/80" />
+              </div>
+            )}
+            <Image
+              src={heroImage.src}
+              alt=""
+              fill
+              className="object-cover transition-opacity duration-300"
+              style={{ opacity: heroImageLoaded ? 1 : 0 }}
+              onLoad={() => setHeroImageLoaded(true)}
+              placeholder="blur"
+              blurDataURL={heroImage.blurDataURL}
+              loading="lazy"
+              sizes="(max-width: 1024px) 100vw, 50vw"
+            />
+            {/* Overlay: moderate opacity so image remains visible */}
+            <div
+              className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/45 text-center px-4"
+              aria-hidden
+            >
               <div
-                className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mx-auto mb-3 sm:mb-4 border-2 border-white/30"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%)',
-                  border: '2px solid rgba(124, 58, 237, 0.2)',
+                  background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.4) 0%, rgba(236, 72, 153, 0.4) 100%)',
                 }}
               >
-                <Video className="w-10 h-10" style={{ color: 'var(--primary)' }} />
+                <Video className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
               </div>
-              <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--neutral-dark)' }}>
-                JOB-VIDEO
+              <h3 className="text-base sm:text-lg font-semibold text-white mb-1">
+                Job video
               </h3>
-              <p className="text-sm mb-4" style={{ color: 'var(--neutral-gray)' }}>
-                Job video will appear here..
+              <p className="text-sm text-white/90 mb-3 sm:mb-4">
+                Coming soon
               </p>
-              <button
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-medium mx-auto transition-all hover:scale-105"
-                style={{ background: 'var(--gradient-primary)', boxShadow: '0 4px 15px rgba(124, 58, 237, 0.3)' }}
+              <span
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-medium bg-white/20 backdrop-blur-sm border border-white/30"
               >
                 <Play className="w-4 h-4" />
-                Coming Soon
-              </button>
+                Preview
+              </span>
             </div>
           </div>
         </div>

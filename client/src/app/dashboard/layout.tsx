@@ -2,6 +2,7 @@
 
 import { NAV_ITEMS, ROUTES } from '@/constants';
 import { EMPLOYER_NAVBAR_BG, EMPLOYER_SIDEBAR_BG } from '@/constants/ui';
+import { prefetchHeroImages } from '@/lib/job-hero-image';
 import { getInitials } from '@/lib/utils';
 import { useAuthStore } from '@/stores';
 import {
@@ -43,6 +44,11 @@ export default function DashboardLayout({
       router.push(ROUTES.LOGIN);
     }
   }, [isAuthenticated, isLoading, router]);
+
+  // Prefetch job hero images once so job detail page often has image in cache
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) prefetchHeroImages();
+  }, [isAuthenticated, isLoading]);
 
   const handleLogout = () => {
     clearEmployer();

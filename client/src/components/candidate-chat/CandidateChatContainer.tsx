@@ -194,6 +194,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
     // When re-enabling: call setupWebSocket(session.id, candidate.id) after session create and
     // use wsManagerRef.current.sendMessage() in handleSendMessage when isConnected().
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for future WebSocket streaming
     const setupWebSocket = useCallback((sessionId: string, candidateId: string) => {
         if (wsManagerRef.current) {
             wsManagerRef.current.disconnect();
@@ -431,7 +432,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
         try {
             // 1. Upload file to Supabase Storage
             const publicUrl = await uploadResume(file, currentSessionId);
-
+ 
             // 2. Send message to backend with the file URL
             // This will trigger the backend extraction pipeline
             handleSendMessage(`Uploaded: ${file.name}`, {

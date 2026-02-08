@@ -18,7 +18,7 @@ import {
 } from '@/lib/hooks';
 import * as chatService from '@/services/chat.service';
 import { useAuthStore } from '@/stores';
-import type { ChatButton, ChatMessage as ChatMessageType, CreateJobRequest } from '@/types';
+import type { ChatButton, ChatMessage as ChatMessageType, CreateJobRequest, Currency, WorkType } from '@/types';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -28,6 +28,21 @@ import { ChatInput } from './ChatInput';
 import { ChatMessage } from './ChatMessage';
 
 type ViewMode = 'chat' | 'history';
+
+/** Collected job form data from chat session context (used for JD generation). */
+type CollectedJobFormData = {
+  title?: string;
+  requirements?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  work_type?: string;
+  salary_range?: string;
+  currency?: string;
+  experience_range?: string;
+  shift_preference?: string;
+  openings_count?: string | number;
+};
 
 /**
  * Progressive status messages shown during JD generation.
@@ -324,7 +339,7 @@ export function ChatContainer() {
             if (extractingResponse) {
                 // Trigger JD extraction
                 const rawJd = extractingResponse.message_data?.raw_jd;
-                if (rawJd) {
+                if (rawJd != null && typeof rawJd === 'string') {
                     await handleExtractJD(rawJd);
                     return; // handleExtractJD will update messages
                 }
@@ -363,15 +378,15 @@ export function ChatContainer() {
 
         // Fetch fresh session data to get the latest collected_data
         // (sessionData from React Query might be stale)
-        let data: Record<string, any>;
+        let data: CollectedJobFormData;
         try {
             const freshSession = await chatService.getChatSession(currentSessionId, employer.id);
-            data = freshSession.context_data?.collected_data || {};
+            data = (freshSession.context_data?.collected_data || {}) as CollectedJobFormData;
             console.log('[handleGenerateDescription] Fresh session data:', data);
         } catch (error) {
             console.error('[handleGenerateDescription] Failed to fetch session:', error);
             // Fallback to cached data
-            data = sessionData?.context_data?.collected_data || {};
+            data = (sessionData?.context_data?.collected_data || {}) as CollectedJobFormData;
         }
 
         // Validate required fields
@@ -410,14 +425,14 @@ export function ChatContainer() {
                 city: data.city,
                 state: data.state,
                 country: data.country,
-                work_type: data.work_type,
+                work_type: data.work_type as WorkType | undefined,
                 salary_min: salaryParts[0] || undefined,
                 salary_max: salaryParts[1] || undefined,
-                currency: data.currency || 'INR',
+                currency: (data.currency || 'INR') as Currency,
                 experience_min: expParts[0] || undefined,
                 experience_max: expParts[1] || undefined,
                 shift_preference: data.shift_preference,
-                openings_count: parseInt(data.openings_count) || 1,
+                openings_count: parseInt(String(data.openings_count ?? ''), 10) || 1,
                 company_name: employer?.company_name,
             });
 
@@ -619,49 +634,45 @@ export function ChatContainer() {
 
     // Handle job creation from preview
     const handleCreateJob = async (previewData?: Record<string, unknown>) => {
-        // Use previewData if provided, otherwise fallback to session data
-        const data = previewData || sessionData?.context_data?.collected_data;
-
-        if (!data) {
+        const raw = previewData || sessionData?.context_data?.collected_data;
+        if (!raw) {
             toast.error('No job data available');
             return;
         }
+        const data = raw as Record<string, unknown>;
 
-        // Parse salary and experience ranges
-        const salaryRange = data.salary_range ? parseSalaryRange(data.salary_range) : { min: 0, max: 0 };
-        const expRange = data.experience_range ? parseExperienceRange(data.experience_range) : { min: 0, max: 0 };
+        // Parse salary and experience ranges (coerce to string for parsers)
+        const salaryRange = data.salary_range != null ? parseSalaryRange(String(data.salary_range)) : { min: 0, max: 0 };
+        const expRange = data.experience_range != null ? parseExperienceRange(String(data.experience_range)) : { min: 0, max: 0 };
 
         // Ensure we have a valid description (minimum 10 chars as per backend validation)
-        const finalDescription = (data.generated_description || data.description || '').trim();
-        const finalRequirements = (data.generated_requirements || data.requirements || '').trim();
+        const finalDescription = String(data.generated_description ?? data.description ?? '').trim();
+        const finalRequirements = String(data.generated_requirements ?? data.requirements ?? '').trim();
 
         if (finalDescription.length < 10) {
             toast.error('Job description is too short. Please add more details.');
             return;
         }
 
-        // Convert shift_preference string to shift_preferences object
-        // e.g., "day" -> { day: true }
-        const shiftPreferences = data.shift_preference 
-            ? { [data.shift_preference]: true } 
-            : undefined;
+        const shiftPref = data.shift_preference != null ? String(data.shift_preference) : undefined;
+        const shiftPreferences = shiftPref ? { [shiftPref]: true } : undefined;
 
         const jobRequest: CreateJobRequest = {
             employer_id: employer!.id,
-            title: data.title,
+            title: String(data.title ?? ''),
             description: finalDescription,
             requirements: finalRequirements,
-            city: data.city,
-            state: data.state,
-            country: data.country,
-            location: [data.city, data.state, data.country].filter(Boolean).join(', '),
+            city: data.city != null ? String(data.city) : undefined,
+            state: data.state != null ? String(data.state) : undefined,
+            country: data.country != null ? String(data.country) : undefined,
+            location: [data.city, data.state, data.country].filter(Boolean).map(String).join(', '),
             work_type: data.work_type as CreateJobRequest['work_type'],
-            salary_range_min: data.salary_min || salaryRange.min || undefined,
-            salary_range_max: data.salary_max || salaryRange.max || undefined,
-            currency: data.currency || 'INR',
-            experience_min: data.experience_min || expRange.min || undefined,
-            experience_max: data.experience_max || expRange.max || undefined,
-            openings_count: parseInt(data.openings_count) || 1,
+            salary_range_min: Number(data.salary_min) || salaryRange.min || undefined,
+            salary_range_max: Number(data.salary_max) || salaryRange.max || undefined,
+            currency: (data.currency != null ? String(data.currency) : 'INR') as CreateJobRequest['currency'],
+            experience_min: Number(data.experience_min) || expRange.min || undefined,
+            experience_max: Number(data.experience_max) || expRange.max || undefined,
+            openings_count: parseInt(String(data.openings_count ?? ''), 10) || 1,
             shift_preferences: shiftPreferences,
         };
 
@@ -775,7 +786,7 @@ export function ChatContainer() {
                                         Click the button below to start a conversation with AIVI
                                     </p>
                                     <button
-                                        onClick={handleNewChat}
+                                        onClick={() => handleNewChat()}
                                         className="px-6 py-2.5 rounded-xl font-medium text-white transition-all hover:scale-105"
                                         style={{ background: 'var(--gradient-primary)' }}
                                     >

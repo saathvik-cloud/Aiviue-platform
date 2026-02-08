@@ -46,8 +46,8 @@ export interface ChatMessage {
         field?: string;
         placeholder?: string;
         action?: string;
-        job_data?: any; // Used for job_preview
-        [key: string]: any;
+        job_data?: Record<string, unknown>; // Used for job_preview
+        [key: string]: unknown;
     };
     created_at: string;
 }
@@ -59,8 +59,8 @@ export interface ChatSession extends BaseEntity {
     session_type: SessionType;
     context_data?: {
         step?: string;
-        collected_data?: Record<string, any>;
-        [key: string]: any;
+        collected_data?: Record<string, unknown>;
+        [key: string]: unknown;
     };
     is_active: boolean;
     message_count: number;
@@ -78,7 +78,7 @@ export interface CreateChatSessionRequest {
 
 export interface SendMessageRequest {
     content: string;
-    message_data?: Record<string, any>;
+    message_data?: Record<string, unknown>;
 }
 
 export interface GenerateDescriptionRequest {

@@ -135,3 +135,58 @@ export const EMPLOYER_STAT_CARD_GRADIENTS = [
     iconColor: '#EC4899',
   },
 ] as const;
+
+/**
+ * Quick Action card styles (Post a New Job, View All Jobs, Update Profile).
+ * Glassmorphic + light gradient per card.
+ */
+export const EMPLOYER_QUICK_ACTION_CARD_STYLES = [
+  {
+    cardBg: 'linear-gradient(145deg, rgba(250, 245, 255, 0.9) 0%, rgba(243, 232, 255, 0.85) 50%, rgba(253, 242, 248, 0.8) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.65)',
+    shadow: '0 6px 24px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255,255,255,0.6)',
+    iconBg: 'linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)',
+    iconColor: '#ffffff',
+  },
+  {
+    cardBg: 'linear-gradient(145deg, rgba(245, 243, 255, 0.9) 0%, rgba(237, 233, 254, 0.85) 50%, rgba(255, 255, 255, 0.75) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.6)',
+    shadow: '0 6px 24px rgba(124, 58, 237, 0.06), inset 0 1px 0 rgba(255,255,255,0.5)',
+    iconBg: 'linear-gradient(135deg, rgba(124, 58, 237, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
+    iconColor: '#7C3AED',
+  },
+  {
+    cardBg: 'linear-gradient(145deg, rgba(253, 242, 248, 0.9) 0%, rgba(252, 231, 243, 0.85) 50%, rgba(240, 253, 250, 0.6) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.6)',
+    shadow: '0 6px 24px rgba(236, 72, 153, 0.06), inset 0 1px 0 rgba(255,255,255,0.5)',
+    iconBg: 'linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(20, 184, 166, 0.15) 100%)',
+    iconColor: '#EC4899',
+  },
+] as const;
+
+/**
+ * Recent Job row card style by status (draft, published, closed).
+ * Matches stat card gradient family for consistency.
+ */
+export const EMPLOYER_RECENT_JOB_ROW_STYLES: Record<string, { cardBg: string; border: string; shadow: string }> = {
+  published: {
+    cardBg: 'linear-gradient(145deg, rgba(240, 253, 244, 0.92) 0%, rgba(220, 252, 231, 0.85) 50%, rgba(255,255,255,0.7) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.65)',
+    shadow: '0 4px 20px rgba(34, 197, 94, 0.06), inset 0 1px 0 rgba(255,255,255,0.5)',
+  },
+  draft: {
+    cardBg: 'linear-gradient(145deg, rgba(255, 251, 235, 0.92) 0%, rgba(254, 243, 199, 0.85) 50%, rgba(255,255,255,0.7) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.6)',
+    shadow: '0 4px 20px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(255,255,255,0.5)',
+  },
+  closed: {
+    cardBg: 'linear-gradient(145deg, rgba(253, 242, 242, 0.92) 0%, rgba(252, 226, 226, 0.85) 50%, rgba(255,255,255,0.7) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.6)',
+    shadow: '0 4px 20px rgba(236, 72, 153, 0.06), inset 0 1px 0 rgba(255,255,255,0.5)',
+  },
+  default: {
+    cardBg: 'linear-gradient(145deg, rgba(250, 245, 255, 0.92) 0%, rgba(243, 232, 255, 0.85) 50%, rgba(255,255,255,0.7) 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.6)',
+    shadow: '0 4px 20px rgba(124, 58, 237, 0.06), inset 0 1px 0 rgba(255,255,255,0.5)',
+  },
+};

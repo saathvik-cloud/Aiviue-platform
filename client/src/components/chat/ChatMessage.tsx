@@ -111,7 +111,7 @@ export function ChatMessage({
 
     // Job Preview
     if (message.message_type === 'job_preview') {
-        const jobData = message.message_data?.job_data || {};
+        const jobData = (message.message_data?.job_data || {}) as Record<string, string | number | undefined>;
         return (
             <div className={`flex items-start gap-3 ${mbClass} animate-fade-in`}>
                 {showAvatar ? <BotAvatar /> : <div className="w-9" />}

@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { ROUTES } from '@/constants';
 import {
   EMPLOYER_GLASS_CARD,
+  EMPLOYER_QUICK_ACTION_CARD_STYLES,
+  EMPLOYER_RECENT_JOB_ROW_STYLES,
   EMPLOYER_STAT_CARD_GRADIENTS,
 } from '@/constants/ui';
 import { useAuthStore } from '@/stores';
@@ -143,68 +145,42 @@ export default function DashboardPage() {
               Quick Actions
             </h2>
             <div className="space-y-3">
-              <Link
-                href={ROUTES.JOB_NEW}
-                className="flex items-center gap-3 p-3 rounded-xl transition-all hover:scale-[1.02]"
-                style={{ background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%)' }}
-              >
-                <div 
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)' }}
-                >
-                  <Plus className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--neutral-dark)' }}>
-                    Post a New Job
-                  </p>
-                  <p className="text-xs" style={{ color: 'var(--neutral-gray)' }}>
-                    Use AIVI to extract details
-                  </p>
-                </div>
-              </Link>
-
-              <Link
-                href={ROUTES.JOBS}
-                className="flex items-center gap-3 p-3 rounded-xl transition-all hover:scale-[1.02] bg-white/60 hover:bg-white"
-                style={{ border: '1px solid var(--neutral-border)' }}
-              >
-                <div 
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ background: 'var(--primary-50)' }}
-                >
-                  <Briefcase className="w-5 h-5" style={{ color: 'var(--primary)' }} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--neutral-dark)' }}>
-                    View All Jobs
-                  </p>
-                  <p className="text-xs" style={{ color: 'var(--neutral-gray)' }}>
-                    Manage your postings
-                  </p>
-                </div>
-              </Link>
-
-              <Link
-                href={ROUTES.DASHBOARD_PROFILE}
-                className="flex items-center gap-3 p-3 rounded-xl transition-all hover:scale-[1.02] bg-white/60 hover:bg-white"
-                style={{ border: '1px solid var(--neutral-border)' }}
-              >
-                <div 
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ background: 'var(--accent-50)' }}
-                >
-                  <TrendingUp className="w-5 h-5" style={{ color: 'var(--accent)' }} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--neutral-dark)' }}>
-                    Update Profile
-                  </p>
-                  <p className="text-xs" style={{ color: 'var(--neutral-gray)' }}>
-                    Company details
-                  </p>
-                </div>
-              </Link>
+              {[
+                { href: ROUTES.JOB_NEW, icon: Plus, title: 'Post a New Job', subtitle: 'Use AIVI to extract details', index: 0 },
+                { href: ROUTES.JOBS, icon: Briefcase, title: 'View All Jobs', subtitle: 'Manage your postings', index: 1 },
+                { href: ROUTES.DASHBOARD_PROFILE, icon: TrendingUp, title: 'Update Profile', subtitle: 'Company details', index: 2 },
+              ].map(({ href, icon: Icon, title, subtitle, index }) => {
+                const style = EMPLOYER_QUICK_ACTION_CARD_STYLES[index];
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className="flex items-center gap-3 p-3 rounded-xl transition-all duration-300 hover:scale-[1.02]"
+                    style={{
+                      background: style.cardBg,
+                      backdropFilter: 'blur(12px)',
+                      WebkitBackdropFilter: 'blur(12px)',
+                      border: style.border,
+                      boxShadow: style.shadow,
+                    }}
+                  >
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: style.iconBg }}
+                    >
+                      <Icon className="w-5 h-5" style={{ color: style.iconColor }} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium" style={{ color: 'var(--neutral-dark)' }}>
+                        {title}
+                      </p>
+                      <p className="text-xs" style={{ color: 'var(--neutral-gray)' }}>
+                        {subtitle}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -230,13 +206,20 @@ export default function DashboardPage() {
             </div>
 
             {jobsLoading ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="animate-pulse flex items-center gap-4 p-4 rounded-xl bg-white/50">
-                    <div className="w-12 h-12 bg-gray-200 rounded-xl" />
+                  <div
+                    key={i}
+                    className="animate-pulse flex items-center gap-4 p-4 rounded-xl"
+                    style={{
+                      background: 'linear-gradient(145deg, rgba(250, 245, 255, 0.85) 0%, rgba(243, 232, 255, 0.75) 100%)',
+                      border: '1px solid rgba(255, 255, 255, 0.6)',
+                    }}
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-white/60" />
                     <div className="flex-1">
-                      <div className="h-4 bg-gray-200 rounded w-1/2 mb-2" />
-                      <div className="h-3 bg-gray-200 rounded w-1/3" />
+                      <div className="h-4 rounded w-1/2 mb-2 bg-white/50" />
+                      <div className="h-3 rounded w-1/3 bg-white/40" />
                     </div>
                   </div>
                 ))}
@@ -265,58 +248,58 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {recentJobs?.items.map((job) => (
-                  <Link
-                    key={job.id}
-                    href={ROUTES.JOB_DETAILS(job.id)}
-                    className="flex items-center gap-4 p-4 rounded-xl transition-all hover:bg-white/80 bg-white/50"
-                    style={{ border: '1px solid transparent' }}
-                    onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--neutral-border)'}
-                    onMouseLeave={(e) => e.currentTarget.style.borderColor = 'transparent'}
-                  >
-                    <div 
-                      className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ 
-                        background: job.status === 'published' 
-                          ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(74, 222, 128, 0.1) 100%)'
-                          : job.status === 'draft'
-                          ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%)'
-                          : 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(248, 113, 113, 0.1) 100%)'
+                {recentJobs?.items.map((job) => {
+                  const rowStyle = EMPLOYER_RECENT_JOB_ROW_STYLES[job.status] ?? EMPLOYER_RECENT_JOB_ROW_STYLES.default;
+                  const iconBg =
+                    job.status === 'published'
+                      ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(74, 222, 128, 0.15) 100%)'
+                      : job.status === 'draft'
+                        ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(251, 191, 36, 0.15) 100%)'
+                        : 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(248, 113, 113, 0.1) 100%)';
+                  const iconColor =
+                    job.status === 'published' ? 'var(--status-published)' : job.status === 'draft' ? 'var(--status-draft)' : 'var(--status-closed)';
+                  return (
+                    <Link
+                      key={job.id}
+                      href={ROUTES.JOB_DETAILS(job.id)}
+                      className="flex items-center gap-4 p-4 rounded-xl transition-all duration-300 hover:scale-[1.01]"
+                      style={{
+                        background: rowStyle.cardBg,
+                        backdropFilter: 'blur(12px)',
+                        WebkitBackdropFilter: 'blur(12px)',
+                        border: rowStyle.border,
+                        boxShadow: rowStyle.shadow,
                       }}
                     >
-                      <Briefcase 
-                        className="w-5 h-5" 
-                        style={{ 
-                          color: job.status === 'published' 
-                            ? 'var(--status-published)' 
-                            : job.status === 'draft'
-                            ? 'var(--status-draft)'
-                            : 'var(--status-closed)'
-                        }} 
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: 'var(--neutral-dark)' }}>
-                        {job.title}
-                      </p>
-                      <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--neutral-gray)' }}>
-                        {job.location && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {job.location}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {formatDate(job.created_at)}
-                        </span>
+                      <div
+                        className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: iconBg }}
+                      >
+                        <Briefcase className="w-5 h-5" style={{ color: iconColor }} />
                       </div>
-                    </div>
-                    <span className={`status-badge status-${job.status} text-xs`}>
-                      {capitalize(job.status)}
-                    </span>
-                  </Link>
-                ))}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--neutral-dark)' }}>
+                          {job.title}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs" style={{ color: 'var(--neutral-gray)' }}>
+                          {job.location && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">{job.location}</span>
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3 flex-shrink-0" />
+                            {formatDate(job.created_at)}
+                          </span>
+                        </div>
+                      </div>
+                      <span className={`status-badge status-${job.status} text-xs flex-shrink-0`}>
+                        {capitalize(job.status)}
+                      </span>
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </div>
