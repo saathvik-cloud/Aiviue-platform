@@ -162,7 +162,7 @@ export function ChatMessage({
                                 <div className="flex items-center gap-2 text-sm">
                                     <DollarSign className="w-4 h-4" style={{ color: 'var(--status-published)' }} />
                                     <span style={{ color: 'var(--neutral-dark)' }}>
-                                        {jobData.currency} {formatSalary(jobData.salary_min)} - {formatSalary(jobData.salary_max)}
+                                        {jobData.currency} {formatSalary(Number(jobData.salary_min) || 0)} - {formatSalary(Number(jobData.salary_max) || 0)}
                                     </span>
                                 </div>
                             )}
