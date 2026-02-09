@@ -14,6 +14,8 @@ from app.shared.auth.dependencies import (
     # New JWT-based dependencies
     get_current_employer_from_token,
     get_current_candidate_from_token,
+    get_optional_employer_from_token,
+    get_optional_candidate_from_token,
 )
 
 from app.shared.auth.jwt import (

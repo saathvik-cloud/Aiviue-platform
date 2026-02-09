@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends, Query, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import API_V1_PREFIX
-from app.shared.auth import get_current_employer_id
+from app.shared.auth import get_current_employer_from_token
 from app.domains.chat.schemas import (
     ChatSessionCreate,
     ChatSessionResponse,
@@ -83,11 +83,12 @@ async def get_service(
 )
 async def create_session(
     request: ChatSessionCreate,
-    current_employer_id: UUID = Depends(get_current_employer_id),
+    current_employer: dict = Depends(get_current_employer_from_token),
     service: ChatService = Depends(get_service),
 ) -> ChatSessionWithMessagesResponse:
     """Create a new chat session. Caller can only create for themselves."""
-    if current_employer_id != request.employer_id:
+    token_employer_id = UUID(current_employer["employer_id"])
+    if token_employer_id != request.employer_id:
         raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     logger.info(
         "Creating chat session",
@@ -120,11 +121,12 @@ async def list_sessions(
     employer_id: UUID = Query(..., description="Employer UUID"),
     limit: int = Query(20, ge=1, le=100, description="Max sessions to return"),
     offset: int = Query(0, ge=0, description="Number of sessions to skip"),
-    current_employer_id: UUID = Depends(get_current_employer_id),
+    current_employer: dict = Depends(get_current_employer_from_token),
     service: ChatService = Depends(get_service),
 ) -> ChatSessionListResponse:
     """List chat sessions for an employer. Caller can only list their own."""
-    if current_employer_id != employer_id:
+    token_employer_id = UUID(current_employer["employer_id"])
+    if token_employer_id != employer_id:
         raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     logger.debug(
         "Listing chat sessions",
@@ -151,11 +153,12 @@ async def list_sessions(
 async def get_session(
     session_id: UUID,
     employer_id: UUID = Query(..., description="Employer UUID for authorization"),
-    current_employer_id: UUID = Depends(get_current_employer_id),
+    current_employer: dict = Depends(get_current_employer_from_token),
     service: ChatService = Depends(get_service),
 ) -> ChatSessionWithMessagesResponse:
     """Get a chat session with messages. Caller can only access their own sessions."""
-    if current_employer_id != employer_id:
+    token_employer_id = UUID(current_employer["employer_id"])
+    if token_employer_id != employer_id:
         raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     logger.debug(
         "Getting chat session",
@@ -181,11 +184,12 @@ async def get_session(
 async def delete_session(
     session_id: UUID,
     employer_id: UUID = Query(..., description="Employer UUID for authorization"),
-    current_employer_id: UUID = Depends(get_current_employer_id),
+    current_employer: dict = Depends(get_current_employer_from_token),
     service: ChatService = Depends(get_service),
 ) -> None:
     """Delete a chat session. Caller can only delete their own sessions."""
-    if current_employer_id != employer_id:
+    token_employer_id = UUID(current_employer["employer_id"])
+    if token_employer_id != employer_id:
         raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     logger.info(
         "Deleting chat session",
@@ -224,11 +228,12 @@ async def send_message(
     session_id: UUID,
     request: SendMessageRequest,
     employer_id: UUID = Query(..., description="Employer UUID for authorization"),
-    current_employer_id: UUID = Depends(get_current_employer_id),
+    current_employer: dict = Depends(get_current_employer_from_token),
     service: ChatService = Depends(get_service),
 ) -> SendMessageResponse:
     """Send a message to a chat session. Caller can only send to their own sessions."""
-    if current_employer_id != employer_id:
+    token_employer_id = UUID(current_employer["employer_id"])
+    if token_employer_id != employer_id:
         raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     logger.info(
         "Sending message to chat session",
@@ -269,11 +274,12 @@ async def extraction_complete(
     session_id: UUID,
     request: ExtractionCompleteRequest,
     employer_id: UUID = Query(..., description="Employer UUID for authorization"),
-    current_employer_id: UUID = Depends(get_current_employer_id),
+    current_employer: dict = Depends(get_current_employer_from_token),
     service: ChatService = Depends(get_service),
 ) -> SendMessageResponse:
     """Handle completion of JD extraction. Caller can only access their own sessions."""
-    if current_employer_id != employer_id:
+    token_employer_id = UUID(current_employer["employer_id"])
+    if token_employer_id != employer_id:
         raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     logger.info(
         "Extraction complete for chat session",

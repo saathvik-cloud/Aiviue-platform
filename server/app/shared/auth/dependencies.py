@@ -13,6 +13,7 @@ Routes should gradually migrate from header-based to JWT-based authentication.
 from uuid import UUID
 
 from fastapi import Header, HTTPException, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.shared.auth.jwt import (
@@ -33,8 +34,8 @@ bearer_scheme = HTTPBearer(auto_error=False)
 # ==================== JWT-BASED DEPENDENCIES ====================
 
 def get_current_employer_from_token(
-    credentials: HTTPAuthorizationCredentials | None = Header(None, alias="Authorization"),
-) -> EmployerTokenPayload:
+    credentials: str | None = Header(None, alias="Authorization"),
+) -> dict:
     """
     Extract and verify employer from JWT token in Authorization header.
     
@@ -75,7 +76,7 @@ def get_current_employer_from_token(
     
     try:
         payload = verify_employer_token(token)
-        return payload
+        return jsonable_encoder(payload)
     except TokenVerificationError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -85,8 +86,8 @@ def get_current_employer_from_token(
 
 
 def get_current_candidate_from_token(
-    credentials: HTTPAuthorizationCredentials | None = Header(None, alias="Authorization"),
-) -> CandidateTokenPayload:
+    credentials: str | None = Header(None, alias="Authorization"),
+) -> dict:
     """
     Extract and verify candidate from JWT token in Authorization header.
     
@@ -126,7 +127,7 @@ def get_current_candidate_from_token(
     
     try:
         payload = verify_candidate_token(token)
-        return payload
+        return jsonable_encoder(payload)
     except TokenVerificationError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -201,4 +202,61 @@ def get_optional_employer_id(
     try:
         return UUID(x_employer_id.strip())
     except ValueError:
+        return None
+
+
+# ==================== OPTIONAL JWT DEPENDENCIES ====================
+
+def get_optional_employer_from_token(
+    credentials: str | None = Header(None, alias="Authorization"),
+) -> dict | None:
+    """
+    Optional employer auth from token.
+    Returns EmployerTokenPayload if valid token present, else None.
+    """
+    if not credentials:
+        return None
+    
+    auth_header = credentials if isinstance(credentials, str) else None
+    if not auth_header:
+        # If credentials is NOT a string, it might be the HTTPAuthorizationCredentials object 
+        # but here we strictly follow the pattern of get_current_employer_from_token
+        # which treats the input as the header value string.
+        return None
+    
+    parts = auth_header.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return None
+        
+    token = parts[1]
+    try:
+        payload = verify_employer_token(token)
+        return jsonable_encoder(payload)
+    except TokenVerificationError:
+        return None
+
+
+def get_optional_candidate_from_token(
+    credentials: str | None = Header(None, alias="Authorization"),
+) -> dict | None:
+    """
+    Optional candidate auth from token.
+    Returns CandidateTokenPayload if valid token present, else None.
+    """
+    if not credentials:
+        return None
+    
+    auth_header = credentials if isinstance(credentials, str) else None
+    if not auth_header:
+        return None
+    
+    parts = auth_header.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return None
+        
+    token = parts[1]
+    try:
+        payload = verify_candidate_token(token)
+        return jsonable_encoder(payload)
+    except TokenVerificationError:
         return None

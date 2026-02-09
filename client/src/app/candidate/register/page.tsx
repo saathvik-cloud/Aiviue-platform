@@ -21,7 +21,7 @@ import { toast } from 'sonner';
  */
 export default function CandidateRegisterPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, setCandidate } = useCandidateAuthStore();
+  const { isAuthenticated, isLoading: authLoading, login } = useCandidateAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -138,7 +138,7 @@ export default function CandidateRegisterPage() {
     setIsLoading(true);
 
     try {
-      const response = await candidateSignup({
+      await candidateSignup({
         mobile: formData.mobile,
         name: formData.name.trim(),
         current_location: formData.current_location.trim() || undefined,
@@ -147,7 +147,9 @@ export default function CandidateRegisterPage() {
         preferred_job_location: formData.preferred_job_location.trim() || undefined,
       });
 
-      setCandidate(response.candidate);
+      // Auto-login to get tokens
+      await login(formData.mobile);
+
       toast.success('Account created successfully! Complete your profile to continue.');
       // Pass signup form data for pre-fill on complete-profile page
       if (typeof window !== 'undefined') {
@@ -225,7 +227,7 @@ export default function CandidateRegisterPage() {
               priority
             />
           </Link>
-          
+
         </div>
 
         {/* Register Card */}

@@ -2,7 +2,6 @@
 
 import { CANDIDATE_VALIDATION, ROUTES } from '@/constants';
 import { getErrorMessage } from '@/lib/api';
-import { getCandidateByMobile } from '@/services';
 import { useCandidateAuthStore } from '@/stores';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -18,7 +17,7 @@ import { toast } from 'sonner';
  */
 export default function CandidateLoginPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, setCandidate } = useCandidateAuthStore();
+  const { isAuthenticated, isLoading: authLoading, login } = useCandidateAuthStore();
   const [mobile, setMobile] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -52,11 +51,13 @@ export default function CandidateLoginPage() {
     setIsLoading(true);
 
     try {
-      const candidate = await getCandidateByMobile(mobile);
-      setCandidate(candidate);
-      toast.success(`Welcome back, ${candidate.name}!`);
-      if (candidate.profile_status === 'complete') router.push(ROUTES.CANDIDATE_DASHBOARD);
-      else router.push(ROUTES.CANDIDATE_DASHBOARD_COMPLETE_PROFILE);
+      await login(mobile);
+      const candidate = useCandidateAuthStore.getState().candidate;
+      if (candidate) {
+        toast.success(`Welcome back, ${candidate.name}!`);
+        if (candidate.profile_status === 'complete') router.push(ROUTES.CANDIDATE_DASHBOARD);
+        else router.push(ROUTES.CANDIDATE_DASHBOARD_COMPLETE_PROFILE);
+      }
     } catch (err) {
       const message = getErrorMessage(err);
       if (message.includes('not found') || message.includes('Not Found')) {

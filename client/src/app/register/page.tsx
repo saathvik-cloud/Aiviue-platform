@@ -27,7 +27,7 @@ const COMPANY_SIZE_OPTIONS = [
  */
 export default function RegisterPage() {
   const router = useRouter();
-  const { setEmployer, isLoading: authLoading } = useAuthStore();
+  const { login, isLoading: authLoading } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -62,7 +62,9 @@ export default function RegisterPage() {
         industry: formData.industry || undefined,
       });
 
-      setEmployer(employer);
+      // Auto-login to get tokens and set authenticated state
+      await login(formData.email);
+
       toast.success('Account created successfully!');
       router.push(ROUTES.DASHBOARD);
     } catch (err) {

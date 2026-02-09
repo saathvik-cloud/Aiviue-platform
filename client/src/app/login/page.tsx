@@ -1,21 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
 import { ROUTES } from '@/constants';
-import { useAuthStore } from '@/stores';
-import { getEmployerByEmail } from '@/services';
 import { getErrorMessage } from '@/lib/api';
+import { useAuthStore } from '@/stores';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 /**
  * Login Page - Glassmorphism design
  */
 export default function LoginPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, setEmployer } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, login } = useAuthStore();
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -33,9 +32,12 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const employer = await getEmployerByEmail(email);
-      setEmployer(employer);
-      toast.success(`Welcome back, ${employer.name}!`);
+      await login(email);
+      // Success toast is handled by dashboard or we can add it here
+      const employer = useAuthStore.getState().employer;
+      if (employer) {
+        toast.success(`Welcome back, ${employer.name}!`);
+      }
       router.push(ROUTES.DASHBOARD);
     } catch (err) {
       const message = getErrorMessage(err);
@@ -67,11 +69,11 @@ export default function LoginPage() {
     <main className="min-h-screen gradient-bg flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background decorations */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div 
+        <div
           className="absolute -top-40 -right-40 w-96 h-96 rounded-full opacity-30 blur-3xl"
           style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)' }}
         />
-        <div 
+        <div
           className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full opacity-20 blur-3xl"
           style={{ background: 'linear-gradient(135deg, #EC4899 0%, #7C3AED 100%)' }}
         />
@@ -103,7 +105,7 @@ export default function LoginPage() {
 
           {/* Error Message */}
           {error && (
-            <div 
+            <div
               className="mb-6 p-4 rounded-xl text-sm"
               style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#991B1B' }}
             >
