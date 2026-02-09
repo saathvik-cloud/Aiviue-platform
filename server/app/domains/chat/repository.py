@@ -80,9 +80,8 @@ class ChatRepository:
         Returns:
             ChatSession or None
         """
-        # Expire cached objects to ensure fresh data
-        self.db.expire_all()
-        
+        # Note: No expire_all() needed - executing a fresh query returns current data.
+        # expire_all() was causing unnecessary invalidation of all cached objects.
         query = select(ChatSession).where(ChatSession.id == session_id)
         
         if include_messages:
@@ -122,9 +121,9 @@ class ChatRepository:
         limit: int = 20,
         offset: int = 0,
         active_only: bool = True,
-    ) -> tuple[List[ChatSession], int]:
+    ) -> tuple[List[ChatSession], int, dict[UUID, int]]:
         """
-        Get chat sessions for an employer.
+        Get chat sessions for an employer with message counts.
         
         Args:
             employer_id: Employer UUID
@@ -133,24 +132,24 @@ class ChatRepository:
             active_only: Only return active sessions
             
         Returns:
-            Tuple of (sessions list, total count)
+            Tuple of (sessions list, total count, message_counts dict)
+            message_counts maps session_id -> count for efficient lookup
         """
-        # Base query
+        # Base query - NO message loading (performance optimization)
         base_query = select(ChatSession).where(ChatSession.employer_id == employer_id)
         
         if active_only:
             base_query = base_query.where(ChatSession.is_active == True)
         
-        # Count total
+        # Count total sessions
         count_query = select(func.count()).select_from(base_query.subquery())
         count_result = await self.db.execute(count_query)
         total_count = count_result.scalar() or 0
         
         # Get sessions with pagination, ordered by most recent
-        # Include messages for message_count property
+        # NOTE: We do NOT load messages here - only session metadata
         query = (
             base_query
-            .options(selectinload(ChatSession.messages))
             .order_by(ChatSession.updated_at.desc())
             .offset(offset)
             .limit(limit)
@@ -159,7 +158,24 @@ class ChatRepository:
         result = await self.db.execute(query)
         sessions = list(result.scalars().all())
         
-        return sessions, total_count
+        # Get message counts via a single efficient query
+        # This is much faster than loading all messages just to count them
+        message_counts: dict[UUID, int] = {}
+        if sessions:
+            session_ids = [s.id for s in sessions]
+            count_subquery = (
+                select(
+                    ChatMessage.session_id,
+                    func.count(ChatMessage.id).label("msg_count")
+                )
+                .where(ChatMessage.session_id.in_(session_ids))
+                .group_by(ChatMessage.session_id)
+            )
+            count_result = await self.db.execute(count_subquery)
+            for row in count_result:
+                message_counts[row.session_id] = row.msg_count
+        
+        return sessions, total_count, message_counts
     
     async def update_session(
         self,
@@ -268,14 +284,18 @@ class ChatRepository:
         messages: List[dict],
     ) -> List[ChatMessage]:
         """
-        Add multiple messages to a session at once.
+        Add multiple messages to a session atomically, preserving insertion order.
+        
+        IMPORTANT: Messages are returned in the exact order they were passed in.
+        This is critical for conversation flow where message order matters
+        (e.g., acknowledgment messages must appear before the next question).
         
         Args:
             session_id: Session UUID
             messages: List of message dicts with role, content, type, message_data
             
         Returns:
-            List of created ChatMessages
+            List of created ChatMessages in insertion order
         """
         created_messages = []
         
@@ -297,13 +317,22 @@ class ChatRepository:
             .values(updated_at=datetime.utcnow())
         )
         
+        # Flush to assign database-generated IDs before commit
+        await self.db.flush()
+        
+        # Capture IDs in insertion order (before commit potentially reorders)
+        message_ids = [msg.id for msg in created_messages]
+        
         await self.db.commit()
         
-        # Refresh all messages
+        # Refresh each message in original insertion order
+        # This preserves the correct sequence of messages
+        refreshed_messages = []
         for msg in created_messages:
             await self.db.refresh(msg)
+            refreshed_messages.append(msg)
         
-        return created_messages
+        return refreshed_messages
     
     async def get_messages_by_session(
         self,

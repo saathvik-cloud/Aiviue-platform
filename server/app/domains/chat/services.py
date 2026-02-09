@@ -91,16 +91,14 @@ class ChatService:
         # Add welcome messages
         welcome_messages = self._get_welcome_messages()
         logger.info(f"Adding {len(welcome_messages)} welcome messages to session {session.id}")
-        await self.repo.add_messages_batch(session.id, welcome_messages)
+        created_messages = await self.repo.add_messages_batch(session.id, welcome_messages)
         
-        # Refresh to get messages - force a clean query
-        session = await self.repo.get_session_by_id(session.id, include_messages=True)
-        logger.info(f"After refresh - session has {len(session.messages) if session.messages else 0} messages")
+        # Use the messages returned directly - no need to re-fetch the session
+        # This saves an extra database query
+        session.messages = created_messages
         
-        logger.info(f"Created new chat session: {session.id}")
-        response = self._to_session_with_messages_response(session)
-        logger.info(f"Response has {len(response.messages) if response.messages else 0} messages")
-        return response
+        logger.info(f"Created new chat session: {session.id} with {len(created_messages)} messages")
+        return self._to_session_with_messages_response(session)
     
     async def get_session(
         self,
@@ -147,14 +145,17 @@ class ChatService:
         Returns:
             List of sessions
         """
-        sessions, total_count = await self.repo.get_sessions_by_employer(
+        sessions, total_count, message_counts = await self.repo.get_sessions_by_employer(
             employer_id=employer_id,
             limit=limit,
             offset=offset,
         )
         
         return ChatSessionListResponse(
-            items=[self._to_session_response(s) for s in sessions],
+            items=[
+                self._to_session_response(s, message_count=message_counts.get(s.id, 0))
+                for s in sessions
+            ],
             total_count=total_count,
             has_more=(offset + len(sessions)) < total_count,
         )
@@ -223,17 +224,17 @@ class ChatService:
         # Process user input and get bot responses
         bot_responses = await self._process_user_input(session, content, message_data)
         
-        # Add bot responses
-        created_bot_messages = []
-        for bot_msg in bot_responses:
-            msg = await self.repo.add_message(
-                session_id=session_id,
-                role=MessageRole.BOT,
-                content=bot_msg["content"],
-                message_type=bot_msg.get("message_type", MessageType.TEXT),
-                message_data=bot_msg.get("message_data"),
-            )
-            created_bot_messages.append(msg)
+        # Add bot responses in a single batch (performance optimization)
+        bot_message_dicts = [
+            {
+                "role": MessageRole.BOT,
+                "content": bot_msg["content"],
+                "message_type": bot_msg.get("message_type", MessageType.TEXT),
+                "message_data": bot_msg.get("message_data", {}),
+            }
+            for bot_msg in bot_responses
+        ]
+        created_bot_messages = await self.repo.add_messages_batch(session_id, bot_message_dicts)
         
         return SendMessageResponse(
             user_message=self._to_message_response(user_message),
@@ -530,17 +531,17 @@ class ChatService:
         next_question = self._get_step_question(first_missing_step, collected_data)
         bot_responses.extend(next_question)
         
-        # Save bot messages
-        created_bot_messages = []
-        for bot_msg in bot_responses:
-            msg = await self.repo.add_message(
-                session_id=session_id,
-                role=MessageRole.BOT,
-                content=bot_msg["content"],
-                message_type=bot_msg.get("message_type", MessageType.TEXT),
-                message_data=bot_msg.get("message_data"),
-            )
-            created_bot_messages.append(msg)
+        # Save bot messages in a single batch (performance optimization)
+        bot_message_dicts = [
+            {
+                "role": MessageRole.BOT,
+                "content": bot_msg["content"],
+                "message_type": bot_msg.get("message_type", MessageType.TEXT),
+                "message_data": bot_msg.get("message_data", {}),
+            }
+            for bot_msg in bot_responses
+        ]
+        created_bot_messages = await self.repo.add_messages_batch(session_id, bot_message_dicts)
         
         return SendMessageResponse(
             user_message=self._to_message_response(user_message),
@@ -1120,8 +1121,19 @@ class ChatService:
     
     # ==================== RESPONSE MAPPERS ====================
     
-    def _to_session_response(self, session: ChatSession) -> ChatSessionResponse:
-        """Convert ChatSession to response schema."""
+    def _to_session_response(
+        self,
+        session: ChatSession,
+        message_count: Optional[int] = None,
+    ) -> ChatSessionResponse:
+        """
+        Convert ChatSession to response schema.
+        
+        Args:
+            session: The ChatSession model
+            message_count: Pre-calculated message count (for list views).
+                           If None, uses session.message_count property.
+        """
         return ChatSessionResponse(
             id=session.id,
             employer_id=session.employer_id,
@@ -1131,7 +1143,7 @@ class ChatService:
             is_active=session.is_active,
             created_at=session.created_at,
             updated_at=session.updated_at,
-            message_count=session.message_count,
+            message_count=message_count if message_count is not None else session.message_count,
             last_message_at=session.last_message_at,
         )
     

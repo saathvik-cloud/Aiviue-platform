@@ -140,7 +140,7 @@ class ChatSession(Base):
     
     employer: Mapped["Employer"] = relationship(
         "Employer",
-        lazy="selectin",
+        lazy="noload",  # Never loaded - employer_id is sufficient for auth checks
     )
     
     # Table indexes
@@ -233,6 +233,13 @@ class ChatMessage(Base):
     session: Mapped["ChatSession"] = relationship(
         "ChatSession",
         back_populates="messages",
+    )
+    
+    # Table indexes for query optimization
+    __table_args__ = (
+        # Composite index for efficient message retrieval by session, ordered by time
+        # This is the most common query pattern: get messages for a session, sorted by created_at
+        Index("idx_chat_messages_session_created", "session_id", "created_at"),
     )
     
     def __repr__(self) -> str:
