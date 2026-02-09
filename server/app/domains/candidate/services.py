@@ -163,10 +163,12 @@ class CandidateService:
                 message="Welcome back! You already have an account.",
             )
 
-        # Create new candidate
+        # Create new candidate (mobile, name, current_location, preferred_location only)
         candidate = await self.repository.create({
             "mobile": request.mobile,
             "name": request.name.strip(),
+            "current_location": request.current_location.strip(),
+            "preferred_job_location": request.preferred_location.strip(),
             "profile_status": ProfileStatus.BASIC,
         })
         await self.session.commit()
@@ -240,11 +242,14 @@ class CandidateService:
         update_data = {
             "name": request.name.strip(),
             "current_location": request.current_location.strip(),
-            "preferred_job_category_id": request.preferred_job_category_id,
-            "preferred_job_role_id": request.preferred_job_role_id,
             "preferred_job_location": request.preferred_job_location.strip(),
-            "profile_status": ProfileStatus.COMPLETE,  # User finished mandatory step; allow dashboard access
+            "profile_status": ProfileStatus.COMPLETE,  # Allow dashboard/chat access
         }
+        # Optional: set category/role only if provided
+        if request.preferred_job_category_id is not None:
+            update_data["preferred_job_category_id"] = request.preferred_job_category_id
+        if request.preferred_job_role_id is not None:
+            update_data["preferred_job_role_id"] = request.preferred_job_role_id
 
         updated = await self.repository.update(
             candidate_id,

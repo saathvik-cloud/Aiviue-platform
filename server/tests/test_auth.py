@@ -361,7 +361,12 @@ class TestCandidateLoginEndpoint:
         # First create a candidate using the signup endpoint
         create_response = test_client.post(
             "/api/v1/candidates/signup",
-            json={"mobile": mobile, "name": "Test Candidate"},
+            json={
+                "mobile": mobile,
+                "name": "Test Candidate",
+                "current_location": "Mumbai, Maharashtra",
+                "preferred_location": "Pune, Maharashtra",
+            },
         )
         assert create_response.status_code == 201, create_response.text
         

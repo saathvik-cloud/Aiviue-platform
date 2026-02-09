@@ -177,6 +177,13 @@ class Candidate(Base, FullAuditMixin):
         nullable=False,
         comment="Profile onboarding: basic, complete (distinct from having a resume)",
     )
+    # Paid/pro: if True, candidate can create multiple resumes via AIVI bot; else one-time free only.
+    is_pro: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        comment="Paid/pro customer: can create multiple resumes with AIVI bot",
+    )
 
     # ==================== RELATIONSHIPS ====================
     # PERF: Use lazy="noload" to prevent automatic eager loading.

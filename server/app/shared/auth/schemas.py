@@ -7,7 +7,7 @@ Pydantic models for authentication requests and responses.
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, field_validator
 
 
 # ==================== LOGIN SCHEMAS ====================
@@ -33,13 +33,27 @@ class EmployerLoginResponse(BaseModel):
 
 class CandidateLoginRequest(BaseModel):
     """Request schema for candidate login."""
-    
+
     mobile_number: str = Field(
         ...,
         min_length=10,
         max_length=15,
-        description="Candidate mobile number",
+        description="Candidate mobile number (10 digits, optionally with +91/91 prefix)",
     )
+
+    @field_validator("mobile_number")
+    @classmethod
+    def normalize_mobile(cls, v: str) -> str:
+        """Normalize to 10 digits so lookup matches signup-stored value."""
+        cleaned = v.replace(" ", "").replace("-", "")
+        if cleaned.startswith("+91"):
+            cleaned = cleaned[3:]
+        elif cleaned.startswith("91") and len(cleaned) > 10:
+            cleaned = cleaned[2:]
+        if not cleaned.isdigit() or len(cleaned) != 10:
+            raise ValueError("Mobile number must be exactly 10 digits (or 10 digits with +91/91 prefix)")
+        return cleaned
+
     # In MVP, we just return tokens without OTP verification
     # In production, add: otp: str = Field(..., min_length=4, max_length=6)
 

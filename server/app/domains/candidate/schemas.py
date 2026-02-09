@@ -19,6 +19,9 @@ class CandidateSignupRequest(BaseModel):
     Schema for candidate signup (mobile-based).
 
     Used in: POST /api/v1/candidates/signup
+
+    Signup collects only: mobile, full name, current location, preferred location.
+    Job category and role are filled later (e.g. from resume extraction or scripts).
     """
     mobile: str = Field(
         ...,
@@ -33,6 +36,20 @@ class CandidateSignupRequest(BaseModel):
         max_length=255,
         description="Candidate's full name",
         examples=["Rahul Sharma"],
+    )
+    current_location: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="Current city/area",
+        examples=["Mumbai, Maharashtra"],
+    )
+    preferred_location: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="Preferred work location",
+        examples=["Pune, Maharashtra"],
     )
 
     @field_validator("mobile")
@@ -80,9 +97,12 @@ class CandidateLoginRequest(BaseModel):
 
 class CandidateBasicProfileRequest(BaseModel):
     """
-    Schema for basic profile creation (post-auth mandatory step).
+    Schema for basic profile creation (optional post-auth step).
 
     Used in: POST /api/v1/candidates/{id}/basic-profile
+
+    Job category and role are optional; they can be filled later from resume
+    extraction or scripts. Only name and locations are required for minimal profile.
     """
     name: str = Field(
         ...,
@@ -97,13 +117,13 @@ class CandidateBasicProfileRequest(BaseModel):
         description="Current city/area",
         examples=["Mumbai, Maharashtra"],
     )
-    preferred_job_category_id: UUID = Field(
-        ...,
-        description="Preferred job category UUID",
+    preferred_job_category_id: Optional[UUID] = Field(
+        None,
+        description="Preferred job category UUID (optional; can be set later from resume)",
     )
-    preferred_job_role_id: UUID = Field(
-        ...,
-        description="Preferred job role UUID",
+    preferred_job_role_id: Optional[UUID] = Field(
+        None,
+        description="Preferred job role UUID (optional; can be set later from resume)",
     )
     preferred_job_location: str = Field(
         ...,
@@ -217,6 +237,7 @@ class CandidateResponse(BaseModel):
     about: Optional[str] = None
     current_monthly_salary: Optional[float] = None
     profile_status: str
+    is_pro: bool = False
     has_resume: bool = False
     latest_resume_version: Optional[int] = None
     is_active: bool
