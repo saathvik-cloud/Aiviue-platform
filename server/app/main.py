@@ -152,6 +152,10 @@ register_exception_handlers(app)
 from app.shared.health.routes import router as health_router
 app.include_router(health_router)
 
+# Auth routes (JWT authentication)
+from app.shared.auth.routes import router as auth_router
+app.include_router(auth_router)
+
 # Domain routes
 from app.domains.employer.api import router as employer_router
 from app.domains.job.api import router as job_router

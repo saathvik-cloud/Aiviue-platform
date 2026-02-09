@@ -22,6 +22,7 @@ pydantic
 pydantic-settings
 email-validator
 python-dotenv
+PyJWT
 
 # HTTP CLIENT (Async)
 httpx
