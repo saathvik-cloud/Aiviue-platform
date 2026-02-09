@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from app.domains.candidate.models import ( 
     Candidate,
-    CandidateResume,
+    CandidateResume, 
     ResumeStatus,
 )
 from app.shared.exceptions import ConflictError
