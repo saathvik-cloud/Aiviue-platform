@@ -149,7 +149,7 @@ class CandidateChatRepository:
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def update_session(
+    async def update_session( 
         self,
         session_id: UUID,
         title: Optional[str] = None,
