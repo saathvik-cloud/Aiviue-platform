@@ -12,7 +12,7 @@ from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.domains.candidate.models import (
+from app.domains.candidate.models import ( 
     Candidate,
     CandidateResume,
     ResumeStatus,
