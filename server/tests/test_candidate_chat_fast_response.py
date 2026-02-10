@@ -80,6 +80,7 @@ def service(chat_repo):
     return CandidateChatService(
         chat_repo=chat_repo,
         candidate_repo=MagicMock(),
+        candidate_service=MagicMock(),
         job_master_repo=MagicMock(),
         resume_builder=MagicMock(),
         resume_extractor=MagicMock(),

@@ -1,9 +1,11 @@
 """
-Candidate chat: one-time free AIVI bot resume and upgrade gate.
+Candidate chat: AIVI bot gate (is_pro + resume_remaining_count).
+
+Gate allows when is_pro or resume_remaining_count > 0; blocks with 403 UPGRADE_REQUIRED
+when is_pro is False and resume_remaining_count <= 0.
 
 Scenarios:
-- New user (free): first resume_creation session → 201; after one completed aivi_bot resume,
-  second resume_creation (new session) → 403 UPGRADE_REQUIRED.
+- New user (free): resume_remaining_count=1 → first resume_creation allowed; set to 0 → 403.
 - Pro user: multiple resume_creation sessions → always 201.
 - resume_upload: always allowed for any user (no gate).
 """
@@ -63,12 +65,12 @@ def test_new_user_first_resume_creation_session_succeeds(api_client, candidate_i
     assert "id" in data
 
 
-def test_new_user_second_resume_creation_after_completed_bot_resume_returns_403(
+def test_new_user_second_resume_creation_when_remaining_zero_returns_403(
     api_client, candidate_id_and_headers, sync_db_helpers
 ):
-    """Free user who already has one completed aivi_bot resume: second resume_creation → 403 UPGRADE_REQUIRED."""
+    """Free user with resume_remaining_count=0: resume_creation → 403 UPGRADE_REQUIRED."""
     candidate_id, headers = candidate_id_and_headers
-    sync_db_helpers.insert_completed_aivi_bot_resume(candidate_id)
+    sync_db_helpers.set_candidate_resume_remaining_count(candidate_id, 0)
 
     r = _create_session(api_client, candidate_id, headers, session_type="resume_creation", force_new=True)
     assert r.status_code == 403, r.text
@@ -82,10 +84,10 @@ def test_new_user_second_resume_creation_after_completed_bot_resume_returns_403(
 def test_pro_user_multiple_resume_creation_sessions_succeed(
     api_client, candidate_id_and_headers, sync_db_helpers
 ):
-    """Pro user: can create multiple resume_creation sessions even after having completed aivi_bot resumes."""
+    """Pro user: can create multiple resume_creation sessions even with resume_remaining_count=0."""
     candidate_id, headers = candidate_id_and_headers
     sync_db_helpers.set_candidate_is_pro(candidate_id, is_pro=True)
-    sync_db_helpers.insert_completed_aivi_bot_resume(candidate_id)
+    sync_db_helpers.set_candidate_resume_remaining_count(candidate_id, 0)
 
     r1 = _create_session(api_client, candidate_id, headers, session_type="resume_creation", force_new=True)
     assert r1.status_code == 201, r1.text
@@ -106,12 +108,12 @@ def test_resume_upload_always_allowed_free_user(api_client, candidate_id_and_hea
     assert r.json().get("session_type") == "resume_upload"
 
 
-def test_resume_upload_always_allowed_even_with_completed_bot_resume(
+def test_resume_upload_always_allowed_even_when_remaining_zero(
     api_client, candidate_id_and_headers, sync_db_helpers
 ):
-    """Free user who already used their one AIVI bot resume: resume_upload is still allowed (user provides PDF)."""
+    """Free user with resume_remaining_count=0: resume_upload is still allowed (user provides PDF)."""
     candidate_id, headers = candidate_id_and_headers
-    sync_db_helpers.insert_completed_aivi_bot_resume(candidate_id)
+    sync_db_helpers.set_candidate_resume_remaining_count(candidate_id, 0)
 
     r = _create_session(api_client, candidate_id, headers, session_type="resume_upload", force_new=False)
     assert r.status_code == 201, r.text
@@ -134,19 +136,19 @@ def test_existing_active_resume_creation_session_returned_no_gate(api_client, ca
 
 # ==================== GATE ON "BUILD FROM SCRATCH" (SEND MESSAGE) ====================
 
-def test_free_user_selecting_build_from_scratch_after_using_one_returns_403(
+def test_free_user_selecting_build_from_scratch_when_remaining_zero_returns_403(
     api_client, candidate_id_and_headers, sync_db_helpers
 ):
     """
-    Free user who already has one completed aivi_bot resume: they have an active session
-    at CHOOSE_METHOD; when they select 'Create with AIVI Bot', send_message returns 403 UPGRADE_REQUIRED.
+    Free user with resume_remaining_count=0: active session at CHOOSE_METHOD;
+    when they select 'Create with AIVI Bot', send_message returns 403 UPGRADE_REQUIRED.
     """
     candidate_id, headers = candidate_id_and_headers
     r = _create_session(api_client, candidate_id, headers, session_type="resume_creation", force_new=False)
     assert r.status_code == 201, r.text
     session_id = r.json()["id"]
 
-    sync_db_helpers.insert_completed_aivi_bot_resume(candidate_id)
+    sync_db_helpers.set_candidate_resume_remaining_count(candidate_id, 0)
 
     msg_resp = api_client.post(
         f"{API_CANDIDATE_CHAT_SESSIONS}/{session_id}/messages",

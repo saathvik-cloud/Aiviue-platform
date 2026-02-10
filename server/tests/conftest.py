@@ -262,6 +262,29 @@ def sync_db_helpers(sync_db_engine):
                 )
                 conn.commit()
 
+        def set_candidate_resume_remaining_count(self, candidate_id: str, count: int) -> None:
+            """Set candidate resume_remaining_count (for AIVI gate tests)."""
+            with self.engine.connect() as conn:
+                conn.execute(
+                    text(
+                        "UPDATE candidates SET resume_remaining_count = :count WHERE id = CAST(:id AS uuid)"
+                    ),
+                    {"id": candidate_id, "count": count},
+                )
+                conn.commit()
+
+        def get_candidate_resume_remaining_count(self, candidate_id: str) -> int | None:
+            """Get candidate resume_remaining_count (for assertions)."""
+            with self.engine.connect() as conn:
+                r = conn.execute(
+                    text(
+                        "SELECT resume_remaining_count FROM candidates WHERE id = CAST(:id AS uuid)"
+                    ),
+                    {"id": candidate_id},
+                )
+                row = r.fetchone()
+                return row[0] if row else None
+
     return SyncDBHelpers(sync_db_engine)
 
 

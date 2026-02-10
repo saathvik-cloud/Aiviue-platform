@@ -4,8 +4,9 @@ Job Master Domain Repository for Aiviue Platform.
 Database operations for job categories, roles, and question templates.
 """
 
+import re
 from typing import Optional, List
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,7 @@ from app.domains.job_master.models import (
     FallbackResumeQuestion,
     JobCategory,
     JobRole,
+    JobType,
     RoleQuestionTemplate,
     job_category_role_association,
 )
@@ -22,6 +24,20 @@ from app.shared.logging import get_logger
 
 
 logger = get_logger(__name__)
+
+
+def role_name_to_slug(name: str) -> str:
+    """
+    Normalize a role name to a slug matching backend/seed pattern.
+    Lowercase, replace non-alphanumeric with hyphens, collapse hyphens.
+    E.g. "Back End Developer" -> "back-end-developer".
+    """
+    if not name or not name.strip():
+        return ""
+    s = name.strip().lower()
+    s = re.sub(r"[^a-z0-9\s-]", "", s)
+    s = re.sub(r"[\s_-]+", "-", s).strip("-")
+    return s or "custom-role"
 
 
 class JobMasterRepository:
@@ -187,6 +203,55 @@ class JobMasterRepository:
 
         result = await self.db.execute(query)
         return list(result.scalars().unique().all())
+
+    async def get_or_create_role_for_category(
+        self,
+        role_name: str,
+        category_id: UUID,
+    ) -> JobRole:
+        """
+        Get an existing role by normalized slug, or create a new one and link to category.
+        Used for custom role text from the frontend; slug matches seed pattern.
+        """
+        name = role_name.strip()[:255] if role_name else "Custom Role"
+        slug = role_name_to_slug(name) or "custom-role"
+        existing = await self.get_role_by_slug(slug, include_templates=False)
+        if existing:
+            # Ensure role is linked to this category
+            result = await self.db.execute(
+                select(job_category_role_association).where(
+                    and_(
+                        job_category_role_association.c.role_id == existing.id,
+                        job_category_role_association.c.category_id == category_id,
+                    )
+                )
+            )
+            if result.scalar_one_or_none() is None:
+                await self.db.execute(
+                    job_category_role_association.insert().values(
+                        category_id=category_id,
+                        role_id=existing.id,
+                    )
+                )
+            return existing
+        # Create new role with unique slug (base + short uuid) to avoid conflicts
+        unique_slug = f"{slug}-{uuid4().hex[:8]}"
+        role = JobRole(
+            name=name,
+            slug=unique_slug,
+            job_type=JobType.WHITE_COLLAR,
+            is_active=True,
+        )
+        self.db.add(role)
+        await self.db.flush()
+        await self.db.execute(
+            job_category_role_association.insert().values(
+                category_id=category_id,
+                role_id=role.id,
+            )
+        )
+        logger.info("Created custom job role: %s (slug=%s)", name, unique_slug)
+        return role
 
     # ==================== QUESTION TEMPLATE OPERATIONS ====================
 

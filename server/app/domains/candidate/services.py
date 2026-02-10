@@ -21,6 +21,7 @@ from app.domains.candidate.models import (
     ResumeStatus,
 )
 from app.domains.candidate.repository import CandidateRepository
+from app.domains.job_master.repository import JobMasterRepository
 from app.domains.candidate.schemas import (
     CandidateAuthResponse,
     CandidateBasicProfileRequest,
@@ -246,11 +247,21 @@ class CandidateService:
             "preferred_job_location": normalize_location(request.preferred_job_location) or request.preferred_job_location.strip(),
             "profile_status": ProfileStatus.COMPLETE,  # Allow dashboard/chat access
         }
-        # Optional: set category/role only if provided
         if request.preferred_job_category_id is not None:
             update_data["preferred_job_category_id"] = request.preferred_job_category_id
         if request.preferred_job_role_id is not None:
             update_data["preferred_job_role_id"] = request.preferred_job_role_id
+        elif getattr(request, "preferred_job_role_custom", None) and (request.preferred_job_role_custom or "").strip():
+            custom = (request.preferred_job_role_custom or "").strip()
+            category_id = request.preferred_job_category_id
+            if not category_id:
+                raise ValidationError(
+                    message="preferred_job_category_id is required when using preferred_job_role_custom",
+                    error_code="VALIDATION_ERROR",
+                )
+            job_master_repo = JobMasterRepository(self.session)
+            role = await job_master_repo.get_or_create_role_for_category(custom, category_id)
+            update_data["preferred_job_role_id"] = role.id
 
         updated = await self.repository.update(
             candidate_id,
@@ -302,6 +313,20 @@ class CandidateService:
                         update_data[field] = value.strip()
                 else:
                     update_data[field] = value
+
+        # Resolve custom role text to a role ID (get or create) when provided
+        if getattr(request, "preferred_job_role_custom", None) and (request.preferred_job_role_custom or "").strip():
+            if update_data.get("preferred_job_role_id") is None:
+                custom = (request.preferred_job_role_custom or "").strip()
+                category_id = update_data.get("preferred_job_category_id") or candidate.preferred_job_category_id
+                if not category_id:
+                    raise ValidationError(
+                        message="preferred_job_category_id is required when using preferred_job_role_custom",
+                        error_code="VALIDATION_ERROR",
+                    )
+                job_master_repo = JobMasterRepository(self.session)
+                role = await job_master_repo.get_or_create_role_for_category(custom, category_id)
+                update_data["preferred_job_role_id"] = role.id
 
         # Handle languages_known (list -> JSON)
         if request.languages_known is not None:
@@ -378,6 +403,23 @@ class CandidateService:
                 error_code="RESUME_NOT_FOUND",
             )
         return CandidateResumeResponse.model_validate(resume)
+
+    async def decrement_resume_remaining_count(self, candidate_id: UUID) -> None:
+        """
+        Decrement free AIVI bot uses (for non-pro candidates) when they save an AIVI resume.
+        No-op if candidate is pro or count already 0.
+        """
+        candidate = await self.repository.get_by_id(candidate_id)
+        if not candidate or getattr(candidate, "is_pro", False):
+            return
+        current = getattr(candidate, "resume_remaining_count", 1)
+        new_count = max(0, current - 1)
+        await self.repository.update(
+            candidate_id,
+            {"resume_remaining_count": new_count},
+            candidate.version,
+        )
+        await self.session.commit()
 
 
 def get_candidate_service(session: AsyncSession) -> CandidateService:

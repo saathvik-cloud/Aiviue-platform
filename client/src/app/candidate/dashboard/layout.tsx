@@ -70,7 +70,7 @@ export default function CandidateDashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { candidate, isAuthenticated, clearCandidate, isLoading, setCandidate } =
+  const { candidate, isAuthenticated, logout, isLoading, setCandidate, _hasHydrated } =
     useCandidateAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -83,12 +83,13 @@ export default function CandidateDashboardLayout({
     if (apiCandidate) setCandidate(apiCandidate);
   }, [apiCandidate, setCandidate]);
 
-  // Protected route: redirect to login if not authenticated
+  // Protected route: redirect to login only after store has rehydrated from localStorage
+  // (avoids redirect on refresh before persisted auth is restored)
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (_hasHydrated && !isLoading && !isAuthenticated) {
       router.push(ROUTES.CANDIDATE_LOGIN);
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [_hasHydrated, isAuthenticated, isLoading, router]);
 
   // Gate: until candidate has completed a resume (built with AIVI or uploaded), only the Resume/Chat page is allowed.
   // Use API candidate when available so we don't redirect with stale has_resume.
@@ -108,12 +109,12 @@ export default function CandidateDashboardLayout({
   }, [mustCompleteResumeFirst, router]);
 
   const handleLogout = () => {
-    clearCandidate();
+    logout();
     router.push(ROUTES.CANDIDATE_HOME);
   };
 
-  // Loading state while hydrating auth from localStorage
-  if (isLoading) {
+  // Loading state until store has rehydrated or auth check is done (keeps user in app on refresh)
+  if (!_hasHydrated || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center gradient-bg">
         <div

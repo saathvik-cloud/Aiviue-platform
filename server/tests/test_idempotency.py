@@ -64,6 +64,7 @@ def chat_service_mocks():
     return {
         "chat_repo": chat_repo,
         "candidate_repo": candidate_repo,
+        "candidate_service": MagicMock(),
         "job_master_repo": job_master_repo,
         "resume_builder": resume_builder,
         "resume_extractor": resume_extractor,
@@ -158,6 +159,11 @@ async def test_resume_confirmation_no_resume_id_calls_compile(
     )
     chat_service_mocks["chat_repo"].update_session = AsyncMock(return_value=None)
     chat_service_mocks["chat_repo"].add_messages_batch = AsyncMock(return_value=[])
+    # Profile sync after resume save awaits these
+    chat_service_mocks["candidate_repo"].get_by_id = AsyncMock(
+        return_value=MagicMock(version=1)
+    )
+    chat_service_mocks["candidate_service"].update_profile = AsyncMock(return_value=None)
 
     service = CandidateChatService(**chat_service_mocks)
 

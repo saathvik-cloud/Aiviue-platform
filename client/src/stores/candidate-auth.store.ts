@@ -2,6 +2,7 @@ import {
   candidateLogin,
   candidateLogout,
   getAccessToken,
+  refreshAccessToken,
   validateToken
 } from '@/lib/auth';
 import { getCandidateById } from '@/services/candidate.service';
@@ -75,7 +76,11 @@ export const useCandidateAuthStore = create<CandidateAuthState>()(
 
         if (token) {
           try {
-            const validation = await validateToken(token);
+            let validation = await validateToken(token);
+            if (!validation.valid) {
+              const newToken = await refreshAccessToken('candidate');
+              if (newToken) validation = await validateToken(newToken);
+            }
             if (validation.valid && validation.user_id) {
               if (!get().candidate) {
                 try {
@@ -93,6 +98,12 @@ export const useCandidateAuthStore = create<CandidateAuthState>()(
             }
           } catch (err) {
             console.error('Candidate auth check failed:', err);
+            // On network error keep rehydrated session so refresh doesn't log user out
+            if (get().candidate && get().isAuthenticated) {
+              set({ isLoading: false });
+              return;
+            }
+            get().logout();
           }
         } else {
           if (get().isAuthenticated) {

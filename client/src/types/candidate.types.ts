@@ -36,8 +36,10 @@ export interface Candidate extends BaseEntity {
   has_resume?: boolean;
   /** Version of latest resume, if any. From API when available. */
   latest_resume_version?: number;
-  /** Pro: unlimited AIVI bot resumes; free: one-time build with AIVI. */
+  /** Pro: unlimited AIVI bot resumes; free: gated by resume_remaining_count. */
   is_pro?: boolean;
+  /** Remaining free AIVI bot uses; 0 = upgrade required. Default 1. */
+  resume_remaining_count?: number;
 }
 
 // ==================== CANDIDATE RESUME ====================
@@ -69,11 +71,18 @@ export interface CandidateLoginRequest {
   mobile: string;
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isUuid(s: string | undefined): boolean {
+  return !!s && UUID_REGEX.test(s.trim());
+}
+
 export interface CandidateBasicProfileRequest {
   name: string;
   current_location?: string;
   preferred_job_category_id?: string;
   preferred_job_role_id?: string;
+  preferred_job_role_custom?: string;
   preferred_job_location?: string;
 }
 
@@ -85,6 +94,7 @@ export interface CandidateUpdateRequest {
   current_location?: string;
   preferred_job_category_id?: string;
   preferred_job_role_id?: string;
+  preferred_job_role_custom?: string;
   preferred_job_location?: string;
   languages_known?: string[];
   about?: string;

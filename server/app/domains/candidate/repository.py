@@ -293,15 +293,22 @@ class CandidateRepository:
         return result.scalar_one_or_none()
 
     async def count_completed_aivi_bot_resumes(self, candidate_id: UUID) -> int:
-        """Count completed resumes created via AIVI bot (for one-time-free gate)."""
+        """
+        Count resumes ever created via AIVI bot (for one-time-free gate).
+        Counts both COMPLETED and INVALIDATED so that saving a PDF (which invalidates
+        the previous AIVI resume) does not reset the gate and allow another free use.
+        """
         query = (
             select(func.count())
             .select_from(CandidateResume)
             .where(
                 and_(
                     CandidateResume.candidate_id == candidate_id,
-                    CandidateResume.status == ResumeStatus.COMPLETED,
                     CandidateResume.source == ResumeSource.AIVI_BOT,
+                    CandidateResume.status.in_([
+                        ResumeStatus.COMPLETED,
+                        ResumeStatus.INVALIDATED,
+                    ]),
                 )
             )
         )

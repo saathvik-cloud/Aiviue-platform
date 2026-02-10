@@ -203,8 +203,9 @@ class ResumeBuilderService:
                 extra={"candidate_id": str(candidate_id)},
             )
 
-        # Step 3b: If no pdf_url (e.g. aivi_bot flow), generate PDF from JSON and upload
-        if pdf_url is None:
+        # Step 3b: Generate PDF only for aivi_bot (build from scratch). For pdf_upload, always use
+        # the user's uploaded file URL — never generate a new PDF from JSON.
+        if pdf_url is None and source != ResumeSource.PDF_UPLOAD:
             try:
                 pdf_bytes = build_resume_pdf(structured_data)
                 generated_url = upload_resume_pdf(pdf_bytes, candidate_id, new_version)
@@ -212,6 +213,11 @@ class ResumeBuilderService:
                     pdf_url = generated_url
             except Exception as e:
                 logger.warning("Resume PDF generation/upload failed: %s", e)
+        elif source == ResumeSource.PDF_UPLOAD and (not pdf_url or not str(pdf_url).strip()):
+            logger.warning(
+                "pdf_upload flow but no uploaded_pdf_url in context; download will be unavailable",
+                extra={"candidate_id": str(candidate_id)},
+            )
 
         # Step 4: Create new resume record (pdf_url: uploaded file URL or generated PDF URL)
         resume_record = await self._candidate_repo.create_resume({

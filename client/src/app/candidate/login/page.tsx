@@ -22,12 +22,10 @@ export default function CandidateLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Redirect if already authenticated (to dashboard or complete-profile if basic)
+  // Redirect if already authenticated — always to dashboard (no profile-completion gate)
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      const c = useCandidateAuthStore.getState().candidate;
-      if (c?.profile_status === 'complete') router.push(ROUTES.CANDIDATE_DASHBOARD);
-      else router.push(ROUTES.CANDIDATE_DASHBOARD_COMPLETE_PROFILE);
+      router.push(ROUTES.CANDIDATE_DASHBOARD);
     }
   }, [isAuthenticated, authLoading, router]);
 
@@ -55,8 +53,7 @@ export default function CandidateLoginPage() {
       const candidate = useCandidateAuthStore.getState().candidate;
       if (candidate) {
         toast.success(`Welcome back, ${candidate.name}!`);
-        if (candidate.profile_status === 'complete') router.push(ROUTES.CANDIDATE_DASHBOARD);
-        else router.push(ROUTES.CANDIDATE_DASHBOARD_COMPLETE_PROFILE);
+        router.push(ROUTES.CANDIDATE_DASHBOARD);
       }
     } catch (err) {
       const message = getErrorMessage(err);

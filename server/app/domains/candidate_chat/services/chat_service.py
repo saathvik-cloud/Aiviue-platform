@@ -22,6 +22,8 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.candidate.repository import CandidateRepository
+from app.domains.candidate.schemas import CandidateUpdateRequest
+from app.domains.candidate.services import CandidateService
 from app.domains.candidate_chat.services.chat_constants import (
     EDIT_FIELD_ALIASES,
     WELCOME_MESSAGES,
@@ -76,6 +78,76 @@ def _has_known_fallback_role(collected_data: dict) -> bool:
         return False
 
 
+def _is_choosing_upload(content: str, message_data: dict) -> bool:
+    """True if the user message indicates they want to upload a resume (not use AIVI bot)."""
+    button_id = (message_data.get("button_id") or "").strip().lower()
+    if button_id in ("upload_pdf", "upload", "pdf", "upload_resume"):
+        return True
+    content_lower = (content or "").strip().lower()
+    if "upload" in content_lower and ("resume" in content_lower or "pdf" in content_lower or "my resume" in content_lower):
+        return True
+    if content_lower in ("pdf", "upload"):
+        return True
+    return False
+
+
+def _build_profile_update_from_chat(
+    collected_data: dict, version: int
+) -> Optional[CandidateUpdateRequest]:
+    """
+    Build CandidateUpdateRequest from chat collected_data (same shape as Edit Profile).
+    Used so post-resume profile sync goes through CandidateService.update_profile.
+    """
+    from datetime import date as date_type, datetime as dt_type
+
+    preferred_job_category_id: Optional[UUID] = None
+    preferred_job_role_id: Optional[UUID] = None
+    languages_known: Optional[List[str]] = None
+    date_of_birth: Optional[date_type] = None
+
+    cat_id = collected_data.get("job_category_id")
+    if cat_id and str(cat_id).strip().lower() != "custom":
+        try:
+            preferred_job_category_id = UUID(str(cat_id))
+        except (ValueError, TypeError):
+            pass
+
+    role_id_val = collected_data.get("job_role_id")
+    if role_id_val and str(role_id_val).strip().lower() != "custom":
+        try:
+            preferred_job_role_id = UUID(str(role_id_val))
+        except (ValueError, TypeError):
+            pass
+
+    langs = collected_data.get("languages_known") or collected_data.get("languages_blue")
+    if langs:
+        if isinstance(langs, str):
+            langs = [s.strip() for s in langs.split(",") if s.strip()]
+        if isinstance(langs, list) and langs:
+            languages_known = langs
+
+    dob_val = collected_data.get("date_of_birth")
+    if dob_val:
+        try:
+            if isinstance(dob_val, str):
+                date_of_birth = dt_type.strptime(dob_val, "%Y-%m-%d").date()
+            elif isinstance(dob_val, date_type):
+                date_of_birth = dob_val
+        except (ValueError, TypeError):
+            pass
+
+    if preferred_job_category_id is None and preferred_job_role_id is None and languages_known is None and date_of_birth is None:
+        return None
+
+    return CandidateUpdateRequest(
+        version=version,
+        preferred_job_category_id=preferred_job_category_id,
+        preferred_job_role_id=preferred_job_role_id,
+        languages_known=languages_known,
+        date_of_birth=date_of_birth,
+    )
+
+
 # ==================== CHAT SERVICE ====================
 
 class CandidateChatService:
@@ -103,6 +175,7 @@ class CandidateChatService:
         self,
         chat_repo: CandidateChatRepository,
         candidate_repo: CandidateRepository,
+        candidate_service: CandidateService,
         job_master_repo: JobMasterRepository,
         resume_builder: ResumeBuilderService,
         resume_extractor: ResumeExtractionService,
@@ -110,6 +183,7 @@ class CandidateChatService:
     ) -> None:
         self._chat_repo = chat_repo
         self._candidate_repo = candidate_repo
+        self._candidate_service = candidate_service
         self._job_master_repo = job_master_repo
         self._resume_builder = resume_builder
         self._resume_extractor = resume_extractor
@@ -185,20 +259,17 @@ class CandidateChatService:
             updated = await self._chat_repo.get_session_by_id(existing_session.id)
             return updated, welcome_back
 
-        # ==================== ONE-TIME FREE GATE (resume_creation only) ====================
-        # Non-pro candidates get one free AIVI bot resume; after that they must upgrade.
+        # ==================== AIVI BOT GATE (resume_creation only) ====================
+        # Allow when is_pro or resume_remaining_count > 0. Else upgrade required.
         if session_type == "resume_creation":
             is_pro = getattr(candidate, "is_pro", False)
-            if not is_pro:
-                aivi_bot_count = await self._candidate_repo.count_completed_aivi_bot_resumes(
-                    candidate_id
+            remaining = getattr(candidate, "resume_remaining_count", 1)
+            if not is_pro and remaining <= 0:
+                raise ForbiddenError(
+                    message="Upgrade to premium to create more resumes with AIVI bot.",
+                    error_code="UPGRADE_REQUIRED",
+                    context={"candidate_id": str(candidate_id)},
                 )
-                if aivi_bot_count >= 1:
-                    raise ForbiddenError(
-                        message="Upgrade to premium to create multiple resumes with AIVI bot.",
-                        error_code="UPGRADE_REQUIRED",
-                        context={"candidate_id": str(candidate_id)},
-                    )
 
         # ==================== CREATE NEW SESSION ====================
         # Build initial context
@@ -270,6 +341,26 @@ class CandidateChatService:
                 message="This chat session is no longer active.",
                 error_code="SESSION_NOT_ACTIVE",
             )
+
+        # Gate: if already inside AIVI bot flow but user has no remaining count, block further messages.
+        # Exception: allow "Upload My Resume" so they can switch to PDF upload (always free).
+        ctx = self._copy_context(session)
+        msg_data = message_data or {}
+        if ctx.get("method") == "aivi_bot" and session.current_step in (
+            ChatStep.ASKING_QUESTIONS,
+            ChatStep.RESUME_PREVIEW,
+        ):
+            if not _is_choosing_upload(content, msg_data):
+                candidate = await self._candidate_repo.get_by_id(session.candidate_id)
+                if candidate:
+                    is_pro = getattr(candidate, "is_pro", False)
+                    remaining = getattr(candidate, "resume_remaining_count", 1)
+                    if not is_pro and remaining <= 0:
+                        raise ForbiddenError(
+                            message="You've used your free AIVI build. Upgrade to Pro to create more resumes with AIVI.",
+                            error_code="UPGRADE_REQUIRED",
+                            context={"candidate_id": str(session.candidate_id)},
+                        )
 
         # Store user message
         user_msg = await self._chat_repo.add_message(
@@ -397,20 +488,17 @@ class CandidateChatService:
                 },
             }]
 
-        else:  # aivi_bot — enforce one-time-free gate (same as create_session)
+        else:  # aivi_bot — enforce gate (is_pro or resume_remaining_count > 0)
             candidate = await self._candidate_repo.get_by_id(session.candidate_id)
             if candidate:
                 is_pro = getattr(candidate, "is_pro", False)
-                if not is_pro:
-                    aivi_bot_count = await self._candidate_repo.count_completed_aivi_bot_resumes(
-                        session.candidate_id
+                remaining = getattr(candidate, "resume_remaining_count", 1)
+                if not is_pro and remaining <= 0:
+                    raise ForbiddenError(
+                        message="To create another resume with AIVI bot, upgrade to Pro.",
+                        error_code="UPGRADE_REQUIRED",
+                        context={"candidate_id": str(session.candidate_id)},
                     )
-                    if aivi_bot_count >= 1:
-                        raise ForbiddenError(
-                            message="To create another resume with AIVI bot, upgrade to Pro.",
-                            error_code="UPGRADE_REQUIRED",
-                            context={"candidate_id": str(session.candidate_id)},
-                        )
 
             ctx["step"] = ChatStep.ASKING_QUESTIONS
             await self._chat_repo.update_session(session.id, context_data=ctx)
@@ -631,6 +719,22 @@ class CandidateChatService:
         """
         ctx = self._copy_context(session)
         collected_data = ctx.get("collected_data", {})
+
+        # ==================== SWITCH TO UPLOAD: user chose "Upload My Resume" from AIVI flow ====================
+        if ctx.get("method") == "aivi_bot" and _is_choosing_upload(content, data):
+            ctx["method"] = "pdf_upload"
+            ctx["step"] = ChatStep.UPLOAD_RESUME
+            await self._chat_repo.update_session(session.id, context_data=ctx)
+            return [{
+                "role": CandidateMessageRole.BOT,
+                "content": "Great! Please upload your resume PDF (max 2MB). I'll extract the information and ask for any missing details.",
+                "message_type": CandidateMessageType.INPUT_FILE,
+                "message_data": {
+                    "question_key": "resume_pdf",
+                    "accept": ".pdf",
+                    "max_size_mb": 2,
+                },
+            }]
 
         # ==================== EDIT RESUME: user just typed which field to change ====================
         if ctx.get("awaiting_edit_field_name") and not data.get("question_key"):
@@ -1209,6 +1313,23 @@ class CandidateChatService:
         """
         button_id = data.get("button_id", "").lower()
         content_lower = content.strip().lower()
+        ctx = self._copy_context(session)
+
+        # ==================== SWITCH TO UPLOAD: user chose "Upload My Resume" from preview ====================
+        if ctx.get("method") == "aivi_bot" and _is_choosing_upload(content, data):
+            ctx["method"] = "pdf_upload"
+            ctx["step"] = ChatStep.UPLOAD_RESUME
+            await self._chat_repo.update_session(session.id, context_data=ctx)
+            return [{
+                "role": CandidateMessageRole.BOT,
+                "content": "Great! Please upload your resume PDF (max 2MB). I'll extract the information and ask for any missing details.",
+                "message_type": CandidateMessageType.INPUT_FILE,
+                "message_data": {
+                    "question_key": "resume_pdf",
+                    "accept": ".pdf",
+                    "max_size_mb": 2,
+                },
+            }]
 
         # Determine user choice
         confirm_keywords = {"confirm_resume", "yes", "save", "confirm", "ok", "done"}
@@ -1272,8 +1393,17 @@ class CandidateChatService:
                     ]
 
             # Determine resume source and uploaded PDF URL (for download link)
+            # For pdf_upload: use the user's uploaded file URL only — never generate a new PDF.
             source = "pdf_upload" if method == "pdf_upload" else "aivi_bot"
-            uploaded_pdf_url = ctx.get("uploaded_pdf_url") if source == "pdf_upload" else None
+            uploaded_pdf_url = None
+            if source == "pdf_upload":
+                raw_url = ctx.get("uploaded_pdf_url")
+                uploaded_pdf_url = (raw_url and str(raw_url).strip()) or None
+                if not uploaded_pdf_url:
+                    logger.warning(
+                        "pdf_upload confirm but uploaded_pdf_url missing in context; download may be unavailable",
+                        extra={"session_id": str(session.id), "candidate_id": str(session.candidate_id)},
+                    )
 
             try:
                 # ==================== COMPILE & PERSIST RESUME ====================
@@ -1290,70 +1420,44 @@ class CandidateChatService:
                 resume_id = result["resume_id"]
                 version = result["version"]
 
-                # ==================== UPDATE CANDIDATE PROFILE (sync chatbot data → profile) ====================
-                profile_update: dict = {}
-
-                # 1. Job Category
-                cat_id = collected_data.get("job_category_id")
-                if cat_id and str(cat_id).strip().lower() != "custom":
-                    try:
-                        profile_update["preferred_job_category_id"] = UUID(str(cat_id))
-                    except (ValueError, TypeError):
-                        pass
-
-                # 2. Job Role
-                role_id_val = collected_data.get("job_role_id")
-                if role_id_val and str(role_id_val).strip().lower() != "custom":
-                    try:
-                        profile_update["preferred_job_role_id"] = UUID(str(role_id_val))
-                    except (ValueError, TypeError):
-                        pass
-
-                # 3. Languages Known (general key or blue-collar key)
-                languages = collected_data.get("languages_known") or collected_data.get("languages_blue")
-                if languages:
-                    # Normalize: ensure it's a list of strings
-                    if isinstance(languages, str):
-                        languages = [lang.strip() for lang in languages.split(",") if lang.strip()]
-                    if isinstance(languages, list) and languages:
-                        profile_update["languages_known"] = languages
-
-                # 4. Date of Birth
-                dob_val = collected_data.get("date_of_birth")
-                if dob_val:
-                    try:
-                        from datetime import date as date_type, datetime as dt_type
-                        if isinstance(dob_val, str):
-                            # QuestionEngine returns ISO format (YYYY-MM-DD)
-                            parsed_dob = dt_type.strptime(dob_val, "%Y-%m-%d").date()
-                        elif isinstance(dob_val, date_type):
-                            parsed_dob = dob_val
-                        else:
-                            parsed_dob = None
-                        if parsed_dob:
-                            profile_update["date_of_birth"] = parsed_dob
-                    except (ValueError, TypeError):
-                        pass
-
-                # Persist all collected profile fields
-                if profile_update:
-                    try:
-                        candidate = await self._candidate_repo.get_by_id(session.candidate_id)
-                        if candidate:
-                            await self._candidate_repo.update(
-                                session.candidate_id,
-                                profile_update,
-                                candidate.version,
-                            )
+                # ==================== UPDATE CANDIDATE PROFILE (same path as Edit Profile page) ====================
+                # Use CandidateService.update_profile so category/role/DOB/languages sync exactly like profile save.
+                candidate = await self._candidate_repo.get_by_id(session.candidate_id)
+                if candidate:
+                    profile_request = _build_profile_update_from_chat(collected_data, candidate.version)
+                    if profile_request is not None:
+                        try:
                             logger.info(
-                                "Updated candidate profile from chat: %s",
-                                list(profile_update.keys()),
+                                "Syncing profile from chat (category=%s, role=%s, keys=%s)",
+                                collected_data.get("job_category_id"),
+                                collected_data.get("job_role_id"),
+                                [k for k, v in profile_request.model_dump(exclude_unset=True).items() if v is not None],
                                 extra={"candidate_id": str(session.candidate_id)},
                             )
-                    except Exception as profile_err:
-                        logger.warning(
-                            "Failed to update candidate profile from chat: %s",
-                            profile_err,
+                            await self._candidate_service.update_profile(session.candidate_id, profile_request)
+                            logger.info(
+                                "Successfully updated candidate profile from chat",
+                                extra={"candidate_id": str(session.candidate_id)},
+                            )
+                        except Exception as profile_err:
+                            logger.error(
+                                "Failed to update candidate profile from chat: %s",
+                                profile_err,
+                                exc_info=True,
+                                extra={"candidate_id": str(session.candidate_id)},
+                            )
+
+                # Decrement free AIVI uses when non-pro candidate saves an AIVI-built resume
+                if source == "aivi_bot":
+                    try:
+                        await self._candidate_service.decrement_resume_remaining_count(
+                            session.candidate_id
+                        )
+                    except Exception as dec_err:
+                        logger.error(
+                            "Failed to decrement resume_remaining_count: %s",
+                            dec_err,
+                            exc_info=True,
                             extra={"candidate_id": str(session.candidate_id)},
                         )
 
@@ -1868,12 +1972,14 @@ def get_candidate_chat_service(session: AsyncSession) -> CandidateChatService:
     """Factory function to create CandidateChatService with all dependencies."""
     chat_repo = CandidateChatRepository(session)
     candidate_repo = CandidateRepository(session)
+    candidate_service = CandidateService(candidate_repo, session)
     job_master_repo = JobMasterRepository(session)
     resume_builder = ResumeBuilderService(candidate_repo, session)
     resume_extractor = get_resume_extractor()
     return CandidateChatService(
         chat_repo=chat_repo,
         candidate_repo=candidate_repo,
+        candidate_service=candidate_service,
         job_master_repo=job_master_repo,
         resume_builder=resume_builder,
         resume_extractor=resume_extractor,

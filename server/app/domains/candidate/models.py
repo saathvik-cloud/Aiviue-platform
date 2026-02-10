@@ -177,12 +177,19 @@ class Candidate(Base, FullAuditMixin):
         nullable=False,
         comment="Profile onboarding: basic, complete (distinct from having a resume)",
     )
-    # Paid/pro: if True, candidate can create multiple resumes via AIVI bot; else one-time free only.
+    # Paid/pro: if True, candidate can create multiple resumes via AIVI bot; else gated by resume_remaining_count.
     is_pro: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
         nullable=False,
         comment="Paid/pro customer: can create multiple resumes with AIVI bot",
+    )
+    # Free-tier AIVI bot uses: 1 = one free use, 0 = must upgrade. Decremented when an AIVI resume is saved.
+    resume_remaining_count: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+        nullable=False,
+        comment="Remaining free AIVI bot resume builds; 0 = upgrade required",
     )
 
     # ==================== RELATIONSHIPS ====================

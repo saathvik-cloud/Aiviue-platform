@@ -15,6 +15,7 @@ import { useJobCategories, useRolesByCategory } from '@/lib/hooks';
 import { createBasicProfile } from '@/services';
 import { useCandidateAuthStore } from '@/stores';
 import { getErrorMessage } from '@/lib/api';
+import { isUuid } from '@/types';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -122,13 +123,22 @@ export default function CompleteProfilePage() {
       }
       setIsLoading(true);
       try {
-        const updated = await createBasicProfile(candidate.id, {
+        const catId = formData.preferred_job_category_id?.trim();
+        const roleValue = formData.preferred_job_role_id?.trim();
+        const payload: Parameters<typeof createBasicProfile>[1] = {
           name,
           current_location,
-          preferred_job_category_id: formData.preferred_job_category_id,
-          preferred_job_role_id: formData.preferred_job_role_id,
           preferred_job_location,
-        });
+          ...(catId && { preferred_job_category_id: catId }),
+        };
+        if (roleValue) {
+          if (isUuid(roleValue)) {
+            payload.preferred_job_role_id = roleValue;
+          } else {
+            payload.preferred_job_role_custom = roleValue;
+          }
+        }
+        const updated = await createBasicProfile(candidate.id, payload);
         setCandidate(updated);
         if (typeof window !== 'undefined') sessionStorage.removeItem(PREFILL_KEY);
         toast.success('Profile complete! Welcome to your dashboard.');
@@ -222,8 +232,6 @@ export default function CompleteProfilePage() {
               onChange={(v) => setFormData((prev) => ({ ...prev, preferred_job_category_id: v, preferred_job_role_id: '' }))}
               placeholder={categoriesLoading ? 'Loading...' : 'Select a job category'}
               isLoading={categoriesLoading}
-              allowCustom
-              customPlaceholder="Or type your category"
             />
           </div>
 
@@ -233,7 +241,7 @@ export default function CompleteProfilePage() {
               options={roleOptions}
               value={formData.preferred_job_role_id}
               onChange={(v) => setFormData((prev) => ({ ...prev, preferred_job_role_id: v }))}
-              placeholder={rolesLoading ? 'Loading...' : formData.preferred_job_category_id ? 'Select role' : 'Select category first'}
+              placeholder={rolesLoading ? 'Loading...' : formData.preferred_job_category_id ? 'Select or type your role' : 'Select category first'}
               disabled={!formData.preferred_job_category_id}
               isLoading={rolesLoading}
               allowCustom

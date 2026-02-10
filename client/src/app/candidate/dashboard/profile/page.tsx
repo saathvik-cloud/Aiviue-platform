@@ -30,6 +30,7 @@ import { uploadProfilePhoto } from '@/lib/supabase';
 import { getInitials } from '@/lib/utils';
 import { useCandidateAuthStore } from '@/stores';
 import type { CandidateUpdateRequest, JobCategory, JobRole } from '@/types';
+import { isUuid } from '@/types';
 import {
   AlertCircle,
   Briefcase,
@@ -296,13 +297,15 @@ export default function CandidateProfilePage() {
         setIsUploadingPhoto(false);
       }
 
+      const roleVal = formData.preferred_job_role_id?.trim();
       const updateData: CandidateUpdateRequest = {
         name: formData.name,
         email: formData.email || undefined,
         date_of_birth: formData.date_of_birth || undefined,
         current_location: formData.current_location || undefined,
         preferred_job_category_id: formData.preferred_job_category_id || undefined,
-        preferred_job_role_id: formData.preferred_job_role_id || undefined,
+        preferred_job_role_id: roleVal && isUuid(roleVal) ? roleVal : undefined,
+        preferred_job_role_custom: roleVal && !isUuid(roleVal) ? roleVal : undefined,
         preferred_job_location: formData.preferred_job_location || undefined,
         languages_known: formData.languages_known.length > 0 ? formData.languages_known : undefined,
         about: formData.about || undefined,
@@ -707,8 +710,6 @@ export default function CandidateProfilePage() {
             placeholder="Select category"
             disabled={false}
             isLoading={categoriesLoading}
-            allowCustom
-            customPlaceholder="Or type your category"
           />
 
           <ProfileStyleSelect

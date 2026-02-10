@@ -123,8 +123,22 @@ class CandidateBasicProfileRequest(BaseModel):
     )
     preferred_job_role_id: Optional[UUID] = Field(
         None,
-        description="Preferred job role UUID (optional; can be set later from resume)",
+        description="Preferred job role UUID (optional; use when selecting from list)",
     )
+    preferred_job_role_custom: Optional[str] = Field(
+        None,
+        max_length=255,
+        description="Custom role text (e.g. 'Python Developer'); normalized and stored like seed roles. Ignored if preferred_job_role_id is set. Requires preferred_job_category_id.",
+    )
+
+    @field_validator("preferred_job_category_id", "preferred_job_role_id", mode="before")
+    @classmethod
+    def empty_str_to_none_uuid(cls, v: object) -> Optional[UUID]:
+        """Coerce empty string to None so clients sending '' do not get 422."""
+        if v is None or (isinstance(v, str) and v.strip() == ""):
+            return None
+        return v  # type: ignore[return-value]
+
     preferred_job_location: str = Field(
         ...,
         min_length=1,
@@ -150,6 +164,7 @@ class CandidateUpdateRequest(BaseModel):
     current_location: Optional[str] = Field(None, max_length=255)
     preferred_job_category_id: Optional[UUID] = None
     preferred_job_role_id: Optional[UUID] = None
+    preferred_job_role_custom: Optional[str] = Field(None, max_length=255, description="Custom role text; normalized like seed roles. Ignored if preferred_job_role_id set.")
     preferred_job_location: Optional[str] = Field(None, max_length=255)
     languages_known: Optional[list[str]] = None
     about: Optional[str] = Field(None, max_length=5000)
@@ -238,6 +253,7 @@ class CandidateResponse(BaseModel):
     current_monthly_salary: Optional[float] = None
     profile_status: str
     is_pro: bool = False
+    resume_remaining_count: int = Field(1, description="Remaining free AIVI bot uses; 0 = upgrade required")
     has_resume: bool = False
     latest_resume_version: Optional[int] = None
     is_active: bool

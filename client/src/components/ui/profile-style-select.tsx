@@ -127,17 +127,19 @@ export function ProfileStyleSelect({
       const target = e.target as Node;
       const inTrigger = dropdownRef.current?.contains(target);
       const inPanel = panelRef.current?.contains(target);
-      if (!inTrigger && !inPanel) {
-        setIsOpen(false);
-        setDropdownPosition(null);
-        if (allowCustom && customInput.trim()) {
-          const match = options.find((o) => optionMatchesInput(o, customInput));
-          if (match) {
-            onChange(match.value);
+        if (!inTrigger && !inPanel) {
+          setIsOpen(false);
+          setDropdownPosition(null);
+          if (allowCustom && customInput.trim()) {
+            const match = options.find((o) => optionMatchesInput(o, customInput));
+            if (match) {
+              onChange(match.value);
+            } else {
+              onChange(customInput.trim());
+            }
             setCustomInput('');
           }
         }
-      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -170,6 +172,11 @@ export function ProfileStyleSelect({
       const match = options.find((o) => optionMatchesInput(o, customInput));
       if (match) {
         handleSelect(match.value);
+      } else {
+        onChange(customInput.trim());
+        setCustomInput('');
+        setIsOpen(false);
+        setDropdownPosition(null);
       }
     }
   };
@@ -195,7 +202,7 @@ export function ProfileStyleSelect({
         >
           <span className="flex items-center gap-2 truncate">
             {icon && <span style={{ color: 'var(--neutral-gray)' }}>{icon}</span>}
-            {selectedOption?.label || placeholder}
+            {selectedOption?.label || (value && String(value).trim() ? value : placeholder)}
           </span>
           {isLoading ? (
             <span className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
