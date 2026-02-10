@@ -130,3 +130,34 @@ def test_existing_active_resume_creation_session_returned_no_gate(api_client, ca
     r2 = _create_session(api_client, candidate_id, headers, session_type="resume_creation", force_new=False)
     assert r2.status_code == 201
     assert r2.json()["id"] == session_id
+
+
+# ==================== GATE ON "BUILD FROM SCRATCH" (SEND MESSAGE) ====================
+
+def test_free_user_selecting_build_from_scratch_after_using_one_returns_403(
+    api_client, candidate_id_and_headers, sync_db_helpers
+):
+    """
+    Free user who already has one completed aivi_bot resume: they have an active session
+    at CHOOSE_METHOD; when they select 'Create with AIVI Bot', send_message returns 403 UPGRADE_REQUIRED.
+    """
+    candidate_id, headers = candidate_id_and_headers
+    r = _create_session(api_client, candidate_id, headers, session_type="resume_creation", force_new=False)
+    assert r.status_code == 201, r.text
+    session_id = r.json()["id"]
+
+    sync_db_helpers.insert_completed_aivi_bot_resume(candidate_id)
+
+    msg_resp = api_client.post(
+        f"{API_CANDIDATE_CHAT_SESSIONS}/{session_id}/messages",
+        json={
+            "content": "Create with AIVI Bot",
+            "message_type": "button_click",
+            "message_data": {"button_id": "create_with_bot"},
+        },
+        headers=headers,
+    )
+    assert msg_resp.status_code == 403, msg_resp.text
+    data = msg_resp.json()
+    assert data.get("error", {}).get("code") == "UPGRADE_REQUIRED"
+    assert "upgrade" in data.get("error", {}).get("message", "").lower()

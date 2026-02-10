@@ -380,7 +380,21 @@ class CandidateChatService:
                 },
             }]
 
-        else:  # aivi_bot
+        else:  # aivi_bot — enforce one-time-free gate (same as create_session)
+            candidate = await self._candidate_repo.get_by_id(session.candidate_id)
+            if candidate:
+                is_pro = getattr(candidate, "is_pro", False)
+                if not is_pro:
+                    aivi_bot_count = await self._candidate_repo.count_completed_aivi_bot_resumes(
+                        session.candidate_id
+                    )
+                    if aivi_bot_count >= 1:
+                        raise ForbiddenError(
+                            message="To create another resume with AIVI bot, upgrade to Pro.",
+                            error_code="UPGRADE_REQUIRED",
+                            context={"candidate_id": str(session.candidate_id)},
+                        )
+
             ctx["step"] = ChatStep.ASKING_QUESTIONS
             await self._chat_repo.update_session(session.id, context_data=ctx)
 

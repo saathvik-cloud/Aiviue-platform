@@ -16,7 +16,7 @@
  * Pattern: Mirrors employer ChatContainer for consistency.
  */
 
-import { isApiError } from '@/lib/api';
+import { getErrorMessage, isApiError } from '@/lib/api';
 import {
     useCandidateChatSession,
     useCandidateChatSessions,
@@ -417,7 +417,11 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
             }
         } catch (error) {
             console.error('[CandidateChat] Failed to send message:', error);
-            toast.error('Failed to send message');
+            const message =
+                isApiError(error, 'UPGRADE_REQUIRED')
+                    ? getErrorMessage(error)
+                    : 'Failed to send message';
+            toast.error(message);
             setLocalMessages((prev) => prev.filter((m) => !m.id.startsWith('loading-')));
         } finally {
             setIsTyping(false);
