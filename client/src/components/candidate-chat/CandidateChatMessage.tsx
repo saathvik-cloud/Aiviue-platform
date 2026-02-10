@@ -298,12 +298,18 @@ export function CandidateChatMessage({
 
     // ==================== BUTTONS MESSAGE ====================
     if (message.message_type === 'buttons' || message.message_type === 'select') {
-        const rawButtons = (message.message_data?.buttons || message.message_data?.options || []) as Array<{ id?: string; value?: string; label: string; variant?: 'primary' | 'secondary' | 'outline' }>;
-        const buttons: CandidateChatButton[] = rawButtons.map((btn) => ({
-            id: btn.id ?? btn.value ?? btn.label,
-            label: btn.label ?? String(btn.id ?? btn.value ?? ''),
-            ...(btn.variant && { variant: btn.variant }),
-        }));
+        const rawButtons = (message.message_data?.buttons || message.message_data?.options || []) as Array<string | { id?: string; value?: string; label: string; variant?: 'primary' | 'secondary' | 'outline' }>;
+        const buttons: CandidateChatButton[] = rawButtons.map((raw) => {
+            if (typeof raw === 'string') {
+                return { id: raw, label: raw };
+            }
+            const btn = raw;
+            return {
+                id: btn.id ?? btn.value ?? btn.label,
+                label: btn.label ?? String(btn.id ?? btn.value ?? ''),
+                ...(btn.variant && { variant: btn.variant }),
+            };
+        });
 
         return (
             <div className={`flex items-start gap-3 ${mbClass} animate-fade-in`}>

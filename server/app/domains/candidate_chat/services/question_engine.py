@@ -331,7 +331,11 @@ class QuestionEngine:
         # Add options for select/multi_select/boolean types
         if template.options:
             if isinstance(template.options, list):
-                message_data["options"] = template.options
+                # For select, append "Custom" so user can type their own value
+                opts = list(template.options)
+                if template.question_type == "select":
+                    opts.append({"id": "custom", "label": "Custom"})
+                message_data["options"] = opts
             elif isinstance(template.options, dict):
                 message_data["options"] = template.options
         elif template.question_type == "boolean":
