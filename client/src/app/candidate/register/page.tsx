@@ -1,9 +1,11 @@
 'use client';
 
-import { CANDIDATE_VALIDATION, ROUTES } from '@/constants';
+import { ProfileStyleSelect } from '@/components/ui';
+import { CANDIDATE_VALIDATION, getCitiesByState, getStates, normalizeLocation, ROUTES } from '@/constants';
 import { getErrorMessage, isApiError } from '@/lib/api';
 import { candidateSignup, getCandidateByMobile } from '@/services';
 import { useCandidateAuthStore } from '@/stores';
+import { MapPin } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -22,12 +24,16 @@ export default function CandidateRegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Form state: 4 fields only
+  // Form state: mobile, name, and location (state/city/custom for each)
   const [formData, setFormData] = useState({
     mobile: '',
     name: '',
-    current_location: '',
-    preferred_location: '',
+    current_state: '',
+    current_city_value: '',
+    current_custom: '',
+    preferred_state: '',
+    preferred_city_value: '',
+    preferred_custom: '',
   });
 
   // Mobile validation state
@@ -80,6 +86,24 @@ export default function CandidateRegisterPage() {
     setError('');
   };
 
+  // Computed location strings (dropdown selection or custom when "Other")
+  const currentLocationValue =
+    formData.current_city_value && formData.current_city_value !== 'other'
+      ? formData.current_city_value
+      : normalizeLocation(formData.current_custom) ?? '';
+  const preferredLocationValue =
+    formData.preferred_city_value && formData.preferred_city_value !== 'other'
+      ? formData.preferred_city_value
+      : normalizeLocation(formData.preferred_custom) ?? '';
+
+  const states = getStates();
+  const currentCities = formData.current_state ? getCitiesByState(formData.current_state) : [];
+  const preferredCities = formData.preferred_state ? getCitiesByState(formData.preferred_state) : [];
+
+  const stateOptions = states.map((s) => ({ value: s, label: s }));
+  const currentCityOptions = currentCities.map((c) => ({ value: c.value, label: c.label }));
+  const preferredCityOptions = preferredCities.map((c) => ({ value: c.value, label: c.label }));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -99,13 +123,13 @@ export default function CandidateRegisterPage() {
       return;
     }
 
-    // Validate locations (required)
-    if (!formData.current_location.trim()) {
-      setError('Please enter your current location.');
+    // Validate locations (required): either from dropdown or custom when Other
+    if (!currentLocationValue) {
+      setError('Please select or enter your current location.');
       return;
     }
-    if (!formData.preferred_location.trim()) {
-      setError('Please enter your preferred work location.');
+    if (!preferredLocationValue) {
+      setError('Please select or enter your preferred work location.');
       return;
     }
 
@@ -118,8 +142,8 @@ export default function CandidateRegisterPage() {
       await candidateSignup({
         mobile: formData.mobile,
         name: formData.name.trim(),
-        current_location: formData.current_location.trim(),
-        preferred_location: formData.preferred_location.trim(),
+        current_location: currentLocationValue,
+        preferred_location: preferredLocationValue,
       });
 
       // Auto-login to get tokens
@@ -288,43 +312,119 @@ export default function CandidateRegisterPage() {
               </div>
             </div>
 
-            {/* Location Row – required */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>
-                  Current Location <span className="text-red-500">*</span>
-                </label>
-                <input
-                  name="current_location"
-                  type="text"
-                  value={formData.current_location}
-                  onChange={handleChange}
-                  placeholder="e.g. Mumbai, Delhi"
-                  required
-                  className={inputStyle}
-                  style={{
-                    borderColor: 'var(--neutral-border)',
-                    '--tw-ring-color': 'var(--primary)',
-                  } as React.CSSProperties}
-                />
+            {/* Current Location – State + City (profile-style dropdowns) or custom (Other) */}
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>
+                Current Location <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <ProfileStyleSelect
+                    options={stateOptions}
+                    value={formData.current_state}
+                    onChange={(v) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        current_state: v,
+                        current_city_value: '',
+                        current_custom: '',
+                      }))
+                    }
+                    placeholder="Select state"
+                    icon={<MapPin className="w-4 h-4" />}
+                  />
+                  <ProfileStyleSelect
+                    options={currentCityOptions}
+                    value={formData.current_city_value}
+                    onChange={(v) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        current_city_value: v,
+                        current_custom: v === 'other' ? prev.current_custom : '',
+                      }))
+                    }
+                    disabled={!formData.current_state}
+                    placeholder="Select city"
+                    icon={<MapPin className="w-4 h-4" />}
+                  />
+                </div>
+                {(formData.current_city_value === 'other' || !formData.current_state) && (
+                  <input
+                    type="text"
+                    value={formData.current_custom}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, current_custom: e.target.value }))}
+                    placeholder={
+                      formData.current_city_value === 'other'
+                        ? 'Enter your city'
+                        : 'Or type your city / area'
+                    }
+                    maxLength={CANDIDATE_VALIDATION.LOCATION_MAX_LENGTH}
+                    className={inputStyle}
+                    style={{
+                      borderColor: 'var(--neutral-border)',
+                      '--tw-ring-color': 'var(--primary)',
+                    } as React.CSSProperties}
+                  />
+                )}
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>
-                  Preferred Location <span className="text-red-500">*</span>
-                </label>
-                <input
-                  name="preferred_location"
-                  type="text"
-                  value={formData.preferred_location}
-                  onChange={handleChange}
-                  placeholder="e.g. Bangalore, Pune"
-                  required
-                  className={inputStyle}
-                  style={{
-                    borderColor: 'var(--neutral-border)',
-                    '--tw-ring-color': 'var(--primary)',
-                  } as React.CSSProperties}
-                />
+            </div>
+
+            {/* Preferred Location – State + City (profile-style dropdowns) or custom (Other) */}
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>
+                Preferred Location <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <ProfileStyleSelect
+                    options={stateOptions}
+                    value={formData.preferred_state}
+                    onChange={(v) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        preferred_state: v,
+                        preferred_city_value: '',
+                        preferred_custom: '',
+                      }))
+                    }
+                    placeholder="Select state"
+                    icon={<MapPin className="w-4 h-4" />}
+                  />
+                  <ProfileStyleSelect
+                    options={preferredCityOptions}
+                    value={formData.preferred_city_value}
+                    onChange={(v) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        preferred_city_value: v,
+                        preferred_custom: v === 'other' ? prev.preferred_custom : '',
+                      }))
+                    }
+                    disabled={!formData.preferred_state}
+                    placeholder="Select city"
+                    icon={<MapPin className="w-4 h-4" />}
+                  />
+                </div>
+                {(formData.preferred_city_value === 'other' || !formData.preferred_state) && (
+                  <input
+                    type="text"
+                    value={formData.preferred_custom}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, preferred_custom: e.target.value }))
+                    }
+                    placeholder={
+                      formData.preferred_city_value === 'other'
+                        ? 'Enter your preferred city'
+                        : 'Or type your preferred city / area'
+                    }
+                    maxLength={CANDIDATE_VALIDATION.LOCATION_MAX_LENGTH}
+                    className={inputStyle}
+                    style={{
+                      borderColor: 'var(--neutral-border)',
+                      '--tw-ring-color': 'var(--primary)',
+                    } as React.CSSProperties}
+                  />
+                )}
               </div>
             </div>
 

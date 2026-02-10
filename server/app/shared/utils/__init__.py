@@ -28,6 +28,7 @@ from app.shared.utils.pagination import (
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
 )
+from app.shared.utils.location import normalize_location
 
 __all__ = [
     # Sanitization
@@ -46,4 +47,5 @@ __all__ = [
     "create_paginated_response",
     "DEFAULT_PAGE_SIZE",
     "MAX_PAGE_SIZE",
+    "normalize_location",
 ]

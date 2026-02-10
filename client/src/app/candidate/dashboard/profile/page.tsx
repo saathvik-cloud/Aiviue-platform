@@ -18,7 +18,13 @@
  */
 
 import { ProfileStyleSelect } from '@/components/ui';
-import { CANDIDATE_VALIDATION } from '@/constants';
+import {
+  CANDIDATE_VALIDATION,
+  getCitiesByState,
+  getStateByCityValue,
+  getStates,
+  normalizeLocation,
+} from '@/constants';
 import { useCandidate, useJobCategories, useRolesByCategory, useUpdateCandidate } from '@/lib/hooks';
 import { uploadProfilePhoto } from '@/lib/supabase';
 import { getInitials } from '@/lib/utils';
@@ -52,9 +58,15 @@ interface ProfileFormData {
   email: string;
   date_of_birth: string;
   current_location: string;
+  current_state: string;
+  current_city_value: string;
+  current_custom: string;
   preferred_job_category_id: string;
   preferred_job_role_id: string;
   preferred_job_location: string;
+  preferred_state: string;
+  preferred_city_value: string;
+  preferred_custom: string;
   languages_known: string[];
   about: string;
   current_monthly_salary: string;
@@ -76,27 +88,6 @@ const COMMON_LANGUAGES = [
   'Odia',
   'Assamese',
   'Urdu',
-];
-
-const INDIAN_CITIES = [
-  'Mumbai',
-  'Delhi NCR',
-  'Bangalore',
-  'Hyderabad',
-  'Chennai',
-  'Kolkata',
-  'Pune',
-  'Ahmedabad',
-  'Jaipur',
-  'Lucknow',
-  'Chandigarh',
-  'Kochi',
-  'Coimbatore',
-  'Indore',
-  'Bhopal',
-  'Nagpur',
-  'Surat',
-  'Visakhapatnam',
 ];
 
 // ==================== COMPONENT ====================
@@ -126,9 +117,15 @@ export default function CandidateProfilePage() {
     email: '',
     date_of_birth: '',
     current_location: '',
+    current_state: '',
+    current_city_value: '',
+    current_custom: '',
     preferred_job_category_id: '',
     preferred_job_role_id: '',
     preferred_job_location: '',
+    preferred_state: '',
+    preferred_city_value: '',
+    preferred_custom: '',
     languages_known: [],
     about: '',
     current_monthly_salary: '',
@@ -148,18 +145,28 @@ export default function CandidateProfilePage() {
   // Initialize form from candidate data
   useEffect(() => {
     if (candidate) {
+      const curLoc = (candidate.current_location || '').trim();
+      const prefLoc = (candidate.preferred_job_location || '').trim();
+      const curState = getStateByCityValue(curLoc);
+      const prefState = getStateByCityValue(prefLoc);
       setFormData({
         name: candidate.name || '',
         email: candidate.email || '',
         date_of_birth: candidate.date_of_birth || '',
-        current_location: candidate.current_location || '',
+        current_location: curLoc,
+        current_state: curState || '',
+        current_city_value: curState ? curLoc : '',
+        current_custom: curState ? '' : curLoc,
         preferred_job_category_id: candidate.preferred_job_category_id || '',
         preferred_job_role_id: candidate.preferred_job_role_id || '',
-        preferred_job_location: candidate.preferred_job_location || '',
+        preferred_job_location: prefLoc,
+        preferred_state: prefState || '',
+        preferred_city_value: prefState ? prefLoc : '',
+        preferred_custom: prefState ? '' : prefLoc,
         languages_known: candidate.languages_known || [],
         about: candidate.about || '',
         current_monthly_salary: candidate.current_monthly_salary?.toString() || '',
-        aadhaar_number: '', // Don't populate encrypted values
+        aadhaar_number: '',
         pan_number: '',
       });
       setSelectedCategoryId(candidate.preferred_job_category_id || '');
@@ -437,18 +444,52 @@ export default function CandidateProfilePage() {
     slug: role.slug,
   }));
 
-  // Include candidate's saved locations so they display even if not in list or different case (e.g. DB has "mumbai", list has "Mumbai")
-  const baseLocationOptions = INDIAN_CITIES.map((city) => ({ value: city, label: city }));
-  const currentVal = (formData.current_location || '').trim();
-  const preferredVal = (formData.preferred_job_location || '').trim();
-  // Match by exact value only so "mumbai" from DB gets its own option and displays (list has value "Mumbai")
-  const hasCurrentInList = baseLocationOptions.some((o) => o.value === currentVal);
-  const hasPreferredInList = baseLocationOptions.some((o) => o.value === preferredVal);
-  const locationOptions = [
-    ...(currentVal && !hasCurrentInList ? [{ value: currentVal, label: currentVal.charAt(0).toUpperCase() + currentVal.slice(1).toLowerCase() }] : []),
-    ...(preferredVal && !hasPreferredInList && preferredVal !== currentVal ? [{ value: preferredVal, label: preferredVal.charAt(0).toUpperCase() + preferredVal.slice(1).toLowerCase() }] : []),
-    ...baseLocationOptions,
-  ];
+  const profileStates = getStates();
+  const profileCurrentCities = formData.current_state ? getCitiesByState(formData.current_state) : [];
+  const profilePreferredCities = formData.preferred_state
+    ? getCitiesByState(formData.preferred_state)
+    : [];
+
+  const profileStateOptions = profileStates.map((s) => ({ value: s, label: s }));
+  const profileCurrentCityOptions = profileCurrentCities.map((c) => ({ value: c.value, label: c.label }));
+  const profilePreferredCityOptions = profilePreferredCities.map((c) => ({ value: c.value, label: c.label }));
+
+  const setCurrentLocationFromUi = (
+    state: string,
+    cityValue: string,
+    custom: string
+  ) => {
+    const loc =
+      cityValue && cityValue !== 'other'
+        ? cityValue
+        : normalizeLocation(custom) ?? '';
+    setFormData((prev) => ({
+      ...prev,
+      current_state: state,
+      current_city_value: cityValue,
+      current_custom: custom,
+      current_location: loc,
+    }));
+    setIsDirty(true);
+  };
+  const setPreferredLocationFromUi = (
+    state: string,
+    cityValue: string,
+    custom: string
+  ) => {
+    const loc =
+      cityValue && cityValue !== 'other'
+        ? cityValue
+        : normalizeLocation(custom) ?? '';
+    setFormData((prev) => ({
+      ...prev,
+      preferred_state: state,
+      preferred_city_value: cityValue,
+      preferred_custom: custom,
+      preferred_job_location: loc,
+    }));
+    setIsDirty(true);
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-8">
@@ -683,23 +724,125 @@ export default function CandidateProfilePage() {
             customPlaceholder="Or type your role (e.g. Backend Developer)"
           />
 
-          <ProfileStyleSelect
-            label="Current Location"
-            icon={<MapPin className="w-4 h-4" />}
-            options={locationOptions}
-            value={formData.current_location}
-            onChange={(v) => handleInputChange('current_location', v)}
-            placeholder="Select city"
-          />
+          <div>
+            <label
+              className="flex items-center gap-2 text-sm font-medium mb-2"
+              style={{ color: 'var(--neutral-dark)' }}
+            >
+              <MapPin className="w-4 h-4 text-teal-600" />
+              Current Location
+            </label>
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <ProfileStyleSelect
+                  options={profileStateOptions}
+                  value={formData.current_state}
+                  onChange={(v) => setCurrentLocationFromUi(v, '', '')}
+                  placeholder="Select state"
+                  icon={<MapPin className="w-4 h-4" />}
+                />
+                <ProfileStyleSelect
+                  options={profileCurrentCityOptions}
+                  value={formData.current_city_value}
+                  onChange={(v) =>
+                    setCurrentLocationFromUi(
+                      formData.current_state,
+                      v,
+                      v === 'other' ? formData.current_custom : ''
+                    )
+                  }
+                  disabled={!formData.current_state}
+                  placeholder="Select city"
+                  icon={<MapPin className="w-4 h-4" />}
+                />
+              </div>
+              {(formData.current_city_value === 'other' ||
+                !formData.current_state) && (
+                <input
+                  type="text"
+                  value={formData.current_custom}
+                  onChange={(e) =>
+                    setCurrentLocationFromUi(
+                      formData.current_state,
+                      formData.current_city_value,
+                      e.target.value
+                    )
+                  }
+                  placeholder={
+                    formData.current_city_value === 'other'
+                      ? 'Enter your city'
+                      : 'Or type your city / area'
+                  }
+                  maxLength={CANDIDATE_VALIDATION.LOCATION_MAX_LENGTH}
+                  className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-all bg-white/50 focus:bg-white focus:ring-2"
+                  style={{
+                    borderColor: 'var(--neutral-border)',
+                    '--tw-ring-color': 'var(--primary)',
+                  } as React.CSSProperties}
+                />
+              )}
+            </div>
+          </div>
 
-          <ProfileStyleSelect
-            label="Preferred Job Location"
-            icon={<MapPin className="w-4 h-4" />}
-            options={locationOptions}
-            value={formData.preferred_job_location}
-            onChange={(v) => handleInputChange('preferred_job_location', v)}
-            placeholder="Select preferred city"
-          />
+          <div>
+            <label
+              className="flex items-center gap-2 text-sm font-medium mb-2"
+              style={{ color: 'var(--neutral-dark)' }}
+            >
+              <MapPin className="w-4 h-4 text-teal-600" />
+              Preferred Job Location
+            </label>
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <ProfileStyleSelect
+                  options={profileStateOptions}
+                  value={formData.preferred_state}
+                  onChange={(v) => setPreferredLocationFromUi(v, '', '')}
+                  placeholder="Select state"
+                  icon={<MapPin className="w-4 h-4" />}
+                />
+                <ProfileStyleSelect
+                  options={profilePreferredCityOptions}
+                  value={formData.preferred_city_value}
+                  onChange={(v) =>
+                    setPreferredLocationFromUi(
+                      formData.preferred_state,
+                      v,
+                      v === 'other' ? formData.preferred_custom : ''
+                    )
+                  }
+                  disabled={!formData.preferred_state}
+                  placeholder="Select city"
+                  icon={<MapPin className="w-4 h-4" />}
+                />
+              </div>
+              {(formData.preferred_city_value === 'other' ||
+                !formData.preferred_state) && (
+                <input
+                  type="text"
+                  value={formData.preferred_custom}
+                  onChange={(e) =>
+                    setPreferredLocationFromUi(
+                      formData.preferred_state,
+                      formData.preferred_city_value,
+                      e.target.value
+                    )
+                  }
+                  placeholder={
+                    formData.preferred_city_value === 'other'
+                      ? 'Enter preferred city'
+                      : 'Or type your preferred city / area'
+                  }
+                  maxLength={CANDIDATE_VALIDATION.LOCATION_MAX_LENGTH}
+                  className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-all bg-white/50 focus:bg-white focus:ring-2"
+                  style={{
+                    borderColor: 'var(--neutral-border)',
+                    '--tw-ring-color': 'var(--primary)',
+                  } as React.CSSProperties}
+                />
+              )}
+            </div>
+          </div>
         </div>
       )}
 

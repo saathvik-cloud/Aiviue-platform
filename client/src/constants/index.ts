@@ -4,6 +4,7 @@
 
 export * from './api-endpoints';
 export * from './routes';
+export * from './state_cities';
 export * from './ui';
 
 // App-wide constants
@@ -72,6 +73,8 @@ export const CANDIDATE_VALIDATION = {
   ABOUT_MAX_LENGTH: 500,
   PROFILE_PHOTO_MAX_SIZE_MB: 2,
   RESUME_PDF_MAX_SIZE_MB: 2,
+  /** Max length for current_location / preferred_job_location (matches backend String(255)) */
+  LOCATION_MAX_LENGTH: 255,
 } as const;
 
 // Profile statuses

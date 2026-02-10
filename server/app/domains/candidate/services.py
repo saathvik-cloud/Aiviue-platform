@@ -30,6 +30,7 @@ from app.domains.candidate.schemas import (
     CandidateSignupRequest,
     CandidateUpdateRequest,
 )
+from app.shared.utils import normalize_location
 from app.shared.exceptions import (
     ConflictError,
     NotFoundError,
@@ -167,8 +168,8 @@ class CandidateService:
         candidate = await self.repository.create({
             "mobile": request.mobile,
             "name": request.name.strip(),
-            "current_location": request.current_location.strip(),
-            "preferred_job_location": request.preferred_location.strip(),
+            "current_location": normalize_location(request.current_location) or request.current_location.strip(),
+            "preferred_job_location": normalize_location(request.preferred_location) or request.preferred_location.strip(),
             "profile_status": ProfileStatus.BASIC,
         })
         await self.session.commit()
@@ -241,8 +242,8 @@ class CandidateService:
 
         update_data = {
             "name": request.name.strip(),
-            "current_location": request.current_location.strip(),
-            "preferred_job_location": request.preferred_job_location.strip(),
+            "current_location": normalize_location(request.current_location) or request.current_location.strip(),
+            "preferred_job_location": normalize_location(request.preferred_job_location) or request.preferred_job_location.strip(),
             "profile_status": ProfileStatus.COMPLETE,  # Allow dashboard/chat access
         }
         # Optional: set category/role only if provided
@@ -295,7 +296,10 @@ class CandidateService:
             value = getattr(request, field, None)
             if value is not None:
                 if isinstance(value, str):
-                    update_data[field] = value.strip()
+                    if field in ("current_location", "preferred_job_location"):
+                        update_data[field] = normalize_location(value) or value.strip()
+                    else:
+                        update_data[field] = value.strip()
                 else:
                     update_data[field] = value
 
