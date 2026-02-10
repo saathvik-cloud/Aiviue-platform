@@ -259,17 +259,8 @@ class CandidateChatService:
             updated = await self._chat_repo.get_session_by_id(existing_session.id)
             return updated, welcome_back
 
-        # ==================== AIVI BOT GATE (resume_creation only) ====================
-        # Allow when is_pro or resume_remaining_count > 0. Else upgrade required.
-        if session_type == "resume_creation":
-            is_pro = getattr(candidate, "is_pro", False)
-            remaining = getattr(candidate, "resume_remaining_count", 1)
-            if not is_pro and remaining <= 0:
-                raise ForbiddenError(
-                    message="Upgrade to premium to create more resumes with AIVI bot.",
-                    error_code="UPGRADE_REQUIRED",
-                    context={"candidate_id": str(candidate_id)},
-                )
+        # No gate on session creation: user can always create a session and use "Upload resume".
+        # AIVI bot is gated in _handle_method_selection (when they choose Build with AIVI) and in send_message (when already in AIVI flow).
 
         # ==================== CREATE NEW SESSION ====================
         # Build initial context
