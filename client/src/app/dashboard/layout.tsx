@@ -68,7 +68,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen flex gradient-bg">
+    <div className="min-h-screen flex gradient-bg lg:h-screen lg:overflow-hidden">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div
@@ -77,11 +77,11 @@ export default function DashboardLayout({
         />
       )}
 
-      {/* Sidebar - light pink → purple gradient */}
+      {/* Sidebar - light pink → purple gradient; sticky on desktop so it stays while main scrolls */}
       <aside
         className={`
-          fixed lg:static inset-y-0 left-0 z-50
-          w-64 flex flex-col
+          fixed lg:sticky lg:top-0 inset-y-0 left-0 z-50
+          w-64 flex-shrink-0 flex flex-col lg:h-screen
           transform transition-transform duration-300 ease-out
           lg:transform-none shadow-xl
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
@@ -199,8 +199,8 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+      {/* Main Content – flex column so header stays at top and only main scrolls */}
+      <div className="flex-1 flex flex-col min-h-screen lg:min-h-0 overflow-hidden">
         {/* Top Header - pink + violet gradient, glass */}
         <header
           className="sticky top-0 z-30 px-4 sm:px-6 py-2 flex items-center justify-between"
@@ -324,8 +324,8 @@ export default function DashboardLayout({
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
+        {/* Page Content – only this area scrolls on desktop */}
+        <main className="flex-1 min-h-0 p-4 sm:p-6 lg:p-8 overflow-auto">
           {children}
         </main>
       </div>
