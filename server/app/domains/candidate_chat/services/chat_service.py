@@ -338,24 +338,31 @@ class CandidateChatService:
             )
 
         # Gate: if already inside AIVI bot flow but user has no remaining count, block further messages.
-        # Exception: allow "Upload My Resume" so they can switch to PDF upload (always free).
+        # Exceptions: (1) "Upload My Resume" button, (2) file_upload (PDF upload always allowed),
+        # (3) steps that are part of PDF-upload flow (MISSING_FIELDS = bot asking salary/age etc. after extraction).
         ctx = self._copy_context(session)
         msg_data = message_data or {}
-        if ctx.get("method") == "aivi_bot" and session.current_step in (
+        step = session.current_step
+        in_aivi_gated_step = ctx.get("method") == "aivi_bot" and step in (
             ChatStep.ASKING_QUESTIONS,
             ChatStep.RESUME_PREVIEW,
-        ):
-            if not _is_choosing_upload(content, msg_data):
-                candidate = await self._candidate_repo.get_by_id(session.candidate_id)
-                if candidate:
-                    is_pro = getattr(candidate, "is_pro", False)
-                    remaining = getattr(candidate, "resume_remaining_count", 1)
-                    if not is_pro and remaining <= 0:
-                        raise ForbiddenError(
-                            message="You've used your free AIVI build. Upgrade to Pro to create more resumes with AIVI.",
-                            error_code="UPGRADE_REQUIRED",
-                            context={"candidate_id": str(session.candidate_id)},
-                        )
+        )
+        allow_through = (
+            _is_choosing_upload(content, msg_data)
+            or message_type == "file_upload"
+            or step == ChatStep.MISSING_FIELDS  # PDF flow: bot asking missing fields (salary, age, etc.)
+        )
+        if in_aivi_gated_step and not allow_through:
+            candidate = await self._candidate_repo.get_by_id(session.candidate_id)
+            if candidate:
+                is_pro = getattr(candidate, "is_pro", False)
+                remaining = getattr(candidate, "resume_remaining_count", 1)
+                if not is_pro and remaining <= 0:
+                    raise ForbiddenError(
+                        message="You've used your free AIVI build. Upgrade to Pro to create more resumes with AIVI.",
+                        error_code="UPGRADE_REQUIRED",
+                        context={"candidate_id": str(session.candidate_id)},
+                    )
 
         # Store user message
         user_msg = await self._chat_repo.add_message(

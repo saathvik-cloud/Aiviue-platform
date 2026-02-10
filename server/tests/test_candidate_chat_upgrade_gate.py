@@ -1,13 +1,15 @@
 """
 Candidate chat: AIVI bot gate (is_pro + resume_remaining_count).
 
-Gate allows when is_pro or resume_remaining_count > 0; blocks with 403 UPGRADE_REQUIRED
-when is_pro is False and resume_remaining_count <= 0.
+Session creation and upload are always allowed. The gate only blocks when the user
+*chooses* "Build with AIVI" (or continues in an existing AIVI flow) and they have
+no remaining count and are not pro.
 
 Scenarios:
-- New user (free): resume_remaining_count=1 → first resume_creation allowed; set to 0 → 403.
+- Session create: always allowed (201) so user can connect and use "Upload resume".
 - Pro user: multiple resume_creation sessions → always 201.
 - resume_upload: always allowed for any user (no gate).
+- send_message with "Create with AIVI Bot" when remaining=0 → 403 UPGRADE_REQUIRED.
 """
 
 import random
@@ -65,18 +67,19 @@ def test_new_user_first_resume_creation_session_succeeds(api_client, candidate_i
     assert "id" in data
 
 
-def test_new_user_second_resume_creation_when_remaining_zero_returns_403(
+def test_resume_creation_session_allowed_even_when_remaining_zero(
     api_client, candidate_id_and_headers, sync_db_helpers
 ):
-    """Free user with resume_remaining_count=0: resume_creation → 403 UPGRADE_REQUIRED."""
+    """Free user with resume_remaining_count=0: can still create resume_creation session (201).
+    Gate applies only when they choose 'Build with AIVI' in chat, not on session create."""
     candidate_id, headers = candidate_id_and_headers
     sync_db_helpers.set_candidate_resume_remaining_count(candidate_id, 0)
 
     r = _create_session(api_client, candidate_id, headers, session_type="resume_creation", force_new=True)
-    assert r.status_code == 403, r.text
+    assert r.status_code == 201, r.text
     data = r.json()
-    assert data.get("error", {}).get("code") == "UPGRADE_REQUIRED"
-    assert "upgrade" in data.get("error", {}).get("message", "").lower()
+    assert data.get("session_type") == "resume_creation"
+    assert "id" in data
 
 
 # ==================== PRO USER: UNLIMITED ====================
