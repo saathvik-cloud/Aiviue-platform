@@ -314,12 +314,12 @@ export function CandidateChatMessage({
                     </div>
 
                     {buttons.length > 0 && isLatest && onButtonClick && (
-                        <div className="flex flex-wrap gap-2 mt-3">
+                        <div className="flex flex-wrap gap-2 sm:gap-3 mt-3">
                             {buttons.map((btn) => (
                                 <button
                                     key={btn.id}
                                     onClick={() => onButtonClick(btn)}
-                                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 active:scale-95 ${btn.variant === 'primary'
+                                    className={`min-h-[44px] px-4 py-2.5 sm:py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 active:scale-95 text-left ${btn.variant === 'primary'
                                             ? 'text-white shadow-sm'
                                             : 'btn-glass border border-neutral-200/80 hover:border-teal-300 hover:bg-teal-50/50'
                                         }`}

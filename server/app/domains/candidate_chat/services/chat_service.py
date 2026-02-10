@@ -52,7 +52,7 @@ from app.domains.candidate_chat.services.resume_from_chat_llm_service import (
     build_resume_from_chat_llm,
 )
 from app.domains.job_master.repository import JobMasterRepository
-from app.shared.exceptions import NotFoundError, ValidationError
+from app.shared.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.shared.logging import get_logger
 
 
@@ -148,7 +148,7 @@ class CandidateChatService:
                 f"Returning existing active session: {existing_session.id}",
                 extra={"session_id": str(existing_session.id), "candidate_id": str(candidate_id)},
             )
-            # Return existing session with a "welcome back" message
+            # Return existing session with a "welcome back" message (no upgrade gate for existing session)
             welcome_back = [{
                 "role": CandidateMessageRole.BOT,
                 "content": "Welcome back! Let's continue building your resume from where you left off.",
@@ -167,6 +167,21 @@ class CandidateChatService:
             # Re-fetch to get updated messages
             updated = await self._chat_repo.get_session_by_id(existing_session.id)
             return updated, welcome_back
+
+        # ==================== ONE-TIME FREE GATE (resume_creation only) ====================
+        # Non-pro candidates get one free AIVI bot resume; after that they must upgrade.
+        if session_type == "resume_creation":
+            is_pro = getattr(candidate, "is_pro", False)
+            if not is_pro:
+                aivi_bot_count = await self._candidate_repo.count_completed_aivi_bot_resumes(
+                    candidate_id
+                )
+                if aivi_bot_count >= 1:
+                    raise ForbiddenError(
+                        message="Upgrade to premium to create multiple resumes with AIVI bot.",
+                        error_code="UPGRADE_REQUIRED",
+                        context={"candidate_id": str(candidate_id)},
+                    )
 
         # ==================== CREATE NEW SESSION ====================
         # Build initial context

@@ -1,6 +1,7 @@
 'use client';
 
 import { CANDIDATE_NAV_ITEMS, ROUTES } from '@/constants';
+import { useCandidate } from '@/lib/hooks';
 import { getInitials } from '@/lib/utils';
 import { useCandidateAuthStore } from '@/stores';
 import {
@@ -69,10 +70,18 @@ export default function CandidateDashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { candidate, isAuthenticated, clearCandidate, isLoading } =
+  const { candidate, isAuthenticated, clearCandidate, isLoading, setCandidate } =
     useCandidateAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  // Keep candidate in sync with API (e.g. has_resume after saving resume)
+  const { data: apiCandidate, isFetched } = useCandidate(
+    isAuthenticated && candidate?.id ? candidate.id : undefined
+  );
+  useEffect(() => {
+    if (apiCandidate) setCandidate(apiCandidate);
+  }, [apiCandidate, setCandidate]);
 
   // Protected route: redirect to login if not authenticated
   useEffect(() => {
@@ -81,13 +90,22 @@ export default function CandidateDashboardLayout({
     }
   }, [isAuthenticated, isLoading, router]);
 
-  // Require complete profile: if status is basic, redirect to complete-profile unless already there
+  // Gate: until candidate has completed a resume (built with AIVI or uploaded), only the Resume/Chat page is allowed.
+  // Use API candidate when available so we don't redirect with stale has_resume.
+  const resumeRoute = ROUTES.CANDIDATE_DASHBOARD_RESUME;
+  const isOnResumePage = pathname === resumeRoute;
+  const effectiveCandidate = apiCandidate ?? candidate;
+  const mustCompleteResumeFirst =
+    isAuthenticated &&
+    effectiveCandidate &&
+    !effectiveCandidate.has_resume &&
+    !isOnResumePage &&
+    isFetched;
   useEffect(() => {
-    if (isLoading || !isAuthenticated || !candidate) return;
-    if (candidate.profile_status === 'basic' && pathname !== ROUTES.CANDIDATE_DASHBOARD_COMPLETE_PROFILE) {
-      router.replace(ROUTES.CANDIDATE_DASHBOARD_COMPLETE_PROFILE);
+    if (mustCompleteResumeFirst) {
+      router.replace(resumeRoute);
     }
-  }, [candidate?.profile_status, isAuthenticated, isLoading, pathname, router]);
+  }, [mustCompleteResumeFirst, router]);
 
   const handleLogout = () => {
     clearCandidate();
@@ -180,7 +198,10 @@ export default function CandidateDashboardLayout({
           >
             General
           </p>
-          {CANDIDATE_NAV_ITEMS.map((item) => {
+          {(effectiveCandidate?.has_resume
+            ? CANDIDATE_NAV_ITEMS
+            : CANDIDATE_NAV_ITEMS.filter((item) => item.href === ROUTES.CANDIDATE_DASHBOARD_RESUME)
+          ).map((item) => {
             const Icon = iconMap[item.icon];
             const isActive =
               item.href === ROUTES.CANDIDATE_DASHBOARD

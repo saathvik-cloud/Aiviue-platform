@@ -23,7 +23,7 @@ import type {
 
 /**
  * Signup a new candidate.
- * Creates a new candidate with mobile + basic profile info.
+ * Payload: mobile, name, current_location, preferred_location only.
  */
 export async function candidateSignup(
   data: CandidateSignupRequest

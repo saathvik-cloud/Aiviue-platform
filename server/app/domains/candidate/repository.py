@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 from app.domains.candidate.models import ( 
     Candidate,
     CandidateResume, 
+    ResumeSource,
     ResumeStatus,
 )
 from app.shared.exceptions import ConflictError
@@ -290,3 +291,19 @@ class CandidateRepository:
         query = select(CandidateResume).where(CandidateResume.id == resume_id)
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
+
+    async def count_completed_aivi_bot_resumes(self, candidate_id: UUID) -> int:
+        """Count completed resumes created via AIVI bot (for one-time-free gate)."""
+        query = (
+            select(func.count())
+            .select_from(CandidateResume)
+            .where(
+                and_(
+                    CandidateResume.candidate_id == candidate_id,
+                    CandidateResume.status == ResumeStatus.COMPLETED,
+                    CandidateResume.source == ResumeSource.AIVI_BOT,
+                )
+            )
+        )
+        result = await self.session.execute(query)
+        return result.scalar() or 0

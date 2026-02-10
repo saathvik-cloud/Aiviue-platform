@@ -19,7 +19,7 @@
 
 import { ProfileStyleSelect } from '@/components/ui';
 import { CANDIDATE_VALIDATION } from '@/constants';
-import { useJobCategories, useRolesByCategory, useUpdateCandidate } from '@/lib/hooks';
+import { useCandidate, useJobCategories, useRolesByCategory, useUpdateCandidate } from '@/lib/hooks';
 import { uploadProfilePhoto } from '@/lib/supabase';
 import { getInitials } from '@/lib/utils';
 import { useCandidateAuthStore } from '@/stores';
@@ -104,6 +104,12 @@ const INDIAN_CITIES = [
 export default function CandidateProfilePage() {
   const candidate = useCandidateAuthStore((state) => state.candidate);
   const setCandidate = useCandidateAuthStore((state) => state.setCandidate);
+
+  // Refetch candidate on mount so profile shows latest from API (e.g. current_location, preferred_job_location from signup)
+  const { data: freshCandidate } = useCandidate(candidate?.id ?? undefined);
+  useEffect(() => {
+    if (freshCandidate) setCandidate(freshCandidate);
+  }, [freshCandidate, setCandidate]);
 
   const updateCandidateMutation = useUpdateCandidate();
   const { data: categories, isLoading: categoriesLoading } = useJobCategories();
@@ -431,7 +437,17 @@ export default function CandidateProfilePage() {
     slug: role.slug,
   }));
 
-  const locationOptions = INDIAN_CITIES.map((city) => ({ value: city, label: city }));
+  // Include candidate's saved locations so they display even if not in INDIAN_CITIES or different case (e.g. "mumbai", "bandra")
+  const baseLocationOptions = INDIAN_CITIES.map((city) => ({ value: city, label: city }));
+  const currentVal = (formData.current_location || '').trim();
+  const preferredVal = (formData.preferred_job_location || '').trim();
+  const hasCurrentInList = baseLocationOptions.some((o) => o.value === currentVal || o.label.toLowerCase() === currentVal.toLowerCase());
+  const hasPreferredInList = baseLocationOptions.some((o) => o.value === preferredVal || o.label.toLowerCase() === preferredVal.toLowerCase());
+  const locationOptions = [
+    ...(currentVal && !hasCurrentInList ? [{ value: currentVal, label: currentVal.charAt(0).toUpperCase() + currentVal.slice(1).toLowerCase() }] : []),
+    ...(preferredVal && !hasPreferredInList && preferredVal !== currentVal ? [{ value: preferredVal, label: preferredVal.charAt(0).toUpperCase() + preferredVal.slice(1).toLowerCase() }] : []),
+    ...baseLocationOptions,
+  ];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-8">

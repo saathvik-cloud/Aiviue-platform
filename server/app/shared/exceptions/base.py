@@ -114,6 +114,21 @@ class ConflictError(BaseAppException):
     error_type: str = "CONFLICT"
 
 
+class ForbiddenError(BaseAppException):
+    """
+    Raised when the user is not allowed to perform the action.
+    
+    HTTP Status: 403 Forbidden
+    
+    Examples:
+        - Upgrade required to create multiple AIVI bot resumes
+        - Access denied to resource
+    """
+    
+    status_code: int = 403
+    error_type: str = "FORBIDDEN"
+
+
 class BusinessError(BaseAppException):
     """
     Raised when a business rule is violated.

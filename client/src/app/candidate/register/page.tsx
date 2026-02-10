@@ -1,9 +1,7 @@
 'use client';
 
-import { ProfileStyleSelect } from '@/components/ui';
 import { CANDIDATE_VALIDATION, ROUTES } from '@/constants';
 import { getErrorMessage, isApiError } from '@/lib/api';
-import { useJobCategories, useRolesByCategory } from '@/lib/hooks/use-candidate';
 import { candidateSignup, getCandidateByMobile } from '@/services';
 import { useCandidateAuthStore } from '@/stores';
 import Image from 'next/image';
@@ -15,9 +13,8 @@ import { toast } from 'sonner';
 /**
  * Candidate Register (Signup) Page - Mobile-based authentication.
  *
- * Design: Same glassmorphism as employer register, adapted for candidate fields.
- * Flow: Mobile + Name (required) + optional basic profile fields.
- * Mobile number is the single source of truth and immutable after creation.
+ * Signup collects only: mobile, full name, current location, preferred location.
+ * Job category/role are filled later (e.g. from resume extraction).
  */
 export default function CandidateRegisterPage() {
   const router = useRouter();
@@ -25,47 +22,22 @@ export default function CandidateRegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Form state
+  // Form state: 4 fields only
   const [formData, setFormData] = useState({
     mobile: '',
     name: '',
     current_location: '',
-    preferred_job_category_id: '',
-    preferred_job_role_id: '',
-    preferred_job_location: '',
+    preferred_location: '',
   });
 
   // Mobile validation state
   const [mobileChecking, setMobileChecking] = useState(false);
   const [mobileError, setMobileError] = useState('');
 
-  // Fetch job categories for dropdown
-  const { data: categories = [], isLoading: categoriesLoading } = useJobCategories();
-
-  // Fetch roles for selected category
-  const { data: roles = [], isLoading: rolesLoading } = useRolesByCategory(
-    formData.preferred_job_category_id || undefined
-  );
-
-  // Options for ProfileStyleSelect (scrollable + add custom): real options only, no empty placeholder
-  const categoryOptions = categories.map((cat) => ({
-    value: cat.id,
-    label: cat.name,
-    slug: cat.slug,
-  }));
-
-  const roleOptions = roles.map((role) => ({
-    value: role.id,
-    label: role.name,
-    slug: role.slug,
-  }));
-
-  // Redirect if already authenticated (and profile complete, else complete-profile handles redirect)
+  // Redirect if already authenticated → resume/chat page (build or upload resume)
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      const c = useCandidateAuthStore.getState().candidate;
-      if (c?.profile_status === 'complete') router.push(ROUTES.CANDIDATE_DASHBOARD);
-      else router.push(ROUTES.CANDIDATE_DASHBOARD_COMPLETE_PROFILE);
+      router.push(ROUTES.CANDIDATE_DASHBOARD_RESUME);
     }
   }, [isAuthenticated, authLoading, router]);
 
@@ -102,11 +74,6 @@ export default function CandidateRegisterPage() {
     }
   }, [formData.mobile, checkMobileUniqueness]);
 
-  // Reset role when category changes
-  useEffect(() => {
-    setFormData((prev) => ({ ...prev, preferred_job_role_id: '' }));
-  }, [formData.preferred_job_category_id]);
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -132,6 +99,16 @@ export default function CandidateRegisterPage() {
       return;
     }
 
+    // Validate locations (required)
+    if (!formData.current_location.trim()) {
+      setError('Please enter your current location.');
+      return;
+    }
+    if (!formData.preferred_location.trim()) {
+      setError('Please enter your preferred work location.');
+      return;
+    }
+
     // Bail if mobile already exists
     if (mobileError) return;
 
@@ -141,30 +118,15 @@ export default function CandidateRegisterPage() {
       await candidateSignup({
         mobile: formData.mobile,
         name: formData.name.trim(),
-        current_location: formData.current_location.trim() || undefined,
-        preferred_job_category_id: formData.preferred_job_category_id || undefined,
-        preferred_job_role_id: formData.preferred_job_role_id || undefined,
-        preferred_job_location: formData.preferred_job_location.trim() || undefined,
+        current_location: formData.current_location.trim(),
+        preferred_location: formData.preferred_location.trim(),
       });
 
       // Auto-login to get tokens
       await login(formData.mobile);
 
-      toast.success('Account created successfully! Complete your profile to continue.');
-      // Pass signup form data for pre-fill on complete-profile page
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem(
-          'aiviue_complete_profile_prefill',
-          JSON.stringify({
-            name: formData.name.trim(),
-            current_location: formData.current_location.trim(),
-            preferred_job_category_id: formData.preferred_job_category_id,
-            preferred_job_role_id: formData.preferred_job_role_id,
-            preferred_job_location: formData.preferred_job_location.trim(),
-          })
-        );
-      }
-      router.push(ROUTES.CANDIDATE_DASHBOARD_COMPLETE_PROFILE);
+      toast.success('Account created! Build or upload your resume to get started.');
+      router.push(ROUTES.CANDIDATE_DASHBOARD_RESUME);
     } catch (err) {
       if (isApiError(err, 'MOBILE_ALREADY_EXISTS') || isApiError(err, 'CONFLICT')) {
         setMobileError('This mobile number is already registered. Please login instead.');
@@ -326,11 +288,11 @@ export default function CandidateRegisterPage() {
               </div>
             </div>
 
-            {/* Location Row */}
+            {/* Location Row – required */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>
-                  Current Location
+                  Current Location <span className="text-red-500">*</span>
                 </label>
                 <input
                   name="current_location"
@@ -338,6 +300,7 @@ export default function CandidateRegisterPage() {
                   value={formData.current_location}
                   onChange={handleChange}
                   placeholder="e.g. Mumbai, Delhi"
+                  required
                   className={inputStyle}
                   style={{
                     borderColor: 'var(--neutral-border)',
@@ -347,14 +310,15 @@ export default function CandidateRegisterPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2" style={{ color: 'var(--neutral-dark)' }}>
-                  Preferred Job Location
+                  Preferred Location <span className="text-red-500">*</span>
                 </label>
                 <input
-                  name="preferred_job_location"
+                  name="preferred_location"
                   type="text"
-                  value={formData.preferred_job_location}
+                  value={formData.preferred_location}
                   onChange={handleChange}
                   placeholder="e.g. Bangalore, Pune"
+                  required
                   className={inputStyle}
                   style={{
                     borderColor: 'var(--neutral-border)',
@@ -362,41 +326,6 @@ export default function CandidateRegisterPage() {
                   } as React.CSSProperties}
                 />
               </div>
-            </div>
-
-            {/* Job Category & Role – scrollable dropdowns with "Or type your own" */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <ProfileStyleSelect
-                label="Preferred Job Category"
-                options={categoryOptions}
-                value={formData.preferred_job_category_id}
-                onChange={(val) =>
-                  setFormData((prev) => ({ ...prev, preferred_job_category_id: val }))
-                }
-                placeholder={categoriesLoading ? 'Loading categories...' : 'Select a job category...'}
-                isLoading={categoriesLoading}
-                allowCustom
-                customPlaceholder="Or type your category"
-              />
-              <ProfileStyleSelect
-                label="Preferred Job Role"
-                options={roleOptions}
-                value={formData.preferred_job_role_id}
-                onChange={(val) =>
-                  setFormData((prev) => ({ ...prev, preferred_job_role_id: val }))
-                }
-                placeholder={
-                  rolesLoading
-                    ? 'Loading roles...'
-                    : formData.preferred_job_category_id
-                      ? 'Select a role...'
-                      : 'Select category first...'
-                }
-                disabled={!formData.preferred_job_category_id}
-                isLoading={rolesLoading}
-                allowCustom
-                customPlaceholder="Or type your role (e.g. Backend Developer)"
-              />
             </div>
 
             {/* Submit Button */}

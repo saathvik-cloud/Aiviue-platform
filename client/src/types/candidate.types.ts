@@ -36,6 +36,8 @@ export interface Candidate extends BaseEntity {
   has_resume?: boolean;
   /** Version of latest resume, if any. From API when available. */
   latest_resume_version?: number;
+  /** Pro: unlimited AIVI bot resumes; free: one-time build with AIVI. */
+  is_pro?: boolean;
 }
 
 // ==================== CANDIDATE RESUME ====================
@@ -55,13 +57,12 @@ export interface CandidateResume {
 
 // ==================== REQUEST TYPES ====================
 
+/** Signup: mobile, name, current location, preferred location only. Category/role filled later (e.g. from resume). */
 export interface CandidateSignupRequest {
   mobile: string;
   name: string;
-  current_location?: string;
-  preferred_job_category_id?: string;
-  preferred_job_role_id?: string;
-  preferred_job_location?: string;
+  current_location: string;
+  preferred_location: string;
 }
 
 export interface CandidateLoginRequest {

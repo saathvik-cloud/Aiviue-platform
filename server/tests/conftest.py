@@ -22,8 +22,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy import text
 
 from app.main import app
 from app.config import settings
@@ -79,6 +79,23 @@ def db_session_factory(db_engine):
         class_=AsyncSession,
         expire_on_commit=False
     )
+
+
+def get_test_database_url_sync() -> str:
+    """Get sync database URL (postgresql:// or postgresql+psycopg2://) for test helpers that must not share async pool."""
+    url = get_test_database_url()
+    if "+asyncpg" in url:
+        return url.replace("postgresql+asyncpg", "postgresql")
+    return url
+
+
+@pytest.fixture(scope="session")
+def sync_db_engine():
+    """Sync engine for test helpers to avoid async pool conflict with TestClient/app."""
+    url = get_test_database_url_sync()
+    engine = create_engine(url, pool_pre_ping=True)
+    yield engine
+    engine.dispose()
 
 
 # =============================================================================
@@ -188,8 +205,64 @@ def db_helpers(db_session_factory):
                     {"id": extraction_id}
                 )
                 await session.commit()
+
+        async def insert_completed_aivi_bot_resume(self, candidate_id: str):
+            """Insert one completed resume with source=aivi_bot for upgrade-gate tests."""
+            async with self.session_factory() as session:
+                await session.execute(
+                    text("""
+                        INSERT INTO candidate_resumes (candidate_id, source, status, version_number)
+                        VALUES (:candidate_id::uuid, 'aivi_bot', 'completed', 1)
+                    """),
+                    {"candidate_id": candidate_id},
+                )
+                await session.commit()
+
+        async def set_candidate_is_pro(self, candidate_id: str, is_pro: bool = True):
+            """Set candidate is_pro flag (for upgrade-gate tests)."""
+            async with self.session_factory() as session:
+                await session.execute(
+                    text("UPDATE candidates SET is_pro = :is_pro WHERE id = :id::uuid"),
+                    {"id": candidate_id, "is_pro": is_pro},
+                )
+                await session.commit()
     
     return DBHelpers(db_session_factory)
+
+
+@pytest.fixture
+def sync_db_helpers(sync_db_engine):
+    """
+    Sync DB helpers for tests that mix API client (TestClient) with DB setup.
+    Uses a separate sync connection to avoid asyncpg 'another operation in progress' when
+    sharing the event loop with the app.
+    """
+    class SyncDBHelpers:
+        def __init__(self, engine):
+            self.engine = engine
+
+        def insert_completed_aivi_bot_resume(self, candidate_id: str) -> None:
+            """Insert one completed resume with source=aivi_bot for upgrade-gate tests."""
+            with self.engine.connect() as conn:
+                conn.execute(
+                    text("""
+                        INSERT INTO candidate_resumes (candidate_id, source, status, version_number)
+                        VALUES (CAST(:candidate_id AS uuid), 'aivi_bot', 'completed', 1)
+                    """),
+                    {"candidate_id": candidate_id},
+                )
+                conn.commit()
+
+        def set_candidate_is_pro(self, candidate_id: str, is_pro: bool = True) -> None:
+            """Set candidate is_pro flag (for upgrade-gate tests)."""
+            with self.engine.connect() as conn:
+                conn.execute(
+                    text("UPDATE candidates SET is_pro = :is_pro WHERE id = CAST(:id AS uuid)"),
+                    {"id": candidate_id, "is_pro": is_pro},
+                )
+                conn.commit()
+
+    return SyncDBHelpers(sync_db_engine)
 
 
 # =============================================================================

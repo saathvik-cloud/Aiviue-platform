@@ -2,12 +2,19 @@
 
 import { ROUTES } from '@/constants';
 import { CandidateChatContainer } from '@/components/candidate-chat';
-import { History } from 'lucide-react';
+import { History, FileUp, Sparkles, Target, Briefcase } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
+const BANNER_TAGLINES = [
+  { icon: FileUp, text: 'Upload your resume' },
+  { icon: Target, text: "We'll recommend you jobs" },
+  { icon: Briefcase, text: 'Get visible to employers' },
+  { icon: Sparkles, text: 'Find your dream job' },
+] as const;
+
 /**
- * Candidate Resume Page – tagline, Resume History button, and AIVI chatbot.
+ * Candidate Resume Page – banner with taglines, Resume History button, and AIVI chatbot.
  * Resume history is also linked from Dashboard Quick Actions.
  */
 export default function CandidateResumePage() {
@@ -16,7 +23,7 @@ export default function CandidateResumePage() {
 
   return (
     <div className="space-y-4 sm:space-y-5 pb-8">
-      {/* Tagline – gradient background + colorful heading */}
+      {/* Banner – gradient, headline, taglines with icons */}
       <div
         className="rounded-2xl p-5 sm:p-6 relative overflow-hidden"
         style={{
@@ -35,9 +42,20 @@ export default function CandidateResumePage() {
           Build or upload your resume to get matched with the best jobs
         </h1>
         <p className="text-sm mt-2 relative" style={{ color: 'var(--neutral-gray)' }}>
-          Build your resume with AIVI bot step by step, or upload your existing PDF and we’ll
+          Build your resume with AIVI step by step, or upload your existing PDF and we’ll
           extract the details. The AI assistant will guide you through any missing information.
         </p>
+        {/* Taglines with icons */}
+        <ul className="mt-4 sm:mt-5 flex flex-wrap gap-x-6 gap-y-2 sm:gap-y-3 relative">
+          {BANNER_TAGLINES.map(({ icon: Icon, text }) => (
+            <li key={text} className="flex items-center gap-2 text-sm" style={{ color: 'var(--neutral-gray)' }}>
+              <span className="flex items-center justify-center w-7 h-7 rounded-lg shrink-0" style={{ background: 'rgba(124, 58, 237, 0.12)', color: '#7C3AED' }}>
+                <Icon className="w-3.5 h-3.5" />
+              </span>
+              <span>{text}</span>
+            </li>
+          ))}
+        </ul>
       </div>
 
       {/* Resume History – right-aligned between tagline and chatbot (same as Dashboard quick action) */}

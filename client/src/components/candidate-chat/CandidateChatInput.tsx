@@ -218,7 +218,7 @@ export function CandidateChatInput({
                     <button
                         onClick={handleSubmit}
                         disabled={isDisabled}
-                        className="w-full mt-3 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                        className="w-full min-h-[44px] mt-3 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                         style={{ background: 'linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)' }}
                     >
                         {isLoading ? 'Uploading...' : 'Upload File'}
@@ -313,7 +313,7 @@ export function CandidateChatInput({
                 <button
                     onClick={handleSubmit}
                     disabled={isDisabled || !value.trim()}
-                    className="p-3 rounded-xl transition-all hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                    className="min-h-[44px] min-w-[44px] flex items-center justify-center p-3 rounded-xl transition-all hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
                     style={{
                         background: 'linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)',
                     }}

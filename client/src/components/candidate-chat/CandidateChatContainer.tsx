@@ -16,6 +16,7 @@
  * Pattern: Mirrors employer ChatContainer for consistency.
  */
 
+import { isApiError } from '@/lib/api';
 import {
     useCandidateChatSession,
     useCandidateChatSessions,
@@ -23,6 +24,9 @@ import {
     useDeleteCandidateChatSession,
     useSendCandidateChatMessage,
 } from '@/lib/hooks';
+import { useQueryClient } from '@tanstack/react-query';
+import { candidateKeys } from '@/lib/hooks/use-candidate';
+import { getCandidateById } from '@/services/candidate.service';
 import { uploadResume } from '@/lib/supabase';
 import {
     CandidateChatSocketManager,
@@ -31,8 +35,11 @@ import {
 } from '@/lib/websocket/candidate-chat-socket';
 import { useCandidateAuthStore } from '@/stores';
 import type { CandidateChatButton, CandidateChatMessage as CandidateChatMessageType } from '@/types';
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { Crown, FileUp } from 'lucide-react';
+import { ROUTES } from '@/constants';
 import { CandidateChatHeader } from './CandidateChatHeader';
 import { CandidateChatHistory } from './CandidateChatHistory';
 import { CandidateChatInput } from './CandidateChatInput';
@@ -57,12 +64,13 @@ const STATIC_WELCOME_MESSAGES: CandidateChatMessageType[] = [
         id: 'welcome-2',
         session_id: '',
         role: 'bot',
-        content: "I'm here to help you build a professional resume.\n\nHow would you like to proceed?",
+        content:
+            "I'm here to help you build a professional resume.\n\n**Upload resume** — always free. **Build with AIVI** — one-time free; upgrade to Pro for unlimited.\n\nHow would you like to proceed?",
         message_type: 'buttons',
         message_data: {
             buttons: [
                 { id: 'upload_resume', label: '📄 Upload My Resume', variant: 'primary' },
-                { id: 'build_new', label: '✨ Build with AIVI', variant: 'secondary' },
+                { id: 'build_new', label: '✨ Build with AIVI (one-time free)', variant: 'secondary' },
             ],
         },
         created_at: new Date().toISOString(),
@@ -90,6 +98,8 @@ export interface CandidateChatContainerProps {
  */
 export function CandidateChatContainer({ initialFlow }: CandidateChatContainerProps = {}) {
     const candidate = useCandidateAuthStore((state) => state.candidate);
+    const setCandidate = useCandidateAuthStore((state) => state.setCandidate);
+    const queryClient = useQueryClient();
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const wsManagerRef = useRef<CandidateChatSocketManager | null>(null);
     const initialFlowSentRef = useRef(false);
@@ -97,6 +107,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
     // View state
     const [viewMode, setViewMode] = useState<ViewMode>('chat');
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+    const [upgradeRequired, setUpgradeRequired] = useState(false);
     const [localMessages, setLocalMessages] = useState<CandidateChatMessageType[]>(STATIC_WELCOME_MESSAGES);
     const [historyOffset, setHistoryOffset] = useState(0);
     const [isInitializing, setIsInitializing] = useState(true);
@@ -268,6 +279,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
 
             setCurrentSessionId(session.id);
             sessionIdRef.current = session.id;
+            setUpgradeRequired(false);
 
             setLocalMessages((prev) =>
                 prev.map((m) => ({ ...m, session_id: session.id }))
@@ -279,18 +291,45 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
             setIsInitializing(false);
         } catch (error) {
             console.error('[CandidateChat] Failed to create session:', error);
-            toast.error('Failed to start chat. Please try again.');
+            if (isApiError(error, 'UPGRADE_REQUIRED')) {
+                setUpgradeRequired(true);
+                toast.error('Upgrade to Pro to create more resumes with AIVI.');
+            } else {
+                toast.error('Failed to start chat. Please try again.');
+            }
             setIsInitializing(false);
         }
     }, [candidate?.id, createSession]);
 
-    // Initialize first session on mount
+    // Create session for upload-only flow (bypasses one-time gate; used when upgradeRequired)
+    const handleStartUploadSession = useCallback(async () => {
+        if (!candidate?.id) return;
+        setIsInitializing(true);
+        try {
+            const session = await createSession.mutateAsync({
+                candidate_id: candidate.id,
+                session_type: 'resume_upload',
+                force_new: false,
+            });
+            setCurrentSessionId(session.id);
+            sessionIdRef.current = session.id;
+            setUpgradeRequired(false);
+            setLocalMessages(STATIC_WELCOME_MESSAGES.map((m) => ({ ...m, session_id: session.id })));
+        } catch (error) {
+            console.error('[CandidateChat] Failed to start upload session:', error);
+            toast.error('Failed to start. Please try again.');
+        } finally {
+            setIsInitializing(false);
+        }
+    }, [candidate?.id, createSession]);
+
+    // Initialize first session on mount (skip if we already got UPGRADE_REQUIRED)
     useEffect(() => {
-        if (!currentSessionId && candidate?.id && !createSession.isPending) {
+        if (!currentSessionId && candidate?.id && !createSession.isPending && !upgradeRequired) {
             handleNewChat();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [candidate?.id]);
+    }, [candidate?.id, upgradeRequired]);
 
     // When initialFlow=upload, auto-send "Upload PDF" choice once session is ready
     useEffect(() => {
@@ -367,6 +406,15 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
                 );
                 return [...filtered, response.user_message, ...response.bot_messages];
             });
+
+            // If backend indicated resume was saved, refetch candidate so store has has_resume: true (for dashboard gate)
+            const resumeSaved = response.bot_messages?.some(
+                (m) => m.message_data && 'resume_id' in m.message_data
+            );
+            if (resumeSaved && candidate?.id) {
+                queryClient.invalidateQueries({ queryKey: candidateKeys.byId(candidate.id) });
+                getCandidateById(candidate.id).then(setCandidate).catch(() => {});
+            }
         } catch (error) {
             console.error('[CandidateChat] Failed to send message:', error);
             toast.error('Failed to send message');
@@ -476,6 +524,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
     const handleSelectSession = (sessionId: string) => {
         setCurrentSessionId(sessionId);
         sessionIdRef.current = sessionId;
+        setUpgradeRequired(false);
         setViewMode('chat');
 
         // When re-enabling WebSocket: call setupWebSocket(sessionId, candidate.id) here.
@@ -540,7 +589,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
 
     return (
         <div
-            className="flex flex-col h-[calc(100vh-120px)] rounded-2xl overflow-hidden"
+            className="flex flex-col min-h-[280px] h-[calc(100vh-220px)] sm:h-[calc(100vh-180px)] lg:h-[calc(100vh-120px)] rounded-2xl overflow-hidden"
             style={{
                 background: 'rgba(246, 239, 214, 0.97)',
                 backdropFilter: 'blur(20px)',
@@ -559,6 +608,29 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
                 showHistoryButton={true}
             />
 
+            {/* Upgrade banner when user has session but tried to create another (e.g. clicked "+ New Resume") */}
+            {upgradeRequired && currentSessionId && viewMode === 'chat' && (
+                <div
+                    className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm"
+                    style={{
+                        background: 'linear-gradient(90deg, rgba(251, 191, 36, 0.12) 0%, rgba(245, 158, 11, 0.08) 100%)',
+                        borderBottom: '1px solid rgba(245, 158, 11, 0.2)',
+                    }}
+                >
+                    <span style={{ color: 'var(--neutral-dark)' }}>
+                        Upgrade to Pro for unlimited resumes with AIVI.
+                    </span>
+                    <Link
+                        href={ROUTES.CANDIDATE_DASHBOARD_PROFILE}
+                        className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium text-white text-xs"
+                        style={{ background: 'linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)' }}
+                    >
+                        <Crown className="w-3.5 h-3.5" />
+                        Upgrade
+                    </Link>
+                </div>
+            )}
+
             {/* Main Content */}
             {viewMode === 'history' ? (
                 <CandidateChatHistory
@@ -570,10 +642,55 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
                     onLoadMore={handleLoadMore}
                     onBack={() => setViewMode('chat')}
                 />
+            ) : upgradeRequired && !currentSessionId ? (
+                /* Full upgrade card when no session (e.g. landed on page after using one-time) */
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex items-center justify-center">
+                    <div
+                        className="w-full max-w-md rounded-2xl p-6 sm:p-8 text-center"
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(253, 242, 248, 0.98) 0%, rgba(243, 232, 255, 0.9) 50%, rgba(237, 233, 254, 0.85) 100%)',
+                            border: '1px solid rgba(124, 58, 237, 0.15)',
+                            boxShadow: '0 8px 32px rgba(124, 58, 237, 0.1)',
+                        }}
+                    >
+                        <div
+                            className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                            style={{ background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.15) 100%)' }}
+                        >
+                            <Crown className="w-7 h-7" style={{ color: '#B45309' }} />
+                        </div>
+                        <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--neutral-dark)' }}>
+                            You’ve used your one free resume with AIVI
+                        </h3>
+                        <p className="text-sm mb-6" style={{ color: 'var(--neutral-gray)' }}>
+                            Upgrade to Pro to create unlimited resumes with the AIVI bot. You can still upload a PDF anytime.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                            <Link
+                                href={ROUTES.CANDIDATE_DASHBOARD_PROFILE}
+                                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-medium text-white text-sm transition-all hover:opacity-90"
+                                style={{ background: 'linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)' }}
+                            >
+                                <Crown className="w-4 h-4" />
+                                Upgrade to Premium
+                            </Link>
+                            <button
+                                type="button"
+                                onClick={handleStartUploadSession}
+                                disabled={createSession.isPending}
+                                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm border transition-all hover:bg-white/50 disabled:opacity-50"
+                                style={{ borderColor: 'var(--neutral-border)', color: 'var(--neutral-dark)' }}
+                            >
+                                <FileUp className="w-4 h-4" />
+                                {createSession.isPending ? 'Starting...' : 'Upload resume'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             ) : (
                 <>
                     {/* Messages Area */}
-                    <div className="flex-1 overflow-y-auto p-5 scrollbar-thin">
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-5 scrollbar-thin">
                         {sessionLoading && currentSessionId && !isInitializing ? (
                             <div className="flex items-center justify-center h-full">
                                 <div className="text-center">
