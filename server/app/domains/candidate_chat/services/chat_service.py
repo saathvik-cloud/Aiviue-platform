@@ -336,7 +336,11 @@ class CandidateChatService:
                 error_code="SESSION_NOT_FOUND",
             )
 
-        if session.session_status != CandidateSessionStatus.ACTIVE:
+        # Allow ACTIVE (normal) and COMPLETED (user can still send a message and get "start a new chat" response)
+        if session.session_status not in (
+            CandidateSessionStatus.ACTIVE,
+            CandidateSessionStatus.COMPLETED,
+        ):
             raise ValidationError(
                 message="This chat session is no longer active.",
                 error_code="SESSION_NOT_ACTIVE",

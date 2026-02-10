@@ -417,10 +417,7 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
             }
         } catch (error) {
             console.error('[CandidateChat] Failed to send message:', error);
-            const message =
-                isApiError(error, 'UPGRADE_REQUIRED')
-                    ? getErrorMessage(error)
-                    : 'Failed to send message';
+            const message = getErrorMessage(error);
             toast.error(message);
             setLocalMessages((prev) => prev.filter((m) => !m.id.startsWith('loading-')));
         } finally {

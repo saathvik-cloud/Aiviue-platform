@@ -209,6 +209,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   FORBIDDEN: 'You do not have permission to perform this action.',
   UPGRADE_REQUIRED:
     'To use AIVI bot to build your resume from scratch again, upgrade to Pro.',
+  SESSION_NOT_ACTIVE:
+    'This chat has ended. Start a new chat to continue.',
   INTERNAL_ERROR: 'Something went wrong. Please try again later.',
   // Validation specific errors
   GST_OR_PAN_REQUIRED: 'Please provide at least one of GST Number or PAN Number.',
