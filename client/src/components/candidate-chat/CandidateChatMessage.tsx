@@ -176,7 +176,7 @@ export function CandidateChatMessage({
                             </div>
                             <div>
                                 <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-                                    {summary.name || resumeData.sections?.personal_info?.full_name || 'Your Resume'}
+                                    {summary.name ?? summary.full_name ?? resumeData.sections?.personal_info?.full_name ?? 'Your Resume'}
                                 </h3>
                                 <p className="text-xs" style={{ color: 'var(--neutral-gray)' }}>
                                     {summary.role || resumeData.meta?.role_name || 'Resume Ready'}
@@ -272,13 +272,16 @@ export function CandidateChatMessage({
         );
     }
 
-    // ==================== MULTI_SELECT (e.g. skills: suggestion buttons + Custom) ====================
+    // ==================== MULTI_SELECT (e.g. skills, languages: suggestion buttons + Custom) ====================
     if (message.message_type === 'multi_select') {
         const questionKey = (message.message_data?.question_key as string) || '';
-        const options: string[] = Array.isArray(message.message_data?.options)
-            ? message.message_data.options
-            : typeof message.message_data?.options === 'object' && message.message_data?.options !== null
-                ? Object.values(message.message_data.options) as string[]
+        const rawOptions = message.message_data?.options;
+        const options: string[] = Array.isArray(rawOptions)
+            ? rawOptions.map((o: unknown) =>
+                typeof o === 'string' ? o : (o && typeof o === 'object' && 'label' in o ? String((o as { label?: string }).label) : (o as { id?: string }).id ? String((o as { id: string }).id) : String(o))
+            )
+            : typeof rawOptions === 'object' && rawOptions !== null
+                ? (Object.values(rawOptions) as string[])
                 : [];
         return (
             <MultiSelectMessage
@@ -295,12 +298,17 @@ export function CandidateChatMessage({
 
     // ==================== BUTTONS MESSAGE ====================
     if (message.message_type === 'buttons' || message.message_type === 'select') {
-        const buttons = (message.message_data?.buttons || []) as CandidateChatButton[];
+        const rawButtons = (message.message_data?.buttons || message.message_data?.options || []) as Array<{ id?: string; value?: string; label: string; variant?: 'primary' | 'secondary' | 'outline' }>;
+        const buttons: CandidateChatButton[] = rawButtons.map((btn) => ({
+            id: btn.id ?? btn.value ?? btn.label,
+            label: btn.label ?? String(btn.id ?? btn.value ?? ''),
+            ...(btn.variant && { variant: btn.variant }),
+        }));
 
         return (
             <div className={`flex items-start gap-3 ${mbClass} animate-fade-in`}>
                 {showAvatar ? <BotAvatar /> : <div className="w-9" />}
-                <div className="flex-1 max-w-lg">
+                <div className="flex-1 min-w-0 max-w-lg">
                     <div
                         className="px-4 py-3 rounded-2xl rounded-tl-md"
                         style={{
@@ -464,7 +472,7 @@ function MultiSelectMessage({
     return (
         <div className={`flex items-start gap-3 ${mbClass} animate-fade-in`}>
             {showAvatar ? <BotAvatar /> : <div className="w-9" />}
-            <div className="flex-1 max-w-lg">
+            <div className="flex-1 min-w-0 max-w-lg">
                 <div
                     className="px-4 py-3 rounded-2xl rounded-tl-md"
                     style={{
@@ -479,7 +487,7 @@ function MultiSelectMessage({
 
                 {isLatest && (
                     <div className="mt-3 space-y-3">
-                        {/* Suggestion buttons (e.g. React, JavaScript, ...) */}
+                        {/* Suggestion buttons (e.g. languages, skills) */}
                         {options.length > 0 && (
                             <div className="flex flex-wrap gap-2">
                                 {options.map((opt) => (

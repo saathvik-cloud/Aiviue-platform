@@ -24,7 +24,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.candidate.repository import CandidateRepository
 from app.domains.candidate_chat.services.chat_constants import (
     EDIT_FIELD_ALIASES,
-    JOB_TYPE_CHOICE_BUTTONS,
     WELCOME_MESSAGES,
     normalize_for_match,
 )
@@ -57,6 +56,24 @@ from app.shared.logging import get_logger
 
 
 logger = get_logger(__name__)
+
+# Education values that imply white vs blue collar (from fallback options)
+EDUCATION_WHITE_COLLAR = {"undergraduate", "postgraduate"}
+EDUCATION_BLUE_COLLAR = {"primary", "10th", "12th"}
+# Experience option ids that imply experienced (≥2 years) for blue collar
+EXPERIENCE_EXPERIENCED_IDS = {"2_years", "3_years", "4_years", "5_plus_years"}
+
+
+def _has_known_fallback_role(collected_data: dict) -> bool:
+    """True if user picked a known role from DB (job_role_id is a UUID, not 'custom')."""
+    rid = collected_data.get("job_role_id")
+    if not rid or str(rid).strip().lower() == "custom":
+        return False
+    try:
+        UUID(str(rid))
+        return True
+    except (ValueError, TypeError):
+        return False
 
 
 # ==================== CHAT SERVICE ====================
@@ -660,66 +677,6 @@ class CandidateChatService:
                 "message_data": {},
             }]
 
-        # ==================== FALLBACK: waiting for job type selection ====================
-        if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "choose_job_type":
-            button_id = (data.get("button_id") or content or "").strip().lower()
-            job_type_map = {"blue_collar": "blue_collar", "white_collar": "white_collar", "grey_collar": "grey_collar"}
-            fallback_job_type = job_type_map.get(button_id)
-            if not fallback_job_type:
-                return [{
-                    "role": CandidateMessageRole.BOT,
-                    "content": "Please select one of the job types above.",
-                    "message_type": CandidateMessageType.BUTTONS,
-                    "message_data": {"buttons": JOB_TYPE_CHOICE_BUTTONS},
-                }]
-            exp_years = collected_data.get("experience_years")
-            try:
-                exp_num = float(exp_years) if exp_years is not None else 0
-            except (TypeError, ValueError):
-                exp_num = 0
-            experience_level = "experienced" if exp_num >= 2 else "fresher"
-
-            ctx["fallback_job_type"] = fallback_job_type
-            ctx["fallback_experience_level"] = experience_level
-            ctx["fallback_phase"] = "type_specific"
-            ctx["job_type"] = fallback_job_type
-            ctx["role_name"] = fallback_job_type.replace("_", " ").title()
-
-            type_templates = await self._job_master_repo.get_fallback_questions(
-                job_type=fallback_job_type,
-                experience_level=experience_level,
-            )
-            if not type_templates:
-                ctx["step"] = ChatStep.RESUME_PREVIEW
-                await self._chat_repo.update_session(session.id, context_data=ctx)
-                if ctx.get("fallback_mode"):
-                    polished = await build_resume_from_chat_llm(
-                        ctx["collected_data"],
-                        job_type=fallback_job_type,
-                        role_name=ctx["role_name"],
-                    )
-                    ctx["collected_data"] = polished
-                    await self._chat_repo.update_session(session.id, context_data=ctx)
-                return build_preview_messages(ctx)
-
-            engine = QuestionEngine(type_templates, collected_data)
-            next_template = engine.get_next_question()
-            if not next_template:
-                ctx["step"] = ChatStep.RESUME_PREVIEW
-                await self._chat_repo.update_session(session.id, context_data=ctx)
-                if ctx.get("fallback_mode"):
-                    polished = await build_resume_from_chat_llm(
-                        ctx["collected_data"],
-                        job_type=fallback_job_type,
-                        role_name=ctx["role_name"],
-                    )
-                    ctx["collected_data"] = polished
-                    await self._chat_repo.update_session(session.id, context_data=ctx)
-                return build_preview_messages(ctx)
-            ctx["current_question_key"] = next_template.question_key
-            await self._chat_repo.update_session(session.id, context_data=ctx)
-            return [engine.build_question_message(next_template)]
-
         # Get the question_key being answered
         question_key = data.get("question_key")
 
@@ -732,15 +689,227 @@ class CandidateChatService:
             logger.warning(f"No question_key found for session {session.id}")
             return await self._build_next_question_messages(session)
 
+        # Handle "custom salary" text when user clicked Custom for salary_expectation and we asked for input
+        if ctx.get("awaiting_custom_salary_text") and question_key == "salary_expectation":
+            custom_salary = (content or "").strip()
+            if not custom_salary:
+                return [{
+                    "role": CandidateMessageRole.BOT,
+                    "content": "Please enter your expected salary (e.g. 50000 or 50k-60k per month).",
+                    "message_type": CandidateMessageType.TEXT,
+                    "message_data": {},
+                }, {
+                    "role": CandidateMessageRole.BOT,
+                    "content": "Type your expected salary below:",
+                    "message_type": CandidateMessageType.INPUT_TEXT,
+                    "message_data": {"question_key": "salary_expectation"},
+                }]
+            collected_data["salary_expectation"] = custom_salary
+            ctx["awaiting_custom_salary_text"] = False
+            ctx["collected_data"] = collected_data
+            answered_keys = ctx.get("answered_keys", [])
+            if "salary_expectation" not in answered_keys:
+                answered_keys = list(answered_keys) + ["salary_expectation"]
+            ctx["answered_keys"] = answered_keys
+            await self._chat_repo.update_session(session.id, context_data=ctx)
+            engine = QuestionEngine(templates, collected_data)
+            next_template = engine.get_next_question()
+            if next_template is None:
+                if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "general":
+                    return await self._transition_fallback_after_general(session, ctx)
+                # role_based / type_specific same as below
+                if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "role_based":
+                    return await self._transition_fallback_after_general(session, ctx)
+                if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "type_specific":
+                    polished = await build_resume_from_chat_llm(
+                        collected_data,
+                        job_type=ctx.get("fallback_job_type", "blue_collar"),
+                        role_name=ctx.get("role_name", "General"),
+                    )
+                    ctx["collected_data"] = polished
+                    await self._chat_repo.update_session(session.id, context_data=ctx)
+                ctx["step"] = ChatStep.RESUME_PREVIEW
+                ctx["current_question_key"] = None
+                await self._chat_repo.update_session(session.id, context_data=ctx)
+                return [
+                    {"role": CandidateMessageRole.BOT, "content": "✅ Great! I've collected all the information.", "message_type": CandidateMessageType.TEXT, "message_data": {}},
+                    {"role": CandidateMessageRole.BOT, "content": "Here's a preview of your resume. Would you like to confirm and save it?", "message_type": CandidateMessageType.RESUME_PREVIEW, "message_data": {"resume_data": collected_data, "role_name": ctx.get("role_name", ""), "job_type": ctx.get("job_type", "")}},
+                    {"role": CandidateMessageRole.BOT, "content": "Would you like to save this resume?", "message_type": CandidateMessageType.BUTTONS, "message_data": {"buttons": [{"id": "confirm_resume", "label": "✅ Yes, save my resume"}, {"id": "edit_resume", "label": "✏️ No, let me make changes"}]}},
+                ]
+            ctx["current_question_key"] = next_template.question_key
+            await self._chat_repo.update_session(session.id, context_data=ctx)
+            if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "general" and next_template.question_key in ("job_category_id", "job_role_id"):
+                question_msg = self._build_fallback_category_role_question_message(next_template, ctx, engine)
+            else:
+                question_msg = engine.build_question_message(next_template)
+            return [{"role": CandidateMessageRole.BOT, "content": "Got it! ✓", "message_type": CandidateMessageType.TEXT, "message_data": {}}, question_msg]
+
+        # Handle "custom role" text when user clicked Custom for job_role_id and we asked for input
+        if ctx.get("awaiting_custom_role_text") and question_key == "job_role_id":
+            custom_text = (content or "").strip()
+            if not custom_text:
+                return [{
+                    "role": CandidateMessageRole.BOT,
+                    "content": "Please enter your custom role (e.g. Data Scientist, Product Manager).",
+                    "message_type": CandidateMessageType.TEXT,
+                    "message_data": {},
+                }, {
+                    "role": CandidateMessageRole.BOT,
+                    "content": "Type your custom role below:",
+                    "message_type": CandidateMessageType.INPUT_TEXT,
+                    "message_data": {"question_key": "job_role_id"},
+                }]
+            collected_data["job_role_id"] = "custom"
+            collected_data["job_role_custom_text"] = custom_text
+            collected_data["job_role_name"] = custom_text
+            ctx["awaiting_custom_role_text"] = False
+            ctx["collected_data"] = collected_data
+            answered_keys = ctx.get("answered_keys", [])
+            if "job_role_id" not in answered_keys:
+                answered_keys = list(answered_keys) + ["job_role_id"]
+            ctx["answered_keys"] = answered_keys
+            await self._chat_repo.update_session(session.id, context_data=ctx)
+            engine = QuestionEngine(templates, collected_data)
+            next_template = engine.get_next_question()
+            if next_template is None:
+                # We're in general phase; custom role means no role_based phase, go straight to type/preview.
+                return await self._transition_fallback_after_general(session, ctx)
+            ctx["current_question_key"] = next_template.question_key
+            await self._chat_repo.update_session(session.id, context_data=ctx)
+            if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "general" and next_template.question_key in ("job_category_id", "job_role_id"):
+                question_msg = self._build_fallback_category_role_question_message(next_template, ctx, engine)
+            else:
+                question_msg = engine.build_question_message(next_template)
+            return [question_msg]
+
+        # Handle "custom education" text when user clicked Custom for education
+        if ctx.get("awaiting_custom_education_text") and question_key == "education":
+            custom_text = (content or "").strip()
+            if not custom_text:
+                return [{
+                    "role": CandidateMessageRole.BOT,
+                    "content": "Please enter your highest education (e.g. B.Tech, Diploma, MBA).",
+                    "message_type": CandidateMessageType.TEXT,
+                    "message_data": {},
+                }, {
+                    "role": CandidateMessageRole.BOT,
+                    "content": "Type your education below:",
+                    "message_type": CandidateMessageType.INPUT_TEXT,
+                    "message_data": {"question_key": "education"},
+                }]
+            collected_data["education"] = custom_text
+            ctx["awaiting_custom_education_text"] = False
+            ctx["collected_data"] = collected_data
+            answered_keys = ctx.get("answered_keys", [])
+            if "education" not in answered_keys:
+                answered_keys = list(answered_keys) + ["education"]
+            ctx["answered_keys"] = answered_keys
+            await self._chat_repo.update_session(session.id, context_data=ctx)
+            engine = QuestionEngine(templates, collected_data)
+            next_template = engine.get_next_question()
+            if next_template is None:
+                if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "general":
+                    return await self._transition_fallback_after_general(session, ctx)
+                if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "role_based":
+                    return await self._transition_fallback_after_general(session, ctx)
+                if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "type_specific":
+                    polished = await build_resume_from_chat_llm(
+                        collected_data,
+                        job_type=ctx.get("fallback_job_type", "blue_collar"),
+                        role_name=ctx.get("role_name", "General"),
+                    )
+                    ctx["collected_data"] = polished
+                    await self._chat_repo.update_session(session.id, context_data=ctx)
+                ctx["step"] = ChatStep.RESUME_PREVIEW
+                ctx["current_question_key"] = None
+                await self._chat_repo.update_session(session.id, context_data=ctx)
+                return [
+                    {"role": CandidateMessageRole.BOT, "content": "✅ Great! I've collected all the information.", "message_type": CandidateMessageType.TEXT, "message_data": {}},
+                    {"role": CandidateMessageRole.BOT, "content": "Here's a preview of your resume. Would you like to confirm and save it?", "message_type": CandidateMessageType.RESUME_PREVIEW, "message_data": {"resume_data": collected_data, "role_name": ctx.get("role_name", ""), "job_type": ctx.get("job_type", "")}},
+                    {"role": CandidateMessageRole.BOT, "content": "Would you like to save this resume?", "message_type": CandidateMessageType.BUTTONS, "message_data": {"buttons": [{"id": "confirm_resume", "label": "✅ Yes, save my resume"}, {"id": "edit_resume", "label": "✏️ No, let me make changes"}]}},
+                ]
+            ctx["current_question_key"] = next_template.question_key
+            await self._chat_repo.update_session(session.id, context_data=ctx)
+            if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "general" and next_template.question_key in ("job_category_id", "job_role_id"):
+                question_msg = self._build_fallback_category_role_question_message(next_template, ctx, engine)
+            else:
+                question_msg = engine.build_question_message(next_template)
+            return [{"role": CandidateMessageRole.BOT, "content": "Got it! ✓", "message_type": CandidateMessageType.TEXT, "message_data": {}}, question_msg]
+
+        # Handle "custom experience" text when user clicked Custom for experience_years
+        if ctx.get("awaiting_custom_experience_text") and question_key == "experience_years":
+            custom_text = (content or "").strip()
+            if not custom_text:
+                return [{
+                    "role": CandidateMessageRole.BOT,
+                    "content": "Please enter your work experience (e.g. 6 years, 10+ years).",
+                    "message_type": CandidateMessageType.TEXT,
+                    "message_data": {},
+                }, {
+                    "role": CandidateMessageRole.BOT,
+                    "content": "Type your experience below:",
+                    "message_type": CandidateMessageType.INPUT_TEXT,
+                    "message_data": {"question_key": "experience_years"},
+                }]
+            collected_data["experience_years"] = custom_text
+            ctx["awaiting_custom_experience_text"] = False
+            ctx["collected_data"] = collected_data
+            answered_keys = ctx.get("answered_keys", [])
+            if "experience_years" not in answered_keys:
+                answered_keys = list(answered_keys) + ["experience_years"]
+            ctx["answered_keys"] = answered_keys
+            await self._chat_repo.update_session(session.id, context_data=ctx)
+            engine = QuestionEngine(templates, collected_data)
+            next_template = engine.get_next_question()
+            if next_template is None:
+                if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "general":
+                    return await self._transition_fallback_after_general(session, ctx)
+                if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "role_based":
+                    return await self._transition_fallback_after_general(session, ctx)
+                if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "type_specific":
+                    polished = await build_resume_from_chat_llm(
+                        collected_data,
+                        job_type=ctx.get("fallback_job_type", "blue_collar"),
+                        role_name=ctx.get("role_name", "General"),
+                    )
+                    ctx["collected_data"] = polished
+                    await self._chat_repo.update_session(session.id, context_data=ctx)
+                ctx["step"] = ChatStep.RESUME_PREVIEW
+                ctx["current_question_key"] = None
+                await self._chat_repo.update_session(session.id, context_data=ctx)
+                return [
+                    {"role": CandidateMessageRole.BOT, "content": "✅ Great! I've collected all the information.", "message_type": CandidateMessageType.TEXT, "message_data": {}},
+                    {"role": CandidateMessageRole.BOT, "content": "Here's a preview of your resume. Would you like to confirm and save it?", "message_type": CandidateMessageType.RESUME_PREVIEW, "message_data": {"resume_data": collected_data, "role_name": ctx.get("role_name", ""), "job_type": ctx.get("job_type", "")}},
+                    {"role": CandidateMessageRole.BOT, "content": "Would you like to save this resume?", "message_type": CandidateMessageType.BUTTONS, "message_data": {"buttons": [{"id": "confirm_resume", "label": "✅ Yes, save my resume"}, {"id": "edit_resume", "label": "✏️ No, let me make changes"}]}},
+                ]
+            ctx["current_question_key"] = next_template.question_key
+            await self._chat_repo.update_session(session.id, context_data=ctx)
+            if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "general" and next_template.question_key in ("job_category_id", "job_role_id"):
+                question_msg = self._build_fallback_category_role_question_message(next_template, ctx, engine)
+            else:
+                question_msg = engine.build_question_message(next_template)
+            return [{"role": CandidateMessageRole.BOT, "content": "Got it! ✓", "message_type": CandidateMessageType.TEXT, "message_data": {}}, question_msg]
+
         # Get question templates (role-based or fallback)
         role_id = ctx.get("role_id")
         if ctx.get("fallback_mode"):
             phase = ctx.get("fallback_phase", "general")
             if phase == "general":
+                # Ensure categories/roles loaded once (e.g. resumed session from before this feature)
+                if not ctx.get("_job_categories"):
+                    categories = await self._job_master_repo.get_all_categories(
+                        active_only=True, include_roles=True
+                    )
+                    ctx["_job_categories"] = self._serialize_categories_for_context(categories)
                 templates = await self._job_master_repo.get_fallback_questions(
                     job_type=None,
                     experience_level=None,
                 )
+            elif phase == "role_based":
+                rid = ctx.get("role_id") or collected_data.get("job_role_id")
+                if not rid:
+                    return await self._transition_fallback_after_general(session, ctx)
+                templates = await self._job_master_repo.get_templates_by_role(UUID(str(rid)))
             else:
                 templates = await self._job_master_repo.get_fallback_questions(
                     job_type=ctx.get("fallback_job_type"),
@@ -786,6 +955,68 @@ class CandidateChatService:
         # ==================== SAVE ANSWER (Auto-save) ====================
         if parsed_value is not None:
             collected_data[question_key] = parsed_value
+            # Enrich with names for category/role (for resume display and profile update)
+            if question_key == "job_category_id" and parsed_value:
+                for c in ctx.get("_job_categories") or []:
+                    if str(c.get("id")) == str(parsed_value):
+                        collected_data["job_category_name"] = c.get("name", "")
+                        break
+            if question_key == "job_role_id" and parsed_value:
+                if parsed_value == "custom":
+                    # Don't mark as answered yet; ask for custom role text in next message.
+                    collected_data["job_role_id"] = "custom"
+                    ctx["collected_data"] = collected_data
+                    ctx["awaiting_custom_role_text"] = True
+                    await self._chat_repo.update_session(session.id, context_data=ctx)
+                    return [{
+                        "role": CandidateMessageRole.BOT,
+                        "content": "Type your custom role below (e.g. Data Scientist, Product Manager):",
+                        "message_type": CandidateMessageType.INPUT_TEXT,
+                        "message_data": {"question_key": "job_role_id"},
+                    }]
+                else:
+                    cat_id = collected_data.get("job_category_id")
+                    for c in ctx.get("_job_categories") or []:
+                        if str(c.get("id")) == str(cat_id):
+                            for r in c.get("roles", []):
+                                if str(r.get("id")) == str(parsed_value):
+                                    collected_data["job_role_name"] = r.get("name", "")
+                                    break
+                            break
+            if question_key == "salary_expectation" and parsed_value == "custom":
+                # Don't mark as answered yet; ask for custom salary in next message.
+                collected_data["salary_expectation"] = "custom"
+                ctx["collected_data"] = collected_data
+                ctx["awaiting_custom_salary_text"] = True
+                await self._chat_repo.update_session(session.id, context_data=ctx)
+                return [{
+                    "role": CandidateMessageRole.BOT,
+                    "content": "Type your expected salary below (e.g. 50000 or 50k-60k per month):",
+                    "message_type": CandidateMessageType.INPUT_TEXT,
+                    "message_data": {"question_key": "salary_expectation"},
+                }]
+            if question_key == "education" and parsed_value == "custom":
+                collected_data["education"] = "custom"
+                ctx["collected_data"] = collected_data
+                ctx["awaiting_custom_education_text"] = True
+                await self._chat_repo.update_session(session.id, context_data=ctx)
+                return [{
+                    "role": CandidateMessageRole.BOT,
+                    "content": "Type your highest education below (e.g. B.Tech, Diploma, MBA):",
+                    "message_type": CandidateMessageType.INPUT_TEXT,
+                    "message_data": {"question_key": "education"},
+                }]
+            if question_key == "experience_years" and parsed_value == "custom":
+                collected_data["experience_years"] = "custom"
+                ctx["collected_data"] = collected_data
+                ctx["awaiting_custom_experience_text"] = True
+                await self._chat_repo.update_session(session.id, context_data=ctx)
+                return [{
+                    "role": CandidateMessageRole.BOT,
+                    "content": "Type your work experience below (e.g. 6 years, 10+ years):",
+                    "message_type": CandidateMessageType.INPUT_TEXT,
+                    "message_data": {"question_key": "experience_years"},
+                }]
 
         answered_keys = ctx.get("answered_keys", [])
         if question_key not in answered_keys:
@@ -803,23 +1034,30 @@ class CandidateChatService:
         if next_template is None:
             # ==================== ALL QUESTIONS ANSWERED (or phase done) ====================
             if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "general":
-                ctx["fallback_phase"] = "choose_job_type"
-                ctx["current_question_key"] = None
-                await self._chat_repo.update_session(session.id, context_data=ctx)
-                return [
-                    {
+                if _has_known_fallback_role(collected_data):
+                    ctx["role_id"] = str(collected_data["job_role_id"])
+                    ctx["fallback_phase"] = "role_based"
+                    ctx["current_question_key"] = None
+                    await self._chat_repo.update_session(session.id, context_data=ctx)
+                    role_templates = await self._job_master_repo.get_templates_by_role(UUID(ctx["role_id"]))
+                    if not role_templates:
+                        return await self._transition_fallback_after_general(session, ctx)
+                    role_engine = QuestionEngine(role_templates, collected_data)
+                    first_role_q = role_engine.get_next_question()
+                    if not first_role_q:
+                        return await self._transition_fallback_after_general(session, ctx)
+                    ctx["current_question_key"] = first_role_q.question_key
+                    await self._chat_repo.update_session(session.id, context_data=ctx)
+                    intro = {
                         "role": CandidateMessageRole.BOT,
-                        "content": "What kind of job type are you looking for?",
+                        "content": f"A few role-specific questions for {collected_data.get('job_role_name', 'your role')}:",
                         "message_type": CandidateMessageType.TEXT,
                         "message_data": {},
-                    },
-                    {
-                        "role": CandidateMessageRole.BOT,
-                        "content": "Select one:",
-                        "message_type": CandidateMessageType.BUTTONS,
-                        "message_data": {"buttons": JOB_TYPE_CHOICE_BUTTONS},
-                    },
-                ]
+                    }
+                    return [intro, role_engine.build_question_message(first_role_q)]
+                return await self._transition_fallback_after_general(session, ctx)
+            if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "role_based":
+                return await self._transition_fallback_after_general(session, ctx)
             if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "type_specific":
                 polished = await build_resume_from_chat_llm(
                     collected_data,
@@ -867,7 +1105,10 @@ class CandidateChatService:
         ctx["current_question_key"] = next_template.question_key
         await self._chat_repo.update_session(session.id, context_data=ctx)
 
-        question_msg = engine.build_question_message(next_template)
+        if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "general" and next_template.question_key in ("job_category_id", "job_role_id"):
+            question_msg = self._build_fallback_category_role_question_message(next_template, ctx, engine)
+        else:
+            question_msg = engine.build_question_message(next_template)
 
         # Add an acknowledgment for the previous answer
         ack_messages = []
@@ -976,6 +1217,36 @@ class CandidateChatService:
 
                 resume_id = result["resume_id"]
                 version = result["version"]
+
+                # ==================== UPDATE CANDIDATE PROFILE (category/role from chat) ====================
+                cat_id = collected_data.get("job_category_id")
+                role_id_val = collected_data.get("job_role_id")
+                update_data = {}
+                if cat_id and str(cat_id).strip().lower() != "custom":
+                    try:
+                        update_data["preferred_job_category_id"] = UUID(str(cat_id))
+                    except (ValueError, TypeError):
+                        pass
+                if role_id_val and str(role_id_val).strip().lower() != "custom":
+                    try:
+                        update_data["preferred_job_role_id"] = UUID(str(role_id_val))
+                    except (ValueError, TypeError):
+                        pass
+                if update_data:
+                    try:
+                        candidate = await self._candidate_repo.get_by_id(session.candidate_id)
+                        if candidate:
+                            await self._candidate_repo.update(
+                                session.candidate_id,
+                                update_data,
+                                candidate.version,
+                            )
+                    except Exception as profile_err:
+                        logger.warning(
+                            "Failed to update candidate profile from chat choices: %s",
+                            profile_err,
+                            extra={"candidate_id": str(session.candidate_id)},
+                        )
 
                 # Update session context with resume info
                 ctx["step"] = ChatStep.COMPLETED
@@ -1140,6 +1411,217 @@ class CandidateChatService:
 
         return [intro_msg, question_msg]
 
+    def _build_fallback_category_role_question_message(
+        self,
+        template: Any,
+        ctx: dict,
+        engine: QuestionEngine,
+    ) -> dict:
+        """
+        Build bot message for job_category_id or job_role_id with buttons from context.
+        Used only in fallback general phase; options come from ctx["_job_categories"] (no DB).
+        """
+        question_key = template.question_key
+        collected = ctx.get("collected_data", {})
+        categories = ctx.get("_job_categories") or []
+
+        if question_key == "job_category_id":
+            # No Custom: user must pick a category from DB (sufficient options available).
+            buttons = [{"id": c["id"], "label": c["name"]} for c in categories]
+        elif question_key == "job_role_id":
+            cat_id = collected.get("job_category_id")
+            if not cat_id or cat_id == "custom":
+                buttons = [{"id": "custom", "label": "Custom"}]
+            else:
+                roles = []
+                for c in categories:
+                    if c.get("id") == cat_id:
+                        roles = [{"id": r["id"], "label": r["name"]} for r in c.get("roles", [])]
+                        break
+                buttons = roles + [{"id": "custom", "label": "Custom"}]
+        else:
+            return engine.build_question_message(template)
+
+        progress = {
+            "current": engine.answered_count + 1,
+            "total": engine.total_applicable_questions,
+            "percentage": engine.progress_percentage,
+        }
+        return {
+            "role": CandidateMessageRole.BOT,
+            "content": template.question_text,
+            "message_type": CandidateMessageType.BUTTONS,
+            "message_data": {
+                "question_key": question_key,
+                "buttons": buttons,
+                "progress": progress,
+                "is_required": getattr(template, "is_required", True),
+            },
+        }
+
+    def _infer_fallback_job_type_and_level(
+        self, collected_data: dict, ctx: dict
+    ) -> Tuple[str, Optional[str]]:
+        """
+        Infer fallback_job_type (white_collar, blue_collar, grey_collar) and
+        experience_level (fresher, experienced) from education and experience_years.
+        experience_level is only relevant for blue_collar; None for white/grey.
+        """
+        education = collected_data.get("education")
+        if isinstance(education, str):
+            education = education.strip().lower().replace(" ", "_")
+        exp_raw = collected_data.get("experience_years")
+
+        if education in EDUCATION_WHITE_COLLAR:
+            return "white_collar", None
+        if education in EDUCATION_BLUE_COLLAR:
+            level = "fresher"
+            if isinstance(exp_raw, str) and exp_raw.strip().lower() in EXPERIENCE_EXPERIENCED_IDS:
+                level = "experienced"
+            elif isinstance(exp_raw, (int, float)):
+                level = "experienced" if exp_raw >= 2 else "fresher"
+            return "blue_collar", level
+
+        # custom or unknown: use role's job_type if they picked a known role
+        role_id = collected_data.get("job_role_id")
+        if role_id and role_id != "custom" and ctx.get("_job_categories"):
+            for c in ctx["_job_categories"]:
+                for r in c.get("roles", []):
+                    if str(r.get("id")) == str(role_id):
+                        role_job_type = (r.get("job_type") or "white_collar").lower()
+                        if role_job_type == "white_collar":
+                            return "white_collar", None
+                        if role_job_type == "blue_collar":
+                            level = "fresher"
+                            if isinstance(exp_raw, str) and exp_raw.strip().lower() in EXPERIENCE_EXPERIENCED_IDS:
+                                level = "experienced"
+                            elif isinstance(exp_raw, (int, float)):
+                                level = "experienced" if exp_raw >= 2 else "fresher"
+                            return "blue_collar", level
+                        return "grey_collar", None
+        # default: grey_collar (vocational / other)
+        return "grey_collar", None
+
+    async def _transition_fallback_after_general(
+        self, session: CandidateChatSession, ctx: dict
+    ) -> List[dict]:
+        """
+        After all general questions: infer job type and experience level,
+        then go to resume preview (white_collar) or ask type_specific questions (blue/grey).
+        No choose_job_type step.
+        """
+        collected_data = ctx.get("collected_data", {})
+        job_type, experience_level = self._infer_fallback_job_type_and_level(collected_data, ctx)
+        ctx["fallback_job_type"] = job_type
+        ctx["fallback_experience_level"] = experience_level
+        ctx["job_type"] = job_type
+        ctx["role_name"] = (
+            collected_data.get("job_role_name")
+            or collected_data.get("job_role_custom_text")
+            or collected_data.get("job_category_name")
+            or ctx.get("role_name")
+            or job_type.replace("_", " ").title()
+        )
+        ctx["fallback_phase"] = "type_specific"
+
+        if job_type == "white_collar":
+            ctx["step"] = ChatStep.RESUME_PREVIEW
+            ctx["current_question_key"] = None
+            polished = await build_resume_from_chat_llm(
+                collected_data,
+                job_type=job_type,
+                role_name=ctx["role_name"],
+            )
+            ctx["collected_data"] = polished
+            await self._chat_repo.update_session(session.id, context_data=ctx)
+            return [
+                {
+                    "role": CandidateMessageRole.BOT,
+                    "content": "✅ I've got everything I need. Here's your resume preview.",
+                    "message_type": CandidateMessageType.TEXT,
+                    "message_data": {},
+                },
+                *build_preview_messages(ctx),
+            ]
+
+        type_templates = await self._job_master_repo.get_fallback_questions(
+            job_type=job_type,
+            experience_level=experience_level or "experienced",
+        )
+        if not type_templates:
+            ctx["step"] = ChatStep.RESUME_PREVIEW
+            ctx["current_question_key"] = None
+            polished = await build_resume_from_chat_llm(
+                collected_data,
+                job_type=job_type,
+                role_name=ctx["role_name"],
+            )
+            ctx["collected_data"] = polished
+            await self._chat_repo.update_session(session.id, context_data=ctx)
+            return [
+                {
+                    "role": CandidateMessageRole.BOT,
+                    "content": "✅ I've got everything I need. Here's your resume preview.",
+                    "message_type": CandidateMessageType.TEXT,
+                    "message_data": {},
+                },
+                *build_preview_messages(ctx),
+            ]
+
+        engine = QuestionEngine(type_templates, collected_data)
+        next_template = engine.get_next_question()
+        if not next_template:
+            ctx["step"] = ChatStep.RESUME_PREVIEW
+            ctx["current_question_key"] = None
+            polished = await build_resume_from_chat_llm(
+                collected_data,
+                job_type=job_type,
+                role_name=ctx["role_name"],
+            )
+            ctx["collected_data"] = polished
+            await self._chat_repo.update_session(session.id, context_data=ctx)
+            return [
+                {"role": CandidateMessageRole.BOT, "content": "✅ All set! Here's your resume.", "message_type": CandidateMessageType.TEXT, "message_data": {}},
+                *build_preview_messages(ctx),
+            ]
+
+        ctx["current_question_key"] = next_template.question_key
+        await self._chat_repo.update_session(session.id, context_data=ctx)
+        intro = {
+            "role": CandidateMessageRole.BOT,
+            "content": f"A few more questions for your profile ({job_type.replace('_', ' ')}):",
+            "message_type": CandidateMessageType.TEXT,
+            "message_data": {},
+        }
+        msg = engine.build_question_message(next_template)
+        return [intro, msg]
+
+    def _serialize_categories_for_context(
+        self, categories: List[Any],
+    ) -> List[dict]:
+        """
+        Build JSON-serializable list of categories with roles for session context.
+        Called once at fallback start so we never hit DB for category/role options again.
+        """
+        out = []
+        for c in categories:
+            roles = []
+            for r in getattr(c, "roles", []) or []:
+                if getattr(r, "is_active", True):
+                    roles.append({
+                        "id": str(r.id),
+                        "name": r.name,
+                        "slug": getattr(r, "slug", ""),
+                        "job_type": getattr(r, "job_type", "white_collar"),
+                    })
+            out.append({
+                "id": str(c.id),
+                "name": c.name,
+                "slug": getattr(c, "slug", ""),
+                "roles": roles,
+            })
+        return out
+
     async def _start_fallback_question_flow(
         self,
         session: CandidateChatSession,
@@ -1150,6 +1632,13 @@ class CandidateChatService:
         ctx["fallback_phase"] = "general"
         ctx["role_name"] = ctx.get("role_name") or "General"
         ctx["job_type"] = ctx.get("job_type") or "blue_collar"
+
+        # Load job categories + roles once and store in context (no DB calls during general phase)
+        if not ctx.get("_job_categories"):
+            categories = await self._job_master_repo.get_all_categories(
+                active_only=True, include_roles=True
+            )
+            ctx["_job_categories"] = self._serialize_categories_for_context(categories)
 
         general_templates = await self._job_master_repo.get_fallback_questions(
             job_type=None,
@@ -1167,22 +1656,26 @@ class CandidateChatService:
         engine = QuestionEngine(general_templates, collected)
         first_question = engine.get_next_question()
         if not first_question:
-            ctx["fallback_phase"] = "choose_job_type"
-            await self._chat_repo.update_session(session.id, context_data=ctx)
-            return [
-                {
-                    "role": CandidateMessageRole.BOT,
-                    "content": "What kind of job type are you looking for?",
-                    "message_type": CandidateMessageType.TEXT,
-                    "message_data": {},
-                },
-                {
-                    "role": CandidateMessageRole.BOT,
-                    "content": "Select one:",
-                    "message_type": CandidateMessageType.BUTTONS,
-                    "message_data": {"buttons": JOB_TYPE_CHOICE_BUTTONS},
-                },
-            ]
+            if _has_known_fallback_role(collected):
+                ctx["role_id"] = str(collected["job_role_id"])
+                ctx["fallback_phase"] = "role_based"
+                ctx["current_question_key"] = None
+                await self._chat_repo.update_session(session.id, context_data=ctx)
+                role_templates = await self._job_master_repo.get_templates_by_role(UUID(ctx["role_id"]))
+                if role_templates:
+                    role_engine = QuestionEngine(role_templates, collected)
+                    first_role_q = role_engine.get_next_question()
+                    if first_role_q:
+                        ctx["current_question_key"] = first_role_q.question_key
+                        await self._chat_repo.update_session(session.id, context_data=ctx)
+                        intro = {
+                            "role": CandidateMessageRole.BOT,
+                            "content": f"A few role-specific questions for {collected.get('job_role_name', 'your role')}:",
+                            "message_type": CandidateMessageType.TEXT,
+                            "message_data": {},
+                        }
+                        return [intro, role_engine.build_question_message(first_role_q)]
+            return await self._transition_fallback_after_general(session, ctx)
 
         ctx["current_question_key"] = first_question.question_key
         await self._chat_repo.update_session(session.id, context_data=ctx)
@@ -1193,7 +1686,10 @@ class CandidateChatService:
             "message_type": CandidateMessageType.TEXT,
             "message_data": {},
         }
-        question_msg = engine.build_question_message(first_question)
+        if first_question.question_key in ("job_category_id", "job_role_id"):
+            question_msg = self._build_fallback_category_role_question_message(first_question, ctx, engine)
+        else:
+            question_msg = engine.build_question_message(first_question)
         return [intro_msg, question_msg]
 
     async def _build_next_question_messages(
@@ -1209,10 +1705,21 @@ class CandidateChatService:
             if phase == "choose_job_type":
                 return []
             if phase == "general":
+                if not ctx.get("_job_categories"):
+                    categories = await self._job_master_repo.get_all_categories(
+                        active_only=True, include_roles=True
+                    )
+                    ctx["_job_categories"] = self._serialize_categories_for_context(categories)
+                    await self._chat_repo.update_session(session.id, context_data=ctx)
                 templates = await self._job_master_repo.get_fallback_questions(
                     job_type=None,
                     experience_level=None,
                 )
+            elif phase == "role_based":
+                rid = ctx.get("role_id") or collected_data.get("job_role_id")
+                if not rid:
+                    return []
+                templates = await self._job_master_repo.get_templates_by_role(UUID(str(rid)))
             else:
                 templates = await self._job_master_repo.get_fallback_questions(
                     job_type=ctx.get("fallback_job_type"),
@@ -1234,6 +1741,8 @@ class CandidateChatService:
         ctx["current_question_key"] = next_q.question_key
         await self._chat_repo.update_session(session.id, context_data=ctx)
 
+        if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "general" and next_q.question_key in ("job_category_id", "job_role_id"):
+            return [self._build_fallback_category_role_question_message(next_q, ctx, engine)]
         return [engine.build_question_message(next_q)]
 
     def _copy_context(self, session: CandidateChatSession) -> dict:

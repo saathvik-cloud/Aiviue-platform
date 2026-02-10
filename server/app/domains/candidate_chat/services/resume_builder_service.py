@@ -177,6 +177,12 @@ class ResumeBuilderService:
             },
         )
 
+        # Inject candidate name from profile when not already in collected_data (for preview/PDF)
+        if not collected_data.get("full_name"):
+            candidate = await self._candidate_repo.get_by_id(candidate_id)
+            if candidate and getattr(candidate, "name", None):
+                collected_data = {**collected_data, "full_name": candidate.name}
+
         # Step 1: Structure the data
         structured_data = self._structure_resume_data(
             collected_data=collected_data,

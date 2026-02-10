@@ -386,6 +386,9 @@ class QuestionEngine:
             return False
 
         actual_value = self._collected_data[depends_on]
+        # If no "value" in condition: show when dependency is present and truthy
+        if expected_value is None and "value" not in template.condition:
+            return bool(actual_value)
         return actual_value == expected_value
 
     def get_template_by_key(self, question_key: str) -> Optional[RoleQuestionTemplate]:
