@@ -1290,32 +1290,69 @@ class CandidateChatService:
                 resume_id = result["resume_id"]
                 version = result["version"]
 
-                # ==================== UPDATE CANDIDATE PROFILE (category/role from chat) ====================
+                # ==================== UPDATE CANDIDATE PROFILE (sync chatbot data → profile) ====================
+                profile_update: dict = {}
+
+                # 1. Job Category
                 cat_id = collected_data.get("job_category_id")
-                role_id_val = collected_data.get("job_role_id")
-                update_data = {}
                 if cat_id and str(cat_id).strip().lower() != "custom":
                     try:
-                        update_data["preferred_job_category_id"] = UUID(str(cat_id))
+                        profile_update["preferred_job_category_id"] = UUID(str(cat_id))
                     except (ValueError, TypeError):
                         pass
+
+                # 2. Job Role
+                role_id_val = collected_data.get("job_role_id")
                 if role_id_val and str(role_id_val).strip().lower() != "custom":
                     try:
-                        update_data["preferred_job_role_id"] = UUID(str(role_id_val))
+                        profile_update["preferred_job_role_id"] = UUID(str(role_id_val))
                     except (ValueError, TypeError):
                         pass
-                if update_data:
+
+                # 3. Languages Known (general key or blue-collar key)
+                languages = collected_data.get("languages_known") or collected_data.get("languages_blue")
+                if languages:
+                    # Normalize: ensure it's a list of strings
+                    if isinstance(languages, str):
+                        languages = [lang.strip() for lang in languages.split(",") if lang.strip()]
+                    if isinstance(languages, list) and languages:
+                        profile_update["languages_known"] = languages
+
+                # 4. Date of Birth
+                dob_val = collected_data.get("date_of_birth")
+                if dob_val:
+                    try:
+                        from datetime import date as date_type, datetime as dt_type
+                        if isinstance(dob_val, str):
+                            # QuestionEngine returns ISO format (YYYY-MM-DD)
+                            parsed_dob = dt_type.strptime(dob_val, "%Y-%m-%d").date()
+                        elif isinstance(dob_val, date_type):
+                            parsed_dob = dob_val
+                        else:
+                            parsed_dob = None
+                        if parsed_dob:
+                            profile_update["date_of_birth"] = parsed_dob
+                    except (ValueError, TypeError):
+                        pass
+
+                # Persist all collected profile fields
+                if profile_update:
                     try:
                         candidate = await self._candidate_repo.get_by_id(session.candidate_id)
                         if candidate:
                             await self._candidate_repo.update(
                                 session.candidate_id,
-                                update_data,
+                                profile_update,
                                 candidate.version,
+                            )
+                            logger.info(
+                                "Updated candidate profile from chat: %s",
+                                list(profile_update.keys()),
+                                extra={"candidate_id": str(session.candidate_id)},
                             )
                     except Exception as profile_err:
                         logger.warning(
-                            "Failed to update candidate profile from chat choices: %s",
+                            "Failed to update candidate profile from chat: %s",
                             profile_err,
                             extra={"candidate_id": str(session.candidate_id)},
                         )

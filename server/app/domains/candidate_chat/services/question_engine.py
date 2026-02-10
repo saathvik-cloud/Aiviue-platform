@@ -334,7 +334,19 @@ class QuestionEngine:
                 # For select, append "Custom" so user can type their own value
                 opts = list(template.options)
                 if template.question_type == "select":
-                    opts.append({"id": "custom", "label": "Custom"})
+                    # Only add "Custom" if not already present in options
+                    has_custom = any(
+                        (
+                            str(o.get("id", "")).lower() == "custom"
+                            or str(o.get("label", "")).lower() == "custom"
+                            or str(o.get("value", "")).lower() == "custom"
+                        )
+                        if isinstance(o, dict)
+                        else str(o).lower() == "custom"
+                        for o in opts
+                    )
+                    if not has_custom:
+                        opts.append({"id": "custom", "label": "Custom"})
                 message_data["options"] = opts
             elif isinstance(template.options, dict):
                 message_data["options"] = template.options

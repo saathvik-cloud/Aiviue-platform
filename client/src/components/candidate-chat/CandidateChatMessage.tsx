@@ -252,8 +252,8 @@ export function CandidateChatMessage({
                                     key={btn.id}
                                     onClick={() => onButtonClick(btn)}
                                     className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-105 active:scale-95 ${btn.variant === 'primary'
-                                            ? 'text-white shadow-sm'
-                                            : 'btn-glass border border-neutral-200'
+                                        ? 'text-white shadow-sm'
+                                        : 'btn-glass border border-neutral-200'
                                         }`}
                                     style={
                                         btn.variant === 'primary'
@@ -329,13 +329,13 @@ export function CandidateChatMessage({
 
                     {buttons.length > 0 && isLatest && onButtonClick && (
                         <div className="flex flex-wrap gap-2 sm:gap-3 mt-3">
-                            {buttons.map((btn) => (
+                            {buttons.map((btn, idx) => (
                                 <button
-                                    key={btn.id}
+                                    key={`${btn.id}-${idx}`}
                                     onClick={() => onButtonClick(btn)}
                                     className={`min-h-[44px] px-4 py-2.5 sm:py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 active:scale-95 text-left ${btn.variant === 'primary'
-                                            ? 'text-white shadow-sm'
-                                            : 'btn-glass border border-neutral-200/80 hover:border-teal-300 hover:bg-teal-50/50'
+                                        ? 'text-white shadow-sm'
+                                        : 'btn-glass border border-neutral-200/80 hover:border-teal-300 hover:bg-teal-50/50'
                                         }`}
                                     style={
                                         btn.variant === 'primary'
