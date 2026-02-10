@@ -437,12 +437,13 @@ export default function CandidateProfilePage() {
     slug: role.slug,
   }));
 
-  // Include candidate's saved locations so they display even if not in INDIAN_CITIES or different case (e.g. "mumbai", "bandra")
+  // Include candidate's saved locations so they display even if not in list or different case (e.g. DB has "mumbai", list has "Mumbai")
   const baseLocationOptions = INDIAN_CITIES.map((city) => ({ value: city, label: city }));
   const currentVal = (formData.current_location || '').trim();
   const preferredVal = (formData.preferred_job_location || '').trim();
-  const hasCurrentInList = baseLocationOptions.some((o) => o.value === currentVal || o.label.toLowerCase() === currentVal.toLowerCase());
-  const hasPreferredInList = baseLocationOptions.some((o) => o.value === preferredVal || o.label.toLowerCase() === preferredVal.toLowerCase());
+  // Match by exact value only so "mumbai" from DB gets its own option and displays (list has value "Mumbai")
+  const hasCurrentInList = baseLocationOptions.some((o) => o.value === currentVal);
+  const hasPreferredInList = baseLocationOptions.some((o) => o.value === preferredVal);
   const locationOptions = [
     ...(currentVal && !hasCurrentInList ? [{ value: currentVal, label: currentVal.charAt(0).toUpperCase() + currentVal.slice(1).toLowerCase() }] : []),
     ...(preferredVal && !hasPreferredInList && preferredVal !== currentVal ? [{ value: preferredVal, label: preferredVal.charAt(0).toUpperCase() + preferredVal.slice(1).toLowerCase() }] : []),
