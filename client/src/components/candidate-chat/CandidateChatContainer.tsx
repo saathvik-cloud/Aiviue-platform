@@ -466,18 +466,10 @@ export function CandidateChatContainer({ initialFlow }: CandidateChatContainerPr
 
         const questionKey = (lastFileRequest?.message_data?.question_key as string) || 'resume_pdf';
 
-        // Show processing state
+        // Show processing state (only bot loading; user "Uploaded: filename" is added by handleSendMessage below to avoid duplicate)
         setIsProcessing(true);
         setLocalMessages((prev) => [
             ...prev,
-            {
-                id: `temp-file-${Date.now()}`,
-                session_id: currentSessionId,
-                role: 'user',
-                content: `Uploaded: ${file.name}`,
-                message_type: 'text',
-                created_at: new Date().toISOString(),
-            },
             {
                 id: `processing-${Date.now()}`,
                 session_id: currentSessionId,
