@@ -913,7 +913,7 @@ class CandidateChatService:
             else:
                 templates = await self._job_master_repo.get_fallback_questions(
                     job_type=ctx.get("fallback_job_type"),
-                    experience_level=ctx.get("fallback_experience_level"),
+                    experience_level=ctx.get("fallback_experience_level") or "experienced",
                 )
         elif role_id:
             templates = await self._job_master_repo.get_templates_by_role(UUID(role_id))
@@ -1512,8 +1512,11 @@ class CandidateChatService:
         """
         collected_data = ctx.get("collected_data", {})
         job_type, experience_level = self._infer_fallback_job_type_and_level(collected_data, ctx)
+        # IMPORTANT: Apply the same "experienced" fallback used in the DB query (line 1549)
+        # so that the answer handler loads the same template set.
+        resolved_experience_level = experience_level or "experienced"
         ctx["fallback_job_type"] = job_type
-        ctx["fallback_experience_level"] = experience_level
+        ctx["fallback_experience_level"] = resolved_experience_level
         ctx["job_type"] = job_type
         ctx["role_name"] = (
             collected_data.get("job_role_name")
@@ -1546,7 +1549,7 @@ class CandidateChatService:
 
         type_templates = await self._job_master_repo.get_fallback_questions(
             job_type=job_type,
-            experience_level=experience_level or "experienced",
+            experience_level=resolved_experience_level,
         )
         if not type_templates:
             ctx["step"] = ChatStep.RESUME_PREVIEW
@@ -1723,7 +1726,7 @@ class CandidateChatService:
             else:
                 templates = await self._job_master_repo.get_fallback_questions(
                     job_type=ctx.get("fallback_job_type"),
-                    experience_level=ctx.get("fallback_experience_level"),
+                    experience_level=ctx.get("fallback_experience_level") or "experienced",
                 )
         else:
             role_id = ctx.get("role_id")
