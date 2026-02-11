@@ -26,6 +26,7 @@ from app.domains.candidate.schemas import CandidateUpdateRequest
 from app.domains.candidate.services import CandidateService
 from app.domains.candidate_chat.services.chat_constants import (
     EDIT_FIELD_ALIASES,
+    PDF_UPLOAD_NO_ROLE_QUESTION_KEYS,
     WELCOME_MESSAGES,
     normalize_for_match,
 )
@@ -87,6 +88,18 @@ def _is_choosing_upload(content: str, message_data: dict) -> bool:
     if "upload" in content_lower and ("resume" in content_lower or "pdf" in content_lower or "my resume" in content_lower):
         return True
     if content_lower in ("pdf", "upload"):
+        return True
+    return False
+
+
+def _is_extracted_value_empty(data: dict, key: str) -> bool:
+    """True if key is missing or value is empty/None (for PDF no-role missing-field detection)."""
+    val = data.get(key)
+    if val is None:
+        return True
+    if isinstance(val, str) and not val.strip():
+        return True
+    if isinstance(val, (list, dict)) and len(val) == 0:
         return True
     return False
 
@@ -595,6 +608,21 @@ class CandidateChatService:
         extracted_data = extraction_result.extracted_data or {}
         missing_keys = extraction_result.missing_keys
         confidence = extraction_result.extraction_confidence
+        whitelist_templates: Optional[List[Any]] = None
+
+        # When user has no preferred role: use general fallback questions, whitelist to 6 keys only
+        if not role_id:
+            fallback_list = await self._job_master_repo.get_fallback_questions(None, None)
+            whitelist_templates = [
+                t for t in fallback_list
+                if t.question_key in PDF_UPLOAD_NO_ROLE_QUESTION_KEYS
+            ]
+            missing_keys = [
+                t.question_key for t in whitelist_templates
+                if _is_extracted_value_empty(extracted_data, t.question_key)
+            ]
+            ctx["pdf_upload_no_role_use_general"] = True
+            ctx["missing_keys_queue"] = missing_keys
 
         # Store extracted data in context
         ctx["collected_data"] = extracted_data
@@ -626,8 +654,9 @@ class CandidateChatService:
             ctx["step"] = ChatStep.MISSING_FIELDS
             ctx["missing_keys_queue"] = missing_keys
 
-            # Get the first missing question
-            engine = QuestionEngine(templates, extracted_data)
+            # Get the first missing question (use whitelist templates when no role)
+            templates_for_engine = whitelist_templates if whitelist_templates is not None else templates
+            engine = QuestionEngine(templates_for_engine, extracted_data)
             next_template = engine.get_next_question()
 
             if next_template:
@@ -699,7 +728,12 @@ class CandidateChatService:
         Handle answers for missing fields after PDF extraction.
 
         Same logic as asking_questions but for fields not found in the PDF.
+        If user sends a new file (upload again), run full upload flow instead of re-asking.
         """
+        file_url = (data or {}).get("file_url", "").strip()
+        if file_url:
+            # User is uploading a new resume — treat as fresh upload (fix: no DOB/question loop)
+            return await self._handle_resume_upload(session, content, {"file_url": file_url})
         return await self._handle_question_answer(session, content, data)
 
     async def _handle_question_answer(
@@ -793,6 +827,30 @@ class CandidateChatService:
         if not question_key:
             # Shouldn't happen, but recover gracefully
             logger.warning(f"No question_key found for session {session.id}")
+            return await self._build_next_question_messages(session)
+
+        # PDF no-role: ignore duplicate file-upload (resume_pdf not in whitelist) — re-ask current question
+        if ctx.get("pdf_upload_no_role_use_general") and question_key == "resume_pdf":
+            current_key = ctx.get("current_question_key")
+            if current_key:
+                fallback_list = await self._job_master_repo.get_fallback_questions(None, None)
+                templates = [
+                    t for t in fallback_list
+                    if t.question_key in PDF_UPLOAD_NO_ROLE_QUESTION_KEYS
+                ]
+                engine = QuestionEngine(templates, ctx.get("collected_data", {}))
+                template = engine.get_template_by_key(current_key)
+                if template:
+                    return [
+                        {
+                            "role": CandidateMessageRole.BOT,
+                            "content": "Your resume was already received. Please answer the question below.",
+                            "message_type": CandidateMessageType.TEXT,
+                            "message_data": {},
+                        },
+                        engine.build_question_message(template),
+                    ]
+            # No current question — treat as no-op / show next
             return await self._build_next_question_messages(session)
 
         # Handle "custom salary" text when user clicked Custom for salary_expectation and we asked for input
@@ -1053,7 +1111,14 @@ class CandidateChatService:
 
         # Get question templates (role-based or fallback)
         role_id = ctx.get("role_id")
-        if ctx.get("fallback_mode"):
+        if ctx.get("pdf_upload_no_role_use_general"):
+            # PDF upload with no preferred role: use general fallback questions, whitelist only
+            fallback_list = await self._job_master_repo.get_fallback_questions(None, None)
+            templates = [
+                t for t in fallback_list
+                if t.question_key in PDF_UPLOAD_NO_ROLE_QUESTION_KEYS
+            ]
+        elif ctx.get("fallback_mode"):
             phase = ctx.get("fallback_phase", "general")
             if phase == "general":
                 # Ensure categories/roles loaded once (e.g. resumed session from before this feature)
@@ -1322,6 +1387,24 @@ class CandidateChatService:
             ctx["method"] = "pdf_upload"
             ctx["step"] = ChatStep.UPLOAD_RESUME
             await self._chat_repo.update_session(session.id, context_data=ctx)
+            return [{
+                "role": CandidateMessageRole.BOT,
+                "content": "Great! Please upload your resume PDF (max 2MB). I'll extract the information and ask for any missing details.",
+                "message_type": CandidateMessageType.INPUT_FILE,
+                "message_data": {
+                    "question_key": "resume_pdf",
+                    "accept": ".pdf",
+                    "max_size_mb": 2,
+                },
+            }]
+
+        # ==================== UPLOAD AGAIN: user at preview (pdf) sends new file or "upload again" ====================
+        file_url = (data or {}).get("file_url", "").strip()
+        if ctx.get("method") == "pdf_upload" and (file_url or _is_choosing_upload(content, data)):
+            ctx["step"] = ChatStep.UPLOAD_RESUME
+            await self._chat_repo.update_session(session.id, context_data=ctx)
+            if file_url:
+                return await self._handle_resume_upload(session, content, {"file_url": file_url})
             return [{
                 "role": CandidateMessageRole.BOT,
                 "content": "Great! Please upload your resume PDF (max 2MB). I'll extract the information and ask for any missing details.",
@@ -1918,7 +2001,13 @@ class CandidateChatService:
         ctx = session.context_data or {}
         collected_data = ctx.get("collected_data", {})
 
-        if ctx.get("fallback_mode"):
+        if ctx.get("pdf_upload_no_role_use_general"):
+            fallback_list = await self._job_master_repo.get_fallback_questions(None, None)
+            templates = [
+                t for t in fallback_list
+                if t.question_key in PDF_UPLOAD_NO_ROLE_QUESTION_KEYS
+            ]
+        elif ctx.get("fallback_mode"):
             phase = ctx.get("fallback_phase", "general")
             if phase == "choose_job_type":
                 return []
@@ -1959,6 +2048,8 @@ class CandidateChatService:
         ctx["current_question_key"] = next_q.question_key
         await self._chat_repo.update_session(session.id, context_data=ctx)
 
+        if ctx.get("pdf_upload_no_role_use_general"):
+            return [engine.build_question_message(next_q)]
         if ctx.get("fallback_mode") and ctx.get("fallback_phase") == "general" and next_q.question_key in ("job_category_id", "job_role_id"):
             return [self._build_fallback_category_role_question_message(next_q, ctx, engine)]
         return [engine.build_question_message(next_q)]

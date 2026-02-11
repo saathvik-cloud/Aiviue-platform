@@ -87,6 +87,17 @@ EDIT_FIELD_ALIASES: Dict[str, str] = {
     "languages": "languages_known",
 }
 
+# When user uploads PDF and has no preferred role, we ask only these general questions if missing.
+# Used to whitelist from fallback_resume_questions (job_type/experience_level NULL).
+PDF_UPLOAD_NO_ROLE_QUESTION_KEYS = (
+    "salary_expectation",
+    "date_of_birth",
+    "skills",
+    "languages_known",
+    "preferred_shift",
+    "about",
+)
+
 
 def normalize_for_match(text: str) -> str:
     """Normalize for matching: lowercase, hyphens to spaces, collapse spaces, trim."""
