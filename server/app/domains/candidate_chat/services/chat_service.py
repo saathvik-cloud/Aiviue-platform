@@ -728,12 +728,29 @@ class CandidateChatService:
         Handle answers for missing fields after PDF extraction.
 
         Same logic as asking_questions but for fields not found in the PDF.
-        If user sends a new file (upload again), run full upload flow instead of re-asking.
+        If user sends a new file (upload again) or clicks "Upload My Resume", show upload flow.
         """
-        file_url = (data or {}).get("file_url", "").strip()
+        data = data or {}
+        file_url = data.get("file_url", "").strip()
         if file_url:
-            # User is uploading a new resume — treat as fresh upload (fix: no DOB/question loop)
+            # User is uploading a new resume — treat as fresh upload
             return await self._handle_resume_upload(session, content, {"file_url": file_url})
+        if _is_choosing_upload(content, data):
+            # User clicked "Upload My Resume" (or similar) without a file — show upload field.
+            # Prevents "Upload My Resume" being validated as DOB when session was in MISSING_FIELDS.
+            ctx = self._copy_context(session)
+            ctx["step"] = ChatStep.UPLOAD_RESUME
+            await self._chat_repo.update_session(session.id, context_data=ctx)
+            return [{
+                "role": CandidateMessageRole.BOT,
+                "content": "Great! Please upload your resume PDF (max 2MB). I'll extract the information and ask for any missing details.",
+                "message_type": CandidateMessageType.INPUT_FILE,
+                "message_data": {
+                    "question_key": "resume_pdf",
+                    "accept": ".pdf",
+                    "max_size_mb": 2,
+                },
+            }]
         return await self._handle_question_answer(session, content, data)
 
     async def _handle_question_answer(
