@@ -8,11 +8,11 @@
  */
 
 import { LoadingContent } from '@/components/ui/loading-content';
+import { ApplyWithResumeModal } from '@/components/apply-with-resume-modal';
 import { ROUTES, JOB_CARD_GRADIENTS } from '@/constants';
-import { useJobs, useApplyToJob } from '@/lib/hooks';
+import { useJobs, useAppliedJobIds } from '@/lib/hooks';
 import { useCandidateAuthStore } from '@/stores';
 import { formatDate, getCurrencySymbol, stripSalaryRangeCurrency } from '@/lib/utils';
-import { getErrorMessage } from '@/lib/api';
 import {
   Briefcase,
   MapPin,
@@ -22,39 +22,20 @@ import {
   Clock,
   DollarSign,
   CheckCircle,
-  Loader2,
   Send,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useState, useCallback } from 'react';
-import { toast } from 'sonner';
-import { getAppliedJobIds, addAppliedJobId } from '@/lib/application-utils';
+import { useMemo, useState } from 'react';
 
 const RECOMMENDED_LIMIT = 12;
 
 export default function CandidateJobsPage() {
   const candidate = useCandidateAuthStore((state) => state.candidate);
   const [showAll, setShowAll] = useState(false);
-  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(() => getAppliedJobIds());
-  const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
-  const applyMutation = useApplyToJob();
+  const [applyModalJob, setApplyModalJob] = useState<{ id: string; title: string } | null>(null);
 
-  const handleApply = useCallback(
-    async (jobId: string) => {
-      setApplyingJobId(jobId);
-      try {
-        const res = await applyMutation.mutateAsync({ jobId });
-        addAppliedJobId(jobId);
-        setAppliedJobIds((prev) => new Set([...prev, jobId]));
-        toast.success(res.already_applied ? 'Already applied' : 'Application submitted!');
-      } catch (err) {
-        toast.error(getErrorMessage(err));
-      } finally {
-        setApplyingJobId(null);
-      }
-    },
-    [applyMutation]
-  );
+  const { data: appliedJobsData } = useAppliedJobIds(candidate?.id);
+  const appliedJobIds = new Set(appliedJobsData?.job_ids ?? []);
 
   // Build filters: prefer candidate's category/location when "recommended", else show all published
   const filters = useMemo(() => {
@@ -261,16 +242,11 @@ export default function CandidateJobsPage() {
                       type="button"
                       onClick={(e) => {
                         e.preventDefault();
-                        handleApply(job.id);
+                        setApplyModalJob({ id: job.id, title: job.title });
                       }}
-                      disabled={applyingJobId === job.id}
-                      className="btn-gradient inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-70"
+                      className="btn-gradient inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
                     >
-                      {applyingJobId === job.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Send className="w-4 h-4" />
-                      )}
+                      <Send className="w-4 h-4" />
                       Apply
                     </button>
                   )}
@@ -280,6 +256,14 @@ export default function CandidateJobsPage() {
           })}
         </div>
       </LoadingContent>
+
+      <ApplyWithResumeModal
+        open={!!applyModalJob}
+        onOpenChange={(open) => !open && setApplyModalJob(null)}
+        jobId={applyModalJob?.id ?? ''}
+        jobTitle={applyModalJob?.title}
+        onSuccess={() => setApplyModalJob(null)}
+      />
     </div>
   );
 }

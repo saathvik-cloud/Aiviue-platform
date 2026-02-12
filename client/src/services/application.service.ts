@@ -7,11 +7,17 @@ import { API_ENDPOINTS } from '@/constants';
 import type {
   ApplicationListResponse,
   ApplicationDetailResponse,
+  AppliedJobIdsResponse,
   JobApplyResponse,
 } from '@/types';
 
 export interface JobApplyRequest {
   resume_id?: string;
+}
+
+// Get job IDs the current candidate has applied to
+export async function getAppliedJobIds(): Promise<AppliedJobIdsResponse> {
+  return get<AppliedJobIdsResponse>(API_ENDPOINTS.CANDIDATES.APPLIED_JOBS);
 }
 
 // List applications for a job (employer)

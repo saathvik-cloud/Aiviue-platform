@@ -17,6 +17,8 @@ Tests covered:
 13. Get application detail - success
 14. Get application detail - 404 / 403
 15. source_application NOT in employer-facing responses
+16. GET /candidates/me/applied-jobs - returns job IDs per candidate (each candidate sees only their own)
+17. GET /candidates/me/applied-jobs - 401 without auth
 
 """
 
@@ -417,4 +419,126 @@ class TestGetApplicationDetail:
         assert apply_resp.status_code == 201
         app_id = apply_resp.json()["application_id"]
         resp = api_client.get(f"{API_JOBS}/{job['id']}/applications/{app_id}")
+        assert resp.status_code == 401
+
+
+# =============================================================================
+# GET MY APPLIED JOBS (Candidate sees only their own applications)
+# =============================================================================
+
+
+class TestGetMyAppliedJobs:
+    """GET /api/v1/candidates/me/applied-jobs"""
+
+    def test_applied_jobs_returns_empty_when_not_applied(
+        self, api_client, employer_and_published_job, candidate_with_resume
+    ):
+        """Candidate who has not applied gets empty job_ids list."""
+        _, job, _ = employer_and_published_job
+        candidate_id, cand_auth = candidate_with_resume
+        resp = api_client.get(
+            f"{API_CANDIDATES}/me/applied-jobs",
+            headers=cand_auth,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "job_ids" in data
+        assert data["job_ids"] == []
+
+    def test_applied_jobs_returns_job_ids_after_apply(
+        self, api_client, employer_and_published_job, candidate_with_resume
+    ):
+        """After applying, candidate sees that job ID in applied-jobs."""
+        _, job, _ = employer_and_published_job
+        candidate_id, cand_auth = candidate_with_resume
+
+        apply_resp = api_client.post(
+            f"{API_JOBS}/{job['id']}/apply",
+            json={},
+            headers=cand_auth,
+        )
+        assert apply_resp.status_code == 201
+
+        resp = api_client.get(
+            f"{API_CANDIDATES}/me/applied-jobs",
+            headers=cand_auth,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "job_ids" in data
+        assert job["id"] in data["job_ids"]
+        assert len(data["job_ids"]) == 1
+
+    def test_applied_jobs_different_candidates_see_own_only(
+        self, api_client, employer_and_published_job, sync_db_helpers
+    ):
+        """
+        Candidate A applies to job -> sees job in their list.
+        Candidate B (different user) sees empty list.
+        Proves applied state is per-candidate, not global.
+        """
+        import random
+
+        _, job, _ = employer_and_published_job
+
+        # Candidate A: signup, resume, apply
+        mobile_a = f"91{random.randint(9000000000, 9999999999)}"
+        signup_a = api_client.post(
+            f"{API_CANDIDATES}/signup",
+            json={
+                "mobile": mobile_a,
+                "name": "Candidate A",
+                "current_location": "Mumbai",
+                "preferred_location": "Pune",
+            },
+        )
+        assert signup_a.status_code in (200, 201)
+        cand_a_id = signup_a.json()["candidate"]["id"]
+        sync_db_helpers.insert_completed_resume_for_apply(
+            cand_a_id, resume_data={"sections": {"summary": "A"}}
+        )
+        login_a = api_client.post(AUTH_CANDIDATE, json={"mobile_number": mobile_a})
+        assert login_a.status_code == 200
+        auth_a = {"Authorization": f"Bearer {login_a.json()['access_token']}"}
+
+        apply_a = api_client.post(
+            f"{API_JOBS}/{job['id']}/apply",
+            json={},
+            headers=auth_a,
+        )
+        assert apply_a.status_code == 201
+
+        # Candidate B: signup, resume (different user, no apply)
+        mobile_b = f"91{random.randint(9000000000, 9999999999)}"
+        signup_b = api_client.post(
+            f"{API_CANDIDATES}/signup",
+            json={
+                "mobile": mobile_b,
+                "name": "Candidate B",
+                "current_location": "Mumbai",
+                "preferred_location": "Pune",
+            },
+        )
+        assert signup_b.status_code in (200, 201)
+        cand_b_id = signup_b.json()["candidate"]["id"]
+        sync_db_helpers.insert_completed_resume_for_apply(
+            cand_b_id, resume_data={"sections": {"summary": "B"}}
+        )
+        login_b = api_client.post(AUTH_CANDIDATE, json={"mobile_number": mobile_b})
+        assert login_b.status_code == 200
+        auth_b = {"Authorization": f"Bearer {login_b.json()['access_token']}"}
+
+        # A sees job in their list
+        resp_a = api_client.get(f"{API_CANDIDATES}/me/applied-jobs", headers=auth_a)
+        assert resp_a.status_code == 200
+        assert job["id"] in resp_a.json()["job_ids"]
+
+        # B sees empty list (they did not apply)
+        resp_b = api_client.get(f"{API_CANDIDATES}/me/applied-jobs", headers=auth_b)
+        assert resp_b.status_code == 200
+        assert resp_b.json()["job_ids"] == []
+
+    def test_applied_jobs_without_auth_returns_401(self, api_client):
+        """GET applied-jobs without candidate auth -> 401."""
+        resp = api_client.get(f"{API_CANDIDATES}/me/applied-jobs")
         assert resp.status_code == 401

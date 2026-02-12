@@ -13,11 +13,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.constants import ApplicationSource, JobStatus
-from app.domains.candidate.models import ResumeStatus
 from app.domains.candidate.repository import CandidateRepository
 from app.domains.candidate.services import build_candidate_response_for_display
 from app.domains.job.repository import JobRepository
 from app.domains.job_application.repository import JobApplicationRepository
+from app.domains.candidate.schemas import AppliedJobIdsResponse
 from app.domains.job_application.schemas import (
     ApplicationDetailResponse,
     ApplicationListItemResponse,
@@ -54,6 +54,14 @@ class JobApplicationService:
         self.candidate_repo = candidate_repo
 
     # ==================== APPLY (Candidate) ====================
+
+    async def get_applied_job_ids(self, candidate_id: UUID) -> AppliedJobIdsResponse:
+        """
+        Get job IDs the candidate has applied to.
+        Used by frontend to show Apply vs Applied per job per candidate.
+        """
+        job_ids = await self.app_repo.list_job_ids_by_candidate_id(candidate_id)
+        return AppliedJobIdsResponse(job_ids=job_ids)
 
     async def apply(
         self,
@@ -112,12 +120,7 @@ class JobApplicationService:
                     error_code="RESUME_NOT_FOUND",
                     context={"resume_id": str(resume_id)},
                 )
-            if resume.status != ResumeStatus.COMPLETED:
-                raise ValidationError(
-                    message="You can only apply with a completed resume.",
-                    error_code="RESUME_NOT_COMPLETED",
-                    context={"resume_id": str(resume_id)},
-                )
+            # Allow any resume when user explicitly selects it (completed or in-progress)
             resolved_resume_id = resume.id
         else:
             latest = await self.candidate_repo.get_latest_resume(candidate_id)

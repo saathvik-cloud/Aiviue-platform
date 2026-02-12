@@ -89,6 +89,22 @@ class JobApplicationRepository:
 
     # ==================== LIST ====================
 
+    async def list_job_ids_by_candidate_id(
+        self,
+        candidate_id: UUID,
+    ) -> list[UUID]:
+        """
+        List job IDs that a candidate has applied to.
+        Used by candidates to show Apply vs Applied state per job.
+        """
+        query = (
+            select(JobApplication.job_id)
+            .where(JobApplication.candidate_id == candidate_id)
+            .distinct()
+        )
+        result = await self.session.execute(query)
+        return [row[0] for row in result.all()]
+
     async def list_by_job_id(
         self,
         job_id: UUID,

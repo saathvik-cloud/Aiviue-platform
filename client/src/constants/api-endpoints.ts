@@ -55,6 +55,7 @@ export const API_ENDPOINTS = {
     RESUMES: (id: string) => `/api/${API_VERSION}/candidates/${id}/resumes`,
     RESUME_BY_ID: (candidateId: string, resumeId: string) =>
       `/api/${API_VERSION}/candidates/${candidateId}/resume/${resumeId}`,
+    APPLIED_JOBS: `/api/${API_VERSION}/candidates/me/applied-jobs`,
   },
 
   // Candidate Chat Endpoints (REST)

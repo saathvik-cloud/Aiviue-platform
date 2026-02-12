@@ -6,10 +6,9 @@
  */
 
 import { ROUTES, WORK_TYPES } from '@/constants';
-import { useJob, useApplyToJob } from '@/lib/hooks';
+import { useJob, useAppliedJobIds } from '@/lib/hooks';
+import { useCandidateAuthStore } from '@/stores';
 import { formatDate, formatSalaryRange, getCurrencySymbol, stripSalaryRangeCurrency } from '@/lib/utils';
-import { getAppliedJobIds, addAppliedJobId } from '@/lib/application-utils';
-import { getErrorMessage } from '@/lib/api';
 import {
   ArrowLeft,
   Briefcase,
@@ -21,12 +20,11 @@ import {
   CheckCircle,
   Globe,
   Send,
-  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState, useCallback } from 'react';
-import { toast } from 'sonner';
+import { useState } from 'react';
+import { ApplyWithResumeModal } from '@/components/apply-with-resume-modal';
 
 interface DescriptionSection {
   title: string;
@@ -83,26 +81,12 @@ function parseIntoBullets(text: string | undefined | null): string[] {
 
 export default function CandidateJobDetailPage() {
   const params = useParams();
+  const candidate = useCandidateAuthStore((state) => state.candidate);
   const jobId = typeof params.id === 'string' ? params.id : undefined;
   const { data: job, isLoading, error } = useJob(jobId);
-  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(() => getAppliedJobIds());
-  const [isApplying, setIsApplying] = useState(false);
-  const applyMutation = useApplyToJob();
-
-  const handleApply = useCallback(async () => {
-    if (!jobId) return;
-    setIsApplying(true);
-    try {
-      const res = await applyMutation.mutateAsync({ jobId });
-      addAppliedJobId(jobId);
-      setAppliedJobIds((prev) => new Set([...prev, jobId]));
-      toast.success(res.already_applied ? 'Already applied' : 'Application submitted!');
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    } finally {
-      setIsApplying(false);
-    }
-  }, [jobId, applyMutation]);
+  const { data: appliedJobsData } = useAppliedJobIds(candidate?.id);
+  const appliedJobIds = new Set(appliedJobsData?.job_ids ?? []);
+  const [showApplyModal, setShowApplyModal] = useState(false);
 
   if (isLoading) {
     return (
@@ -209,15 +193,10 @@ export default function CandidateJobDetailPage() {
               ) : (
                 <button
                   type="button"
-                  onClick={handleApply}
-                  disabled={isApplying}
-                  className="btn-gradient inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-70"
+                  onClick={() => setShowApplyModal(true)}
+                  className="btn-gradient inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold"
                 >
-                  {isApplying ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Send className="w-5 h-5" />
-                  )}
+                  <Send className="w-5 h-5" />
                   Apply
                 </button>
               )}
@@ -379,6 +358,14 @@ export default function CandidateJobDetailPage() {
           )}
         </div>
       </div>
+
+      <ApplyWithResumeModal
+        open={showApplyModal}
+        onOpenChange={setShowApplyModal}
+        jobId={job.id}
+        jobTitle={job.title}
+        onSuccess={() => setShowApplyModal(false)}
+      />
     </div>
   );
 }

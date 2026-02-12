@@ -305,3 +305,13 @@ class CandidateResumeResponse(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ==================== APPLIED JOBS (candidate-facing, avoids circular import) ====================
+
+class AppliedJobIdsResponse(BaseModel):
+    """Job IDs the current candidate has applied to."""
+    job_ids: list[UUID] = Field(
+        default_factory=list,
+        description="List of job IDs the candidate has applied to",
+    )

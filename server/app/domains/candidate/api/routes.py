@@ -11,6 +11,7 @@ Endpoints:
 - PUT   /api/v1/candidates/{id}                  Update full profile
 - GET   /api/v1/candidates/{id}/resume            Get latest resume
 - GET   /api/v1/candidates/{id}/resume/{resume_id}  Get specific resume
+- GET   /api/v1/candidates/me/applied-jobs         Get job IDs current candidate has applied to
 - GET   /api/v1/candidates/mobile/{mobile}        Get candidate by mobile
 """
 
@@ -31,6 +32,7 @@ from app.domains.candidate.schemas import (
     CandidateUpdateRequest,
 )
 from app.domains.candidate.services import CandidateService, get_candidate_service
+from app.domains.candidate.schemas import AppliedJobIdsResponse
 from app.shared.database import get_db
 from app.shared.logging import get_logger
 
@@ -58,6 +60,12 @@ async def get_service(
 ) -> CandidateService:
     """Dependency to get CandidateService."""
     return get_candidate_service(session)
+
+
+async def get_application_service(session: AsyncSession = Depends(get_db)):
+    """Dependency to get JobApplicationService. Lazy import to avoid circular dependency."""
+    from app.domains.job_application.services import get_job_application_service
+    return get_job_application_service(session)
 
 
 # ==================== AUTH ENDPOINTS ====================
@@ -99,6 +107,27 @@ async def login(
 ) -> CandidateAuthResponse:
     """Login an existing candidate."""
     return await service.login(request)
+
+
+# ==================== MY APPLIED JOBS (must be before /{candidate_id}) ====================
+
+@router.get(
+    "/me/applied-jobs",
+    response_model=AppliedJobIdsResponse,
+    summary="Get applied job IDs",
+    description="""
+    Returns job IDs the current candidate has applied to.
+    Used by frontend to show Apply vs Applied state per job.
+    Each candidate sees only their own applications.
+    """,
+)
+async def get_my_applied_jobs(
+    current_candidate: dict = Depends(get_current_candidate_from_token),
+    application_service=Depends(get_application_service),
+) -> AppliedJobIdsResponse:
+    """Get job IDs the current candidate has applied to."""
+    candidate_id = UUID(current_candidate["candidate_id"])
+    return await application_service.get_applied_job_ids(candidate_id)
 
 
 # ==================== PROFILE ENDPOINTS ====================

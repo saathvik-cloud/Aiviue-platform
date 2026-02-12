@@ -36,6 +36,10 @@ export interface ApplicationDetailResponse {
   resume_snapshot?: Record<string, unknown> | null;
 }
 
+export interface AppliedJobIdsResponse {
+  job_ids: string[];
+}
+
 export interface JobApplyResponse {
   application_id: string;
   applied_at: string;
