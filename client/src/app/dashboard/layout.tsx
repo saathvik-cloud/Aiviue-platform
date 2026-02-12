@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores';
 import {
   Briefcase,
   ChevronDown,
+  ClipboardList,
   HelpCircle,
   LayoutDashboard,
   LogOut,
@@ -25,6 +26,7 @@ import { useEffect, useState } from 'react';
 const iconMap = {
   LayoutDashboard,
   Briefcase,
+  ClipboardList,
   User,
 };
 
@@ -126,7 +128,9 @@ export default function DashboardLayout({
               ? pathname === item.href
               : item.href === ROUTES.DASHBOARD_PROFILE
                 ? pathname === item.href
-                : pathname === item.href || pathname.startsWith(item.href + '/');
+                : item.href === ROUTES.APPLICATIONS
+                  ? pathname === item.href || pathname.startsWith(item.href + '/')
+                  : pathname === item.href || pathname.startsWith(item.href + '/');
 
             return (
               <Link
@@ -227,6 +231,9 @@ export default function DashboardLayout({
               {pathname === ROUTES.DASHBOARD && 'Dashboard'}
               {pathname === ROUTES.JOBS && 'Jobs'}
               {pathname === ROUTES.JOB_NEW && 'Create New Job'}
+              {pathname === ROUTES.APPLICATIONS && 'Application Management'}
+              {pathname.match(/\/dashboard\/applications\/jobs\/[^/]+$/) && !pathname.includes('/candidates/') && 'Applicants'}
+              {pathname.includes('/dashboard/applications/jobs/') && pathname.includes('/candidates/') && 'Candidate Profile'}
               {pathname === ROUTES.DASHBOARD_PROFILE && 'Profile'}
               {pathname.match(/\/dashboard\/jobs\/[^/]+$/) && !pathname.includes('/edit') && !pathname.includes('/new') && 'Job Details'}
               {pathname.includes('/edit') && 'Edit Job'}

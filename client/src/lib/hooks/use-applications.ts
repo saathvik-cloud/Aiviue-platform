@@ -1,0 +1,56 @@
+/**
+ * Application Hooks - TanStack Query hooks for job application operations
+ */
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import * as applicationService from '@/services/application.service';
+import { jobKeys } from './use-jobs';
+
+// Query keys
+export const applicationKeys = {
+  all: ['applications'] as const,
+  list: (jobId: string) => [...applicationKeys.all, 'list', jobId] as const,
+  detail: (jobId: string, applicationId: string) =>
+    [...applicationKeys.all, 'detail', jobId, applicationId] as const,
+};
+
+// List applications for a job
+export function useApplicationsForJob(jobId: string | undefined) {
+  return useQuery({
+    queryKey: applicationKeys.list(jobId || ''),
+    queryFn: () => applicationService.listApplications(jobId!),
+    enabled: !!jobId,
+  });
+}
+
+// Get application detail
+export function useApplicationDetail(
+  jobId: string | undefined,
+  applicationId: string | undefined
+) {
+  return useQuery({
+    queryKey: applicationKeys.detail(jobId || '', applicationId || ''),
+    queryFn: () =>
+      applicationService.getApplicationDetail(jobId!, applicationId!),
+    enabled: !!jobId && !!applicationId,
+  });
+}
+
+// Apply to job (candidate)
+export function useApplyToJob() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      jobId,
+      data,
+    }: {
+      jobId: string;
+      data?: applicationService.JobApplyRequest;
+    }) => applicationService.applyToJob(jobId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: applicationKeys.all });
+      queryClient.invalidateQueries({ queryKey: jobKeys.all });
+    },
+  });
+}

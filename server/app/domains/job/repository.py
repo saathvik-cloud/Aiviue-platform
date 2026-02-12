@@ -67,6 +67,22 @@ class JobRepository:
         
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
+
+    async def get_by_id_with_role(
+        self,
+        job_id: UUID,
+        include_inactive: bool = False,
+    ) -> Optional[Job]:
+        """Get job by ID with role loaded (for application list/detail role name)."""
+        query = (
+            select(Job)
+            .where(Job.id == job_id)
+            .options(selectinload(Job.role))
+        )
+        if not include_inactive:
+            query = query.where(Job.is_active == True)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
     
     async def get_by_idempotency_key(
         self,

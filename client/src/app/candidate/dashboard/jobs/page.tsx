@@ -9,9 +9,10 @@
 
 import { LoadingContent } from '@/components/ui/loading-content';
 import { ROUTES, JOB_CARD_GRADIENTS } from '@/constants';
-import { useJobs } from '@/lib/hooks';
+import { useJobs, useApplyToJob } from '@/lib/hooks';
 import { useCandidateAuthStore } from '@/stores';
 import { formatDate, getCurrencySymbol, stripSalaryRangeCurrency } from '@/lib/utils';
+import { getErrorMessage } from '@/lib/api';
 import {
   Briefcase,
   MapPin,
@@ -20,15 +21,40 @@ import {
   Building2,
   Clock,
   DollarSign,
+  CheckCircle,
+  Loader2,
+  Send,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
+import { toast } from 'sonner';
+import { getAppliedJobIds, addAppliedJobId } from '@/lib/application-utils';
 
 const RECOMMENDED_LIMIT = 12;
 
 export default function CandidateJobsPage() {
   const candidate = useCandidateAuthStore((state) => state.candidate);
   const [showAll, setShowAll] = useState(false);
+  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(() => getAppliedJobIds());
+  const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
+  const applyMutation = useApplyToJob();
+
+  const handleApply = useCallback(
+    async (jobId: string) => {
+      setApplyingJobId(jobId);
+      try {
+        const res = await applyMutation.mutateAsync({ jobId });
+        addAppliedJobId(jobId);
+        setAppliedJobIds((prev) => new Set([...prev, jobId]));
+        toast.success(res.already_applied ? 'Already applied' : 'Application submitted!');
+      } catch (err) {
+        toast.error(getErrorMessage(err));
+      } finally {
+        setApplyingJobId(null);
+      }
+    },
+    [applyMutation]
+  );
 
   // Build filters: prefer candidate's category/location when "recommended", else show all published
   const filters = useMemo(() => {
@@ -207,7 +233,10 @@ export default function CandidateJobsPage() {
                   </p>
                 </div>
 
-                <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(124, 58, 237, 0.15)' }}>
+                <div
+                  className="mt-4 pt-4 flex flex-wrap items-center gap-2"
+                  style={{ borderTop: '1px solid rgba(124, 58, 237, 0.15)' }}
+                >
                   <Link
                     href={`/candidate/dashboard/jobs/${job.id}`}
                     className="inline-flex items-center gap-1.5 text-sm font-semibold transition-all hover:opacity-90"
@@ -216,6 +245,35 @@ export default function CandidateJobsPage() {
                     View details
                     <ArrowRight className="w-4 h-4" />
                   </Link>
+                  {appliedJobIds.has(job.id) ? (
+                    <span
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                      style={{
+                        background: 'rgba(34, 197, 94, 0.15)',
+                        color: 'var(--status-published)',
+                      }}
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Applied
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleApply(job.id);
+                      }}
+                      disabled={applyingJobId === job.id}
+                      className="btn-gradient inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-70"
+                    >
+                      {applyingJobId === job.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                      Apply
+                    </button>
+                  )}
                 </div>
               </div>
             );

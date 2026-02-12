@@ -253,6 +253,30 @@ def sync_db_helpers(sync_db_engine):
                 )
                 conn.commit()
 
+        def insert_completed_resume_for_apply(
+            self, candidate_id: str, resume_data: dict | None = None, pdf_url: str | None = None
+        ) -> str:
+            """Insert completed resume and return resume_id for job-apply tests."""
+            import json
+            rd = json.dumps(resume_data) if resume_data is not None else None
+            with self.engine.connect() as conn:
+                r = conn.execute(
+                    text("""
+                        INSERT INTO candidate_resumes (candidate_id, source, status, version_number, resume_data, pdf_url)
+                        VALUES (CAST(:candidate_id AS uuid), 'aivi_bot', 'completed', 1,
+                                CAST(:resume_data AS jsonb), :pdf_url)
+                        RETURNING id
+                    """),
+                    {
+                        "candidate_id": candidate_id,
+                        "resume_data": rd,
+                        "pdf_url": pdf_url or None,
+                    },
+                )
+                row = r.fetchone()
+                conn.commit()
+                return str(row[0]) if row else ""
+
         def set_candidate_is_pro(self, candidate_id: str, is_pro: bool = True) -> None:
             """Set candidate is_pro flag (for upgrade-gate tests)."""
             with self.engine.connect() as conn:

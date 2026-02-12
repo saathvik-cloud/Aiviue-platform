@@ -135,6 +135,23 @@ def _candidate_response_with_masked(
     return r.model_copy(update=updates)
 
 
+def build_candidate_response_for_display(
+    candidate: Candidate,
+    *,
+    has_resume: Optional[bool] = None,
+    latest_resume_version: Optional[int] = None,
+) -> CandidateResponse:
+    """
+    Build CandidateResponse from Candidate ORM with masked Aadhaar/PAN.
+    For use by other domains (e.g. job_application) that need to expose candidate profile.
+    """
+    return _candidate_response_with_masked(
+        candidate,
+        has_resume=has_resume,
+        latest_resume_version=latest_resume_version,
+    )
+
+
 # ==================== SERVICE ====================
 
 class CandidateService:

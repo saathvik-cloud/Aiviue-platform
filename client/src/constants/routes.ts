@@ -18,6 +18,12 @@ export const ROUTES = {
   JOB_NEW: '/dashboard/jobs/new',
   JOB_EDIT: (id: string) => `/dashboard/jobs/${id}/edit`,
 
+  // Application Management Routes
+  APPLICATIONS: '/dashboard/applications',
+  APPLICATIONS_JOB: (jobId: string) => `/dashboard/applications/jobs/${jobId}`,
+  APPLICATIONS_JOB_CANDIDATE: (jobId: string, applicationId: string) =>
+    `/dashboard/applications/jobs/${jobId}/candidates/${applicationId}`,
+
   // Candidate Public Routes
   CANDIDATE_HOME: '/candidate',
   CANDIDATE_LOGIN: '/candidate/login',
@@ -46,6 +52,11 @@ export const NAV_ITEMS = [
     label: 'Jobs',
     href: ROUTES.JOBS,
     icon: 'Briefcase',
+  },
+  {
+    label: 'Application Management',
+    href: ROUTES.APPLICATIONS,
+    icon: 'ClipboardList',
   },
   {
     label: 'Profile',

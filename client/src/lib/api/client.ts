@@ -63,7 +63,8 @@ apiClient.interceptors.request.use(
       // Check for candidate-specific endpoints
       const isCandidateEndpoint =
         config.url?.includes('/candidate') ||
-        config.url?.includes('/candidates');
+        config.url?.includes('/candidates') ||
+        (config.url?.includes('/jobs/') && config.url?.endsWith('/apply'));
 
       if (isCandidateEndpoint && candidateToken && !isTokenExpired(candidateToken)) {
         token = candidateToken;

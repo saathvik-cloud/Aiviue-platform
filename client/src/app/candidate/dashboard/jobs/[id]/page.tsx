@@ -6,8 +6,10 @@
  */
 
 import { ROUTES, WORK_TYPES } from '@/constants';
-import { useJob } from '@/lib/hooks';
+import { useJob, useApplyToJob } from '@/lib/hooks';
 import { formatDate, formatSalaryRange, getCurrencySymbol, stripSalaryRangeCurrency } from '@/lib/utils';
+import { getAppliedJobIds, addAppliedJobId } from '@/lib/application-utils';
+import { getErrorMessage } from '@/lib/api';
 import {
   ArrowLeft,
   Briefcase,
@@ -18,9 +20,13 @@ import {
   Calendar,
   CheckCircle,
   Globe,
+  Send,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useState, useCallback } from 'react';
+import { toast } from 'sonner';
 
 interface DescriptionSection {
   title: string;
@@ -79,6 +85,24 @@ export default function CandidateJobDetailPage() {
   const params = useParams();
   const jobId = typeof params.id === 'string' ? params.id : undefined;
   const { data: job, isLoading, error } = useJob(jobId);
+  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(() => getAppliedJobIds());
+  const [isApplying, setIsApplying] = useState(false);
+  const applyMutation = useApplyToJob();
+
+  const handleApply = useCallback(async () => {
+    if (!jobId) return;
+    setIsApplying(true);
+    try {
+      const res = await applyMutation.mutateAsync({ jobId });
+      addAppliedJobId(jobId);
+      setAppliedJobIds((prev) => new Set([...prev, jobId]));
+      toast.success(res.already_applied ? 'Already applied' : 'Application submitted!');
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setIsApplying(false);
+    }
+  }, [jobId, applyMutation]);
 
   if (isLoading) {
     return (
@@ -139,7 +163,7 @@ export default function CandidateJobDetailPage() {
         Back to jobs
       </Link>
 
-      {/* Hero: title + company */}
+      {/* Hero: title + company + Apply */}
       <div
         className="rounded-2xl p-5 sm:p-6 relative overflow-hidden"
         style={{
@@ -149,24 +173,56 @@ export default function CandidateJobDetailPage() {
           boxShadow: '0 8px 32px rgba(124, 58, 237, 0.08)',
         }}
       >
-        <div className="flex items-start gap-4">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-            style={{
-              background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.2) 0%, rgba(236, 72, 153, 0.15) 100%)',
-            }}
-          >
-            <Briefcase className="w-7 h-7" style={{ color: 'var(--primary)' }} />
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="flex items-start gap-4 min-w-0 flex-1">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{
+                background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.2) 0%, rgba(236, 72, 153, 0.15) 100%)',
+              }}
+            >
+              <Briefcase className="w-7 h-7" style={{ color: 'var(--primary)' }} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl sm:text-2xl font-bold" style={{ color: '#374151' }}>
+                {job.title}
+              </h1>
+              <p className="text-sm font-semibold mt-1 flex items-center gap-1" style={{ color: '#6B7280' }}>
+                <Building2 className="w-4 h-4" style={{ color: 'var(--primary)' }} />
+                {job.employer_name ?? 'Company'}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl font-bold" style={{ color: '#374151' }}>
-              {job.title}
-            </h1>
-            <p className="text-sm font-semibold mt-1 flex items-center gap-1" style={{ color: '#6B7280' }}>
-              <Building2 className="w-4 h-4" style={{ color: 'var(--primary)' }} />
-              {job.employer_name ?? 'Company'}
-            </p>
-          </div>
+          {job.status === 'published' && (
+            <div className="flex-shrink-0">
+              {appliedJobIds.has(job.id) ? (
+                <span
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold"
+                  style={{
+                    background: 'rgba(34, 197, 94, 0.15)',
+                    color: 'var(--status-published)',
+                  }}
+                >
+                  <CheckCircle className="w-5 h-5" />
+                  Applied
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleApply}
+                  disabled={isApplying}
+                  className="btn-gradient inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-70"
+                >
+                  {isApplying ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Send className="w-5 h-5" />
+                  )}
+                  Apply
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

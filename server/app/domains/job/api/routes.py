@@ -1,7 +1,7 @@
 """
 Job API Routes for Aiviue Platform.
 
-RESTful endpoints for job and extraction management.
+RESTful endpoints for job, extraction, and job applications.
 
 Job Endpoints:
 - POST   /api/v1/jobs                  Create job
@@ -11,6 +11,11 @@ Job Endpoints:
 - DELETE /api/v1/jobs/{id}             Delete job
 - POST   /api/v1/jobs/{id}/publish     Publish job
 - POST   /api/v1/jobs/{id}/close       Close job
+
+Job Application Endpoints (Application Management):
+- GET    /api/v1/jobs/{id}/applications           List applications (employer)
+- GET    /api/v1/jobs/{id}/applications/{app_id}   Application detail (employer)
+- POST   /api/v1/jobs/{id}/apply                   Apply to job (candidate, idempotent)
 
 Extraction Endpoints:
 - POST   /api/v1/jobs/extract          Submit JD for extraction
@@ -24,7 +29,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import API_V1_PREFIX
-from app.shared.auth import get_current_employer_from_token, get_optional_employer_from_token
+from app.shared.auth import (
+    get_current_candidate_from_token,
+    get_current_employer_from_token,
+    get_optional_employer_from_token,
+)
 from app.domains.job.schemas import (
     ExtractionRequest,
     ExtractionResponse,
@@ -38,6 +47,16 @@ from app.domains.job.schemas import (
     JobUpdateRequest,
 )
 from app.domains.job.services import ExtractionService, JobService
+from app.domains.job_application.schemas import (
+    ApplicationDetailResponse,
+    ApplicationListResponse,
+    JobApplyRequest,
+    JobApplyResponse,
+)
+from app.domains.job_application.services import (
+    get_job_application_service,
+    JobApplicationService,
+)
 from app.shared.cache import CacheService, RedisClient
 from app.shared.database import get_db
 from app.shared.events import EventPublisher
@@ -106,6 +125,13 @@ async def get_extraction_service(
         session=session,
         queue_producer=queue_producer,
     )
+
+
+async def get_application_service(
+    session: AsyncSession = Depends(get_db),
+) -> JobApplicationService:
+    """Dependency to get JobApplicationService."""
+    return get_job_application_service(session)
 
 
 # ==================== EXTRACTION ENDPOINTS ====================
@@ -401,3 +427,72 @@ async def close_job(
     if job.employer_id != token_employer_id:
         raise HTTPException(status_code=403, detail="Not allowed to access this resource")
     return await service.close(job_id, request.version, request.reason)
+
+
+# ==================== JOB APPLICATION ENDPOINTS ====================
+
+@router.get(
+    "/{job_id}/applications",
+    response_model=ApplicationListResponse,
+    summary="List applications for a job",
+    description="""
+    List candidates who applied to this job. Employer only; job must be published.
+    Used by Application Management.
+    """,
+)
+async def list_job_applications(
+    job_id: UUID,
+    current_employer: dict = Depends(get_current_employer_from_token),
+    service: JobApplicationService = Depends(get_application_service),
+) -> ApplicationListResponse:
+    """List applications for a job. Caller must own the job and job must be published."""
+    return await service.list_applications_for_job(
+        job_id=job_id,
+        employer_id=UUID(current_employer["employer_id"]),
+    )
+
+
+@router.get(
+    "/{job_id}/applications/{application_id}",
+    response_model=ApplicationDetailResponse,
+    summary="Get application detail",
+    description="""
+    Full candidate profile and resume for display/download. Employer only.
+    """,
+)
+async def get_job_application_detail(
+    job_id: UUID,
+    application_id: UUID,
+    current_employer: dict = Depends(get_current_employer_from_token),
+    service: JobApplicationService = Depends(get_application_service),
+) -> ApplicationDetailResponse:
+    """Get application detail. Caller must own the job."""
+    return await service.get_application_detail(
+        application_id=application_id,
+        job_id=job_id,
+        employer_id=UUID(current_employer["employer_id"]),
+    )
+
+
+@router.post(
+    "/{job_id}/apply",
+    response_model=JobApplyResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Apply to a job",
+    description="""
+    Candidate applies to a published job. Idempotent: if already applied, returns same body with already_applied=true.
+    Uses latest completed resume if resume_id not provided.
+    """,
+)
+async def apply_to_job(
+    job_id: UUID,
+    request: JobApplyRequest,
+    current_candidate: dict = Depends(get_current_candidate_from_token),
+    service: JobApplicationService = Depends(get_application_service),
+) -> JobApplyResponse:
+    """Apply to a job. Candidate only; idempotent."""
+    return await service.apply(
+        job_id=job_id,
+        candidate_id=UUID(current_candidate["candidate_id"]),
+        resume_id=request.resume_id,
+    )

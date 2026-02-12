@@ -3,6 +3,7 @@
  */
 
 export * from './api.types';
+export * from './application.types';
 export * from './candidate-chat.types';
 export * from './candidate.types';
 export * from './chat.types';

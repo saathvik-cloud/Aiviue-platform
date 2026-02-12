@@ -22,6 +22,12 @@ export const API_ENDPOINTS = {
     PUBLISH: (id: string) => `/api/${API_VERSION}/jobs/${id}/publish`,
     CLOSE: (id: string) => `/api/${API_VERSION}/jobs/${id}/close`,
 
+    // Application Management
+    APPLICATIONS: (jobId: string) => `/api/${API_VERSION}/jobs/${jobId}/applications`,
+    APPLICATION_DETAIL: (jobId: string, applicationId: string) =>
+      `/api/${API_VERSION}/jobs/${jobId}/applications/${applicationId}`,
+    APPLY: (jobId: string) => `/api/${API_VERSION}/jobs/${jobId}/apply`,
+
     // Extraction
     EXTRACT: `/api/${API_VERSION}/jobs/extract`,
     EXTRACTION_STATUS: (id: string) => `/api/${API_VERSION}/jobs/extract/${id}`,

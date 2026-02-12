@@ -2,6 +2,7 @@
  * Services Index
  */
 
+export * from './application.service';
 export * from './candidate-chat.service';
 export * from './candidate.service';
 export * from './chat.service';
