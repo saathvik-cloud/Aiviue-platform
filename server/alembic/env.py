@@ -35,6 +35,7 @@ from app.domains.job_master.models import (
 )
 from app.domains.candidate.models import Candidate, CandidateResume
 from app.domains.candidate_chat.models.db_models import CandidateChatSession, CandidateChatMessage
+from app.domains.job_application.models import JobApplication
 
 
 # Alembic Config object

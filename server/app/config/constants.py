@@ -47,6 +47,11 @@ class CandidateResumeSource:
     AIVI_BOT = "aivi_bot"
     PDF_UPLOAD = "pdf_upload"
 
+# Job Application Source (admin-only; not exposed to employer)
+class ApplicationSource:
+    PLATFORM = "platform"
+    SCREENING_AGENT = "screening_agent"
+
 # Job Type Classification
 class JobTypeClassification:
     BLUE_COLLAR = "blue_collar"
