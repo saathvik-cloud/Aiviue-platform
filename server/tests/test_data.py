@@ -36,6 +36,12 @@ def generate_uuid() -> str:
     return str(uuid.uuid4())
 
 
+def generate_unique_indian_mobile() -> str:
+    """Generate unique 10-digit Indian mobile for screening tests."""
+    import random
+    return str(random.randint(9000000000, 9999999999))
+
+
 # =============================================================================
 # EMPLOYER TEST DATA
 # =============================================================================
@@ -236,6 +242,54 @@ EXPECTED_EXTRACTION_FIELDS = [
     "openings_count",
     "extraction_confidence",
 ]
+
+
+# =============================================================================
+# SCREENING API TEST DATA
+# =============================================================================
+
+def screening_payload_minimal(job_id: str, phone: str = None) -> dict:
+    """Minimal screening payload (candidate only, no resume)."""
+    import random
+    phone = phone or str(random.randint(9000000000, 9999999999))
+    return {
+        "job_id": job_id,
+        "candidate": {
+            "phone": phone,
+            "name": "Screening Test Candidate",
+        },
+    }
+
+
+def screening_payload_full(job_id: str, phone: str = None) -> dict:
+    """Full screening payload with candidate + resume."""
+    import random
+    phone = phone or str(random.randint(9000000000, 9999999999))
+    return {
+        "job_id": job_id,
+        "correlation_id": f"test-{uuid.uuid4().hex[:8]}",
+        "candidate": {
+            "phone": phone,
+            "name": "Screening Full Candidate",
+            "email": "screening@test.com",
+            "current_location": "Mumbai, Maharashtra",
+            "years_experience": 3,
+            "relevant_skills": "Python, SQL",
+            "job_title": "Data Engineer",
+            "work_preference": "remote",
+            "is_fresher": False,
+            "resume_summary": "LLM summary",
+            "fit_score_details": {"overall": 78},
+        },
+        "resume": {
+            "file_url": "https://storage.example.com/resume.pdf",
+            "file_type": "pdf",
+            "file_name": "resume.pdf",
+            "file_size": 102400,
+            "mime_type": "application/pdf",
+            "resume_data": {"sections": {"summary": "Test resume"}},
+        },
+    }
 
 
 # =============================================================================

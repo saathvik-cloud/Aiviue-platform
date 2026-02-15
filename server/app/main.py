@@ -163,6 +163,7 @@ from app.domains.chat import chat_router
 from app.domains.candidate import candidate_router
 from app.domains.candidate_chat import candidate_chat_router, candidate_chat_ws_router
 from app.domains.job_master import job_master_router
+from app.domains.screening import router as screening_router
 
 app.include_router(employer_router)
 app.include_router(job_router)
@@ -171,6 +172,7 @@ app.include_router(candidate_router)
 app.include_router(candidate_chat_router)
 app.include_router(candidate_chat_ws_router)  # WebSocket kept for future use (streaming/server push); client uses HTTP
 app.include_router(job_master_router)
+app.include_router(screening_router)
 
 
 # ==================== ROOT ENDPOINT ====================
@@ -195,6 +197,7 @@ async def root():
             "candidate_chat": f"{API_V1_PREFIX}/candidate-chat",
             "candidate_chat_ws": f"ws://localhost:8000{API_V1_PREFIX}/candidate-chat/ws/{{session_id}}",
             "job_master": f"{API_V1_PREFIX}/job-master",
+            "screening": f"{API_V1_PREFIX}/screening",
         },
     }
 

@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     # Feature Flags
     enable_screening_events: bool = False  # Set True when Screening Agent is ready
 
+    # Screening Agent API - when set, screening endpoints require X-Api-Key header
+    screening_api_key: str | None = None
+
     # Storage (optional - for resume PDF upload)
     supabase_url: str | None = None
     supabase_service_role_key: str | None = None

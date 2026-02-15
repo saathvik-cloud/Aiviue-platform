@@ -184,6 +184,43 @@ class Candidate(Base, FullAuditMixin):
         nullable=False,
         comment="Paid/pro customer: can create multiple resumes with AIVI bot",
     )
+
+    # ==================== SCREENING AGENT (screening_agent integration) ====================
+    fit_score_details: Mapped[dict | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        comment="Structured scoring output (skills match, weights, gaps) from screening",
+    )
+    resume_summary: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="LLM/parsed resume summary from screening",
+    )
+    years_experience: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="Years of experience for eligibility/scoring",
+    )
+    relevant_skills: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Relevant skills for fitment and skill matching",
+    )
+    job_title: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Candidate's current/job title for scoring and display",
+    )
+    work_preference: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="remote/onsite/shifts for matching",
+    )
+    is_fresher: Mapped[bool | None] = mapped_column(
+        Boolean,
+        nullable=True,
+        comment="Screening rules differ for freshers",
+    )
     # Free-tier AIVI bot uses: 1 = one free use, 0 = must upgrade. Decremented when an AIVI resume is saved.
     resume_remaining_count: Mapped[int] = mapped_column(
         Integer,
@@ -320,6 +357,33 @@ class CandidateResume(Base):
         PG_UUID(as_uuid=True),
         nullable=True,
         comment="FK to candidate_chat_sessions (if created via bot)",
+    )
+
+    # ==================== SCREENING AGENT (screening_agent integration) ====================
+    file_type: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="Resume type: pdf, docx, parsed-json",
+    )
+    file_name: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+        comment="Original file name for display and audit",
+    )
+    file_size: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="File size in bytes for storage/processing metrics",
+    )
+    mime_type: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="MIME type for validation and downstream parsing",
+    )
+    processed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="When parsing/resume-to-JSON processing completed",
     )
 
     # Timestamps
