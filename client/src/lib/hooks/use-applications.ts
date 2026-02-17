@@ -10,6 +10,7 @@ import { jobKeys } from './use-jobs';
 export const applicationKeys = {
   all: ['applications'] as const,
   appliedJobIds: ['applications', 'appliedJobIds'] as const,
+  appliedJobsList: ['applications', 'appliedJobsList'] as const,
   list: (jobId: string) => [...applicationKeys.all, 'list', jobId] as const,
   detail: (jobId: string, applicationId: string) =>
     [...applicationKeys.all, 'detail', jobId, applicationId] as const,
@@ -20,6 +21,19 @@ export function useAppliedJobIds(candidateId: string | undefined) {
   return useQuery({
     queryKey: applicationKeys.appliedJobIds,
     queryFn: () => applicationService.getAppliedJobIds(),
+    enabled: !!candidateId,
+  });
+}
+
+// List applied jobs for current candidate (paginated, recent first)
+export function useAppliedJobsList(
+  candidateId: string | undefined,
+  cursor?: string,
+  limit: number = 20
+) {
+  return useQuery({
+    queryKey: [...applicationKeys.appliedJobsList, cursor ?? '', limit],
+    queryFn: () => applicationService.listAppliedJobs(cursor, limit),
     enabled: !!candidateId,
   });
 }
@@ -61,6 +75,7 @@ export function useApplyToJob() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: applicationKeys.all });
       queryClient.invalidateQueries({ queryKey: applicationKeys.appliedJobIds });
+      queryClient.invalidateQueries({ queryKey: applicationKeys.appliedJobsList });
       queryClient.invalidateQueries({ queryKey: jobKeys.all });
     },
   });

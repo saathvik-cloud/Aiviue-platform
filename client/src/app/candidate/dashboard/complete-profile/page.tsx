@@ -163,10 +163,29 @@ export default function CompleteProfilePage() {
   const inputStyle =
     'w-full px-4 py-3 rounded-xl border text-sm outline-none transition-all bg-white/50 focus:bg-white focus:ring-2';
 
+  if (categoriesLoading) {
+    return (
+      <div className="max-w-xl mx-auto px-1 sm:px-0">
+        <div className="glass-card rounded-2xl p-6 sm:p-8 animate-pulse">
+          <div className="h-7 rounded w-3/4 mb-2" style={{ background: 'var(--neutral-light)' }} />
+          <div className="h-4 rounded w-full max-w-sm mb-6" style={{ background: 'var(--neutral-light)' }} />
+          <div className="space-y-4">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i}>
+                <div className="h-4 rounded w-24 mb-2" style={{ background: 'var(--neutral-light)' }} />
+                <div className="h-12 rounded-xl w-full" style={{ background: 'var(--neutral-light)' }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-xl mx-auto">
+    <div className="max-w-xl mx-auto px-1 sm:px-0">
       <div className="glass-card rounded-2xl p-6 sm:p-8">
-        <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--neutral-dark)' }}>
+        <h1 className="text-xl sm:text-2xl font-bold mb-1" style={{ color: 'var(--neutral-dark)' }}>
           Complete your profile
         </h1>
         <p className="text-sm mb-6" style={{ color: 'var(--neutral-gray)' }}>

@@ -15,9 +15,10 @@ Endpoints:
 - GET   /api/v1/candidates/mobile/{mobile}        Get candidate by mobile
 """
 
+from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import API_V1_PREFIX
@@ -33,6 +34,7 @@ from app.domains.candidate.schemas import (
 )
 from app.domains.candidate.services import CandidateService, get_candidate_service
 from app.domains.candidate.schemas import AppliedJobIdsResponse
+from app.domains.job.schemas import JobListResponse
 from app.shared.database import get_db
 from app.shared.logging import get_logger
 
@@ -110,6 +112,31 @@ async def login(
 
 
 # ==================== MY APPLIED JOBS (must be before /{candidate_id}) ====================
+
+@router.get(
+    "/me/applied-jobs/list",
+    response_model=JobListResponse,
+    summary="List applied jobs (paginated)",
+    description="""
+    Returns paginated list of jobs the current candidate has applied to, most recent first.
+    Cursor-based pagination: pass next_cursor from previous response for next page.
+    Each candidate sees only their own applications.
+    """,
+)
+async def list_my_applied_jobs(
+    current_candidate: dict = Depends(get_current_candidate_from_token),
+    application_service=Depends(get_application_service),
+    cursor: Optional[str] = Query(None, description="Pagination cursor from previous response"),
+    limit: int = Query(20, ge=1, le=100, description="Page size"),
+) -> JobListResponse:
+    """List jobs the current candidate has applied to, cursor-paginated, recent first."""
+    candidate_id = UUID(current_candidate["candidate_id"])
+    return await application_service.list_applied_jobs_paginated(
+        candidate_id=candidate_id,
+        cursor=cursor,
+        limit=limit,
+    )
+
 
 @router.get(
     "/me/applied-jobs",

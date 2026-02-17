@@ -495,11 +495,11 @@ export default function CandidateProfilePage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+    <div className="max-w-4xl mx-auto space-y-6 pb-8 px-1 sm:px-0">
+      {/* Header – stacks on mobile for better touch UX */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold truncate" style={{ color: 'var(--text-primary)' }}>
             Profile Settings
           </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--neutral-gray)' }}>
@@ -510,7 +510,7 @@ export default function CandidateProfilePage() {
         <button
           onClick={handleSubmit}
           disabled={!isDirty || isSaving || isUploadingPhoto}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+          className="flex items-center justify-center gap-2 px-5 py-3 sm:py-2.5 rounded-xl text-sm font-medium text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 min-h-[44px] sm:min-h-0 shrink-0"
           style={{
             background: isDirty
               ? 'linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)'

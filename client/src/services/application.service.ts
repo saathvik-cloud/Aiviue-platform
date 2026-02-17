@@ -4,11 +4,14 @@
 
 import { get, post } from '@/lib/api';
 import { API_ENDPOINTS } from '@/constants';
+import { buildQueryParams } from '@/constants';
 import type {
   ApplicationListResponse,
   ApplicationDetailResponse,
   AppliedJobIdsResponse,
   JobApplyResponse,
+  JobSummary,
+  PaginatedResponse,
 } from '@/types';
 
 export interface JobApplyRequest {
@@ -18,6 +21,17 @@ export interface JobApplyRequest {
 // Get job IDs the current candidate has applied to
 export async function getAppliedJobIds(): Promise<AppliedJobIdsResponse> {
   return get<AppliedJobIdsResponse>(API_ENDPOINTS.CANDIDATES.APPLIED_JOBS);
+}
+
+// List applied jobs for current candidate (paginated, recent first)
+export async function listAppliedJobs(
+  cursor?: string,
+  limit: number = 20
+): Promise<PaginatedResponse<JobSummary>> {
+  const params = buildQueryParams({ cursor, limit });
+  return get<PaginatedResponse<JobSummary>>(
+    `${API_ENDPOINTS.CANDIDATES.APPLIED_JOBS_LIST}${params}`
+  );
 }
 
 // List applications for a job (employer)

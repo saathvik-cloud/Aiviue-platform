@@ -1,8 +1,8 @@
 'use client';
 
 import { Skeleton } from '@/components/ui/skeleton';
-import { ROUTES } from '@/constants';
-import { useCandidateResumes, useJobs } from '@/lib/hooks';
+import { ROUTES, JOB_CARD_GRADIENTS } from '@/constants';
+import { useCandidateResumes, useAppliedJobsList, useJobs } from '@/lib/hooks';
 import { formatDate, getCurrencySymbol, stripSalaryRangeCurrency } from '@/lib/utils';
 import { useCandidateAuthStore } from '@/stores';
 import {
@@ -33,6 +33,7 @@ const RECOMMENDED_JOBS_TILE_BG_IMAGE =
  * and a placeholder for job recommendations (Step 3.8).
  */
 const RECOMMENDED_JOBS_CAROUSEL_LIMIT = 8;
+const APPLIED_JOBS_CAROUSEL_LIMIT = 10;
 
 export default function CandidateDashboardPage() {
   const candidate = useCandidateAuthStore((state) => state.candidate);
@@ -40,6 +41,14 @@ export default function CandidateDashboardPage() {
 
   // "Has resume" = at least one resume built/uploaded in AIVI (not just profile complete)
   const hasResume = (resumes?.length ?? 0) > 0;
+
+  // Applied jobs for carousel (below Recommended Jobs)
+  const { data: appliedJobsData } = useAppliedJobsList(
+    candidate?.id,
+    undefined,
+    APPLIED_JOBS_CAROUSEL_LIMIT
+  );
+  const appliedJobsCarousel = appliedJobsData?.items ?? [];
 
   // Recommended jobs for carousel (only fetched when user has resume)
   const jobFilters = useMemo(() => {
@@ -377,7 +386,10 @@ export default function CandidateDashboardPage() {
                 </Link>
               </div>
             ) : jobsLoading ? (
-              <div className="relative flex gap-3 overflow-x-auto overflow-y-hidden py-2 -mx-1 px-1 snap-x snap-mandatory scrollbar-thin">
+              <div
+                className="relative flex gap-3 overflow-x-auto overflow-y-hidden py-2 -mx-1 px-1 snap-x snap-mandatory scrollbar-thin"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
                 {[1, 2, 3, 4].map((i) => (
                   <div
                     key={i}
@@ -407,12 +419,15 @@ export default function CandidateDashboardPage() {
                 </Link>
               </div>
             ) : (
-              <div className="relative flex gap-3 overflow-x-auto overflow-y-hidden pb-2 -mx-1 px-1 scrollbar-thin snap-x snap-mandatory">
+              <div
+                className="relative flex gap-3 overflow-x-auto overflow-y-hidden pb-2 -mx-1 px-1 scrollbar-thin snap-x snap-mandatory"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
                 {recommendedJobs.map((job) => (
                   <Link
                     key={job.id}
                     href={`/candidate/dashboard/jobs/${job.id}`}
-                    className="flex-shrink-0 w-[260px] sm:w-[280px] rounded-xl p-4 flex flex-col transition-all hover:scale-[1.02] hover:shadow-lg snap-center touch-pan-x"
+                    className="flex-shrink-0 w-[260px] sm:w-[280px] rounded-xl p-4 flex flex-col transition-all hover:scale-[1.02] active:scale-[0.99] hover:shadow-lg snap-center touch-pan-x"
                     style={{
                       background:
                         'linear-gradient(145deg, rgba(250, 245, 255, 0.98) 0%, rgba(243, 232, 255, 0.7) 50%, rgba(237, 233, 254, 0.6) 100%)',
@@ -465,6 +480,133 @@ export default function CandidateDashboardPage() {
               </div>
             )}
             </div>
+          </div>
+
+          {/* Applied Jobs carousel – below Recommended Jobs */}
+          <div
+            className="rounded-2xl p-4 sm:p-5 mt-4 sm:mt-6 relative overflow-hidden"
+            style={{
+              background:
+                'linear-gradient(145deg, rgba(250, 245, 255, 0.98) 0%, rgba(243, 232, 255, 0.6) 50%, rgba(240, 253, 250, 0.4) 100%)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255, 255, 255, 0.7)',
+              boxShadow: '0 4px 24px rgba(124, 58, 237, 0.08)',
+            }}
+          >
+            <div className="flex items-center justify-between mb-3 sm:mb-4 relative z-10">
+              <h2 className="text-base font-semibold" style={{ color: 'var(--neutral-dark)' }}>
+                Applied Jobs
+              </h2>
+              {appliedJobsCarousel.length > 0 && (
+                <Link
+                  href={ROUTES.CANDIDATE_DASHBOARD_JOBS}
+                  className="text-sm font-medium flex items-center gap-1 transition-colors hover:opacity-80"
+                  style={{ color: 'var(--primary)' }}
+                >
+                  View all
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              )}
+            </div>
+            {appliedJobsCarousel.length === 0 ? (
+              <div className="relative text-center py-6 sm:py-8 z-10">
+                <div
+                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mx-auto mb-3"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(20, 184, 166, 0.12) 100%)',
+                  }}
+                >
+                  <CheckCircle className="w-7 h-7 sm:w-8 sm:h-8" style={{ color: 'var(--secondary-teal)' }} />
+                </div>
+                <p className="text-sm font-medium mb-1" style={{ color: 'var(--neutral-dark)' }}>
+                  No applied jobs yet
+                </p>
+                <p className="text-xs px-2" style={{ color: 'var(--neutral-gray)' }}>
+                  Apply to jobs from Jobs to see them here.
+                </p>
+                <Link
+                  href={ROUTES.CANDIDATE_DASHBOARD_JOBS}
+                  className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium"
+                  style={{ color: 'var(--primary)' }}
+                >
+                  Browse jobs
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            ) : (
+              <div
+                className="relative flex gap-3 overflow-x-auto overflow-y-hidden pb-2 -mx-1 px-1 scrollbar-thin snap-x snap-mandatory z-10"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
+                {appliedJobsCarousel.map((job, index) => {
+                  const style = JOB_CARD_GRADIENTS[index % JOB_CARD_GRADIENTS.length];
+                  return (
+                    <Link
+                      key={job.id}
+                      href={`/candidate/dashboard/jobs/${job.id}`}
+                      className="flex-shrink-0 w-[260px] sm:w-[280px] rounded-xl p-4 flex flex-col transition-all hover:scale-[1.02] active:scale-[0.99] hover:shadow-lg snap-center touch-pan-x"
+                      style={{
+                        background: style.bg,
+                        border: style.border,
+                        boxShadow: style.shadow,
+                        backdropFilter: 'blur(16px)',
+                      }}
+                    >
+                      <div className="flex items-start gap-2 mb-2">
+                        <div
+                          className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ background: style.iconBg }}
+                        >
+                          <Briefcase className="w-5 h-5" style={{ color: style.accent }} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-sm font-bold truncate" style={{ color: 'var(--neutral-dark)' }}>
+                            {job.title}
+                          </h3>
+                          <p className="text-xs truncate flex items-center gap-1 mt-0.5" style={{ color: 'var(--neutral-gray)' }}>
+                            <Building2 className="w-3 h-3 flex-shrink-0" style={{ color: style.accent }} />
+                            {job.employer_name ?? 'Company'}
+                          </p>
+                        </div>
+                      </div>
+                      {job.location && (
+                        <p className="flex items-center gap-1.5 text-xs mt-1 truncate" style={{ color: 'var(--neutral-gray)' }}>
+                          <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                          {job.location}
+                        </p>
+                      )}
+                      {job.salary_range && (
+                        <p className="flex items-center gap-1.5 text-xs mt-0.5" style={{ color: 'var(--neutral-gray)' }}>
+                          <DollarSign className="w-3.5 h-3.5 flex-shrink-0" />
+                          {getCurrencySymbol(job.currency)} {stripSalaryRangeCurrency(job.salary_range)}
+                        </p>
+                      )}
+                      <p className="flex items-center gap-1.5 text-xs mt-1" style={{ color: 'var(--neutral-gray)' }}>
+                        <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                        {formatDate(job.created_at)}
+                      </p>
+                      <div className="mt-3 pt-3 flex items-center gap-2" style={{ borderTop: '1px solid rgba(124, 58, 237, 0.12)' }}>
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: style.accent }}>
+                          View details
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </span>
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold"
+                          style={{
+                            background: 'rgba(34, 197, 94, 0.15)',
+                            color: 'var(--status-published)',
+                          }}
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          Applied
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Profile Completion Card – soft gradient */}

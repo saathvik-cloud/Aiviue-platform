@@ -18,6 +18,7 @@ from app.domains.candidate.services import build_candidate_response_for_display
 from app.domains.job.repository import JobRepository
 from app.domains.job_application.repository import JobApplicationRepository
 from app.domains.candidate.schemas import AppliedJobIdsResponse
+from app.domains.job.schemas import JobListResponse, JobSummaryResponse
 from app.domains.job_application.schemas import (
     ApplicationDetailResponse,
     ApplicationListItemResponse,
@@ -26,6 +27,7 @@ from app.domains.job_application.schemas import (
 )
 from app.shared.exceptions import BusinessError, ForbiddenError, NotFoundError, ValidationError
 from app.shared.logging import get_logger
+from app.shared.utils.pagination import encode_cursor
 
 
 logger = get_logger(__name__)
@@ -62,6 +64,58 @@ class JobApplicationService:
         """
         job_ids = await self.app_repo.list_job_ids_by_candidate_id(candidate_id)
         return AppliedJobIdsResponse(job_ids=job_ids)
+
+    async def list_applied_jobs_paginated(
+        self,
+        candidate_id: UUID,
+        cursor: Optional[str],
+        limit: int,
+    ) -> JobListResponse:
+        """
+        List jobs the candidate has applied to, most recent first, cursor-paginated.
+        Only returns jobs for this candidate (candidate_id from auth). Same shape as job list.
+        """
+        applications = await self.app_repo.list_by_candidate_paginated(
+            candidate_id=candidate_id,
+            cursor=cursor,
+            limit=limit,
+        )
+        has_more = len(applications) > limit
+        if has_more:
+            applications = applications[:limit]
+        items = [
+            self._job_to_summary(app.job)
+            for app in applications
+            if app.job is not None
+        ]
+        next_cursor = None
+        if has_more and applications:
+            last = applications[-1]
+            next_cursor = encode_cursor(id=last.id, created_at=last.applied_at)
+        return JobListResponse(
+            items=items,
+            next_cursor=next_cursor,
+            has_more=has_more,
+            total_count=None,
+        )
+
+    @staticmethod
+    def _job_to_summary(job) -> JobSummaryResponse:
+        """Build job summary from Job model (job.employer must be loaded)."""
+        employer_name = job.employer.company_name if job.employer else None
+        return JobSummaryResponse(
+            id=job.id,
+            employer_id=job.employer_id,
+            employer_name=employer_name,
+            title=job.title,
+            location=job.location,
+            work_type=job.work_type,
+            salary_range=job.salary_range,
+            currency=job.currency,
+            status=job.status,
+            openings_count=job.openings_count,
+            created_at=job.created_at,
+        )
 
     async def apply(
         self,
