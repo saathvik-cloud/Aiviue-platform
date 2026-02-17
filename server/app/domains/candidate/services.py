@@ -291,7 +291,12 @@ class CandidateService:
             raise NotFoundError(message="Candidate not found")
 
         await self.session.refresh(updated)
-        return _candidate_response_with_masked(updated)
+        count, max_version = await self.repository.get_resume_stats(candidate_id)
+        return _candidate_response_with_masked(
+            updated,
+            has_resume=count > 0,
+            latest_resume_version=max_version,
+        )
 
     async def update_profile(
         self,
@@ -364,7 +369,12 @@ class CandidateService:
             update_data["profile_status"] = ProfileStatus.COMPLETE
 
         if not update_data:
-            return _candidate_response_with_masked(candidate)
+            count, max_version = await self.repository.get_resume_stats(candidate_id)
+            return _candidate_response_with_masked(
+                candidate,
+                has_resume=count > 0,
+                latest_resume_version=max_version,
+            )
 
         updated = await self.repository.update(
             candidate_id,
@@ -377,7 +387,12 @@ class CandidateService:
             raise NotFoundError(message="Candidate not found")
 
         await self.session.refresh(updated)
-        return _candidate_response_with_masked(updated)
+        count, max_version = await self.repository.get_resume_stats(candidate_id)
+        return _candidate_response_with_masked(
+            updated,
+            has_resume=count > 0,
+            latest_resume_version=max_version,
+        )
 
     def _is_profile_complete(self, candidate: Candidate, update_data: dict) -> bool:
         """Check if profile has all required fields for 'complete' status."""

@@ -251,6 +251,8 @@ class CandidateResponse(BaseModel):
     languages_known: Optional[list] = None
     about: Optional[str] = None
     current_monthly_salary: Optional[float] = None
+    years_experience: Optional[int] = Field(None, description="Years of experience for job recommendations")
+    relevant_skills: Optional[str] = Field(None, description="Relevant skills for job recommendations (e.g. comma-separated)")
     profile_status: str
     is_pro: bool = False
     resume_remaining_count: int = Field(1, description="Remaining free AIVI bot uses; 0 = upgrade required")

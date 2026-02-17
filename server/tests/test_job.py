@@ -298,6 +298,48 @@ class TestListJobs:
         
         assert len(data["items"]) <= 5
 
+    def test_list_jobs_filter_by_category_id(self, api_client):
+        """
+        Test filtering jobs by category_id (recommendation use case).
+        Expected: 200 OK; API accepts category_id and returns valid list.
+        """
+        from tests.test_data import generate_uuid
+        category_id = generate_uuid()
+        response = api_client.get(f"{API_PREFIX}?status=published&category_id={category_id}")
+        assert_response_success(response, 200)
+        data = response.json()
+        assert "items" in data
+        assert isinstance(data["items"], list)
+
+    def test_list_jobs_filter_by_role_id(self, api_client):
+        """
+        Test filtering jobs by role_id (recommendation use case).
+        Expected: 200 OK; API accepts role_id and returns valid list.
+        """
+        from tests.test_data import generate_uuid
+        role_id = generate_uuid()
+        response = api_client.get(f"{API_PREFIX}?status=published&role_id={role_id}")
+        assert_response_success(response, 200)
+        data = response.json()
+        assert "items" in data
+        assert isinstance(data["items"], list)
+
+    def test_list_jobs_recommendation_filters_experience_skills_salary(self, api_client):
+        """
+        Test recommendation filters: candidate_experience_years, skills, min_salary_expectation.
+        Expected: 200 OK; API accepts params and returns valid list.
+        """
+        response = api_client.get(
+            f"{API_PREFIX}?status=published"
+            "&candidate_experience_years=3"
+            "&skills=Python,React"
+            "&min_salary_expectation=50000"
+        )
+        assert_response_success(response, 200)
+        data = response.json()
+        assert "items" in data
+        assert isinstance(data["items"], list)
+
 
 # =============================================================================
 # UPDATE JOB TESTS

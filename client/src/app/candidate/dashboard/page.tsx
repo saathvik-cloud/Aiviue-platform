@@ -52,9 +52,13 @@ export default function CandidateDashboardPage() {
 
   // Recommended jobs for carousel (only fetched when user has resume)
   const jobFilters = useMemo(() => {
-    const base: { status: 'published'; category_id?: string; city?: string } = { status: 'published' };
+    const base: Parameters<typeof useJobs>[0] = { status: 'published' };
     if (candidate?.preferred_job_category_id) base.category_id = candidate.preferred_job_category_id;
     if (candidate?.preferred_job_location?.trim()) base.city = candidate.preferred_job_location.trim();
+    if (candidate?.years_experience != null) base.candidate_experience_years = candidate.years_experience;
+    if (candidate?.relevant_skills?.trim()) base.skills = candidate.relevant_skills.trim();
+    if (candidate?.current_monthly_salary != null && candidate.current_monthly_salary > 0)
+      base.min_salary_expectation = candidate.current_monthly_salary;
     return base;
   }, [candidate]);
   const { data: jobList, isLoading: jobsLoading } = useJobs(

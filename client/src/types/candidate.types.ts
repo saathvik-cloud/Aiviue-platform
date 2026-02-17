@@ -28,6 +28,10 @@ export interface Candidate extends BaseEntity {
   languages_known?: string[];
   about?: string;
   current_monthly_salary?: number;
+  /** Years of experience (for job recommendations). From API when available. */
+  years_experience?: number;
+  /** Relevant skills text or comma-separated (for job recommendations). From API when available. */
+  relevant_skills?: string;
   aadhaar_number_encrypted?: string;
   pan_number_encrypted?: string;
   /** Profile/onboarding completion (basic | complete). Distinct from has_resume. */

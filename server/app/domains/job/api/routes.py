@@ -241,9 +241,14 @@ async def create_job(
     **Filters:**
     - `employer_id`: Filter by employer
     - `status`: Filter by status (draft, published, paused, closed)
+    - `category_id`: Filter by job category (e.g. for candidate recommendations)
+    - `role_id`: Filter by job role
     - `work_type`: Filter by work type
     - `city`, `state`: Filter by location
     - `search`: Search in title and description
+    - `candidate_experience_years`: For recommendations; only show jobs where experience_min <= this or job has no minimum
+    - `skills`: For recommendations; show jobs where requirements mention at least one skill (comma or repeated param)
+    - `min_salary_expectation`: For recommendations; only show jobs where salary_range_max >= this or job has no salary
     
     **Pagination:**
     - Uses cursor-based pagination
@@ -253,11 +258,16 @@ async def create_job(
 async def list_jobs(
     employer_id: Optional[UUID] = Query(None, description="Filter by employer"),
     status: Optional[str] = Query(None, description="Filter by status"),
+    category_id: Optional[UUID] = Query(None, description="Filter by job category"),
+    role_id: Optional[UUID] = Query(None, description="Filter by job role"),
     work_type: Optional[str] = Query(None, description="Filter by work type"),
     city: Optional[str] = Query(None, description="Filter by city"),
     state: Optional[str] = Query(None, description="Filter by state"),
     search: Optional[str] = Query(None, description="Search term"),
     is_active: Optional[bool] = Query(True, description="Active status"),
+    candidate_experience_years: Optional[float] = Query(None, ge=0, le=99, description="Candidate years of experience (for recommendations)"),
+    skills: Optional[str] = Query(None, description="Comma-separated candidate skills; jobs whose requirements mention any of these"),
+    min_salary_expectation: Optional[float] = Query(None, ge=0, description="Candidate minimum salary expectation (for recommendations)"),
     cursor: Optional[str] = Query(None, description="Pagination cursor"),
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
     include_total: bool = Query(False, description="Include total count"),
@@ -272,11 +282,16 @@ async def list_jobs(
     filters = JobFilters(
         employer_id=employer_id,
         status=status,
+        category_id=category_id,
+        role_id=role_id,
         work_type=work_type,
         city=city,
         state=state,
         search=search,
         is_active=is_active,
+        candidate_experience_years=candidate_experience_years,
+        skills=[s.strip() for s in skills.split(",")] if skills and skills.strip() else None,
+        min_salary_expectation=min_salary_expectation,
     )
     
     return await service.list(

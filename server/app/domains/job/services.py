@@ -372,22 +372,40 @@ class JobService:
         limit: int = 20,
         include_total: bool = False,
     ) -> JobListResponse:
-        """List jobs with filters and pagination."""
+        """List jobs with filters and pagination.
+        When location filter yields 0 results and request has recommendation filters (skills/experience/salary),
+        fallback: retry without city/state so candidate still sees jobs matched by skills, salary, experience.
+        """
         jobs = await self.repo.list(filters=filters, cursor=cursor, limit=limit)
-        
+
+        # Fallback: if location filter yields 0 jobs but we have recommendation filters, retry without location
+        if (
+            not jobs
+            and filters
+            and (filters.city or filters.state)
+            and (
+                filters.candidate_experience_years is not None
+                or (filters.skills and len([s for s in filters.skills if s and s.strip()]) > 0)
+                or filters.min_salary_expectation is not None
+            )
+        ):
+            fallback_filters = filters.model_copy(update={"city": None, "state": None})
+            jobs = await self.repo.list(filters=fallback_filters, cursor=cursor, limit=limit)
+            filters = fallback_filters
+
         paginated = create_paginated_response(
             items=jobs,
             limit=limit,
             cursor_field="id",
             timestamp_field="created_at",
         )
-        
+
         items = [self._to_summary_response(job) for job in paginated["items"]]
-        
+
         total_count = None
-        if include_total:
+        if include_total and filters:
             total_count = await self.repo.count(filters)
-        
+
         return JobListResponse(
             items=items,
             next_cursor=paginated["next_cursor"],

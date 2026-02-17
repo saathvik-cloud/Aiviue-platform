@@ -104,6 +104,12 @@ export interface JobFilters {
   role_id?: string;
   city?: string;
   state?: string;
+  /** Candidate years of experience (for recommendations); only show jobs where experience_min <= this or job has no minimum */
+  candidate_experience_years?: number;
+  /** Comma-separated skills (for recommendations); show jobs where requirements mention any of these */
+  skills?: string;
+  /** Candidate minimum salary expectation (for recommendations); only show jobs where salary_range_max >= this or job has no salary */
+  min_salary_expectation?: number;
 }
 
 // Job Summary (for lists)

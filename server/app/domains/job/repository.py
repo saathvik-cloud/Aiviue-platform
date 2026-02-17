@@ -189,11 +189,50 @@ class JobRepository:
         if filters.state:
             conditions.append(Job.state.ilike(f"%{filters.state}%"))
 
+        # Category: show jobs that match OR jobs with no category set (so uncategorized jobs still appear in recommendations)
         if filters.category_id:
-            conditions.append(Job.category_id == filters.category_id)
-            
+            conditions.append(
+                or_(Job.category_id == filters.category_id, Job.category_id.is_(None))
+            )
+        # Role: show jobs that match OR jobs with no role set
         if filters.role_id:
-            conditions.append(Job.role_id == filters.role_id)
+            conditions.append(
+                or_(Job.role_id == filters.role_id, Job.role_id.is_(None))
+            )
+
+        # Recommendation: experience – show jobs where candidate meets min or job has no minimum
+        if filters.candidate_experience_years is not None:
+            conditions.append(
+                or_(
+                    Job.experience_min.is_(None),
+                    Job.experience_min <= filters.candidate_experience_years,
+                )
+            )
+
+        # Recommendation: skills – show jobs where requirements mention at least one skill, or job has no requirements.
+        # Normalize: strip, lowercase, dedupe so "Python", "  PYTHON  ", "python" all match the same (ILIKE is case-insensitive).
+        if filters.skills:
+            normalized = set()
+            for s in filters.skills:
+                if not s or not isinstance(s, str):
+                    continue
+                t = s.strip().lower()
+                if t:
+                    normalized.add(t)
+            if normalized:
+                skill_conditions = [Job.requirements.ilike(f"%{n}%") for n in normalized]
+                conditions.append(
+                    or_(Job.requirements.is_(None), or_(*skill_conditions))
+                )
+
+        # Recommendation: salary – show jobs where max salary >= candidate min expectation, or job has no salary
+        if filters.min_salary_expectation is not None:
+            conditions.append(
+                or_(
+                    Job.salary_range_max.is_(None),
+                    Job.salary_range_max >= filters.min_salary_expectation,
+                )
+            )
         
         if filters.search:
             search_term = f"%{filters.search}%"

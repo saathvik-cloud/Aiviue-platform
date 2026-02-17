@@ -348,6 +348,16 @@ class JobFilters(BaseModel):
     role_id: Optional[UUID] = Field(None, description="Filter by role")
     search: Optional[str] = Field(None, description="Search in title/description")
     is_active: Optional[bool] = Field(True, description="Filter by active status")
+    # Recommendation filters (candidate-centric)
+    candidate_experience_years: Optional[float] = Field(
+        None, ge=0, le=99, description="Candidate's years of experience; only show jobs where job.experience_min <= this or job has no minimum"
+    )
+    skills: Optional[list[str]] = Field(
+        None, description="Candidate skills; show jobs where requirements mention at least one of these (case-insensitive)"
+    )
+    min_salary_expectation: Optional[float] = Field(
+        None, ge=0, description="Candidate's minimum expected salary; only show jobs where job.salary_range_max >= this or job has no salary"
+    )
 
 
 # ==================== EXTRACTION REQUEST SCHEMAS ====================
