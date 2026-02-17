@@ -188,6 +188,8 @@ The `job_id` **must exist** in the Aiviue platform database and must be **publis
 
 **For production (later):** Jobs will be synced from Aiviue to Meta. You will use the job IDs that Aiviue provides when posting jobs to Meta Ads.
 
+**Seeding your job data:** If you provide job data from your DB (e.g. id, title, description), the Aiviue team can seed it into our DB so you can use your own job IDs. Run `python scripts/seed_screening_job.py` from the server directory (see `scripts/README.md`). After seeding, use `--verify` to confirm the job exists and is published.
+
 ---
 
 ## Field Mapping (API → Platform DB)
