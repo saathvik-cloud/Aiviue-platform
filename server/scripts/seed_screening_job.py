@@ -50,7 +50,8 @@ SCREENING_AGENT_JOB = {
 }
 
 # Employer for screening test jobs (we create if not exists)
-SEED_EMPLOYER_EMAIL = "screening-test@orange-antelopes.aiviue.local"
+# Use a valid email format (.local fails Pydantic/EmailStr validation on login)
+SEED_EMPLOYER_EMAIL = "screening-test@orange-antelopes.aiviue.com"
 SEED_EMPLOYER_COMPANY = "Orange Antelopes (Screening Test)"
 
 
