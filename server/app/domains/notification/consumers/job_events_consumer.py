@@ -29,11 +29,12 @@ async def run_job_events_notification_consumer(
         logger.warning("Redis client not provided - notification consumer will not run")
         return
 
-    last_id = "0"  # Start from beginning; next reads use last message id
+    # "$" = only new messages from now on (avoids re-sending on deploy/restart)
+    last_id = "$"
     stream = StreamNames.JOBS
 
     logger.info(
-        "Notification consumer started (listening for job.published)",
+        "Notification consumer started (listening for job.published, new messages only)",
         extra={"stream": stream},
     )
 
