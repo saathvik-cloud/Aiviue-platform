@@ -14,7 +14,7 @@ from app.shared.database import async_session_factory
 from app.shared.logging import get_logger
 from app.shared.utils.phone import normalize_phone_to_e164
 
-logger = get_logger(__name__)
+logger = get_logger(__name__) 
 
 
 class NotificationService:
