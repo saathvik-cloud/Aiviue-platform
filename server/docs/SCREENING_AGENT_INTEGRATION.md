@@ -1,28 +1,36 @@
 # Screening Agent API Integration Guide
 
-This document describes how to integrate the Screening Agent with the Aiviue Platform backend.
+This document describes how to integrate the Screening Agent with the Aiviue Platform backend. Use this guide to implement the API calls from the Screening Agent side.
 
 ---
 
-## Base URL
+## Quick Start – Where to Call
 
+**Base URL (Live – Railway):**
 ```
-https://<your-platform-host>/api/v1
+https://aiviue-mvp-server-production-3788.up.railway.app
 ```
 
-Example (local): `http://localhost:8000/api/v1`
+**Full endpoint URLs you need to call:**
+
+| Action | Method | Full URL |
+|--------|--------|----------|
+| Submit screened application | POST | `https://aiviue-mvp-server-production-3788.up.railway.app/api/v1/screening/applications` |
+| List failed requests | GET | `https://aiviue-mvp-server-production-3788.up.railway.app/api/v1/screening/failed-requests` |
+
+**Recommended:** Call from your **backend** (Node/Python/etc.). Meta sends leads to your backend → your backend calls these Aiviue endpoints. Avoid calling from the frontend to keep API keys secure (when enabled later).
 
 ---
 
 ## Authentication
 
-When `SCREENING_API_KEY` is configured on the platform, include the API key in the request header:
+**For testing (current):** API key is **not** required. Do not send `X-Api-Key` header.
 
+**When API key is enabled (later):** Include the API key in the request header:
 ```
 X-Api-Key: <your-api-key>
 ```
-
-If not configured, no auth is required (development mode only).
+(You will receive the key when the platform enables it.)
 
 ---
 
@@ -30,16 +38,16 @@ If not configured, no auth is required (development mode only).
 
 ### 1. Submit Screened Application
 
-**POST** `/screening/applications`
+**POST** `https://aiviue-mvp-server-production-3788.up.railway.app/api/v1/screening/applications`
 
-Submits a screened candidate + application. Platform creates/updates candidate, optional resume, and job application.
+Submits a screened candidate + application. The platform creates/updates the candidate, optional resume, and job application.
 
 #### Request Headers
 
 | Header | Required | Description |
 |--------|----------|-------------|
 | Content-Type | Yes | application/json |
-| X-Api-Key | If configured | Your API key |
+| X-Api-Key | Only when configured | Omit for testing |
 
 #### Request Body (JSON)
 
@@ -79,7 +87,7 @@ Submits a screened candidate + application. Platform creates/updates candidate, 
 
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
-| job_id | UUID | Yes | Must be a published job |
+| job_id | UUID | Yes | Must be a **published** job that exists in Aiviue DB. For testing, use a job_id provided by the Aiviue team. |
 | correlation_id | string | No | Your ID for debugging/correlation |
 | candidate | object | Yes | See candidate fields below |
 | resume | object | No | Omit if no resume |
@@ -128,23 +136,17 @@ Submits a screened candidate + application. Platform creates/updates candidate, 
 | Status | Code | Meaning |
 |--------|------|---------|
 | 400 | REQUEST_VALIDATION_FAILED | Invalid payload (check error details) |
-| 404 | JOB_NOT_FOUND | Job does not exist |
+| 404 | JOB_NOT_FOUND | Job does not exist in Aiviue DB |
 | 422 | JOB_NOT_PUBLISHED | Job exists but is not published |
-| 401 | - | Invalid/missing API key |
+| 401 | - | Invalid/missing API key (when key is configured) |
 
 ---
 
 ### 2. List Failed Requests
 
-**GET** `/screening/failed-requests`
+**GET** `https://aiviue-mvp-server-production-3788.up.railway.app/api/v1/screening/failed-requests`
 
-Returns payloads that failed to insert (dead letter table). Use for debugging and visibility.
-
-#### Request Headers
-
-| Header | Required | Description |
-|--------|----------|-------------|
-| X-Api-Key | If configured | Your API key |
+Returns payloads that failed to insert (dead letter table). Use for debugging and retry.
 
 #### Query Parameters
 
@@ -175,6 +177,80 @@ Returns payloads that failed to insert (dead letter table). Use for debugging an
 
 ---
 
+## Job ID Requirement – Important
+
+The `job_id` **must exist** in the Aiviue platform database and must be **published**. If it does not exist, the API returns `404 JOB_NOT_FOUND`.
+
+**For testing:**
+- The Aiviue team will provide you with one or more valid `job_id` values (UUIDs of published jobs).
+- Use these `job_id` values in your payload. All candidate and resume data can come from your Screening Agent / Meta leads.
+- This validates that the API flow works end-to-end.
+
+**For production (later):** Jobs will be synced from Aiviue to Meta. You will use the job IDs that Aiviue provides when posting jobs to Meta Ads.
+
+---
+
+## Field Mapping (API → Platform DB)
+
+| Your Field | Platform Field |
+|------------|----------------|
+| phone | mobile |
+| file_url | pdf_url |
+
+---
+
+## Example cURL
+
+```bash
+# Submit application (no API key for testing)
+curl -X POST "https://aiviue-mvp-server-production-3788.up.railway.app/api/v1/screening/applications" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "job_id": "8fadd86b-0cdf-4e95-bdc0-81c8db73e923",
+    "candidate": {
+      "phone": "9876543210",
+      "name": "Test Candidate",
+      "email": "test@example.com"
+    },
+    "resume": {
+      "file_url": "https://storage.example.com/resume.pdf",
+      "file_name": "resume.pdf"
+    }
+  }'
+
+# List failed requests
+curl "https://aiviue-mvp-server-production-3788.up.railway.app/api/v1/screening/failed-requests"
+```
+
+---
+
+## Example Code (Node.js / fetch)
+
+```javascript
+const BASE_URL = "https://aiviue-mvp-server-production-3788.up.railway.app/api/v1";
+
+// Submit application
+async function submitApplication(payload) {
+  const res = await fetch(`${BASE_URL}/screening/applications`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return res.json();
+}
+
+// Example payload
+const payload = {
+  job_id: "8fadd86b-0cdf-4e95-bdc0-81c8db73e923",  // Use job_id from Aiviue team
+  candidate: { phone: "9876543210", name: "Test Candidate" },
+  resume: { file_url: "https://...", file_name: "resume.pdf" },
+};
+
+submitApplication(payload).then(console.log).catch(console.error);
+```
+
+---
+
 ## JSON Schema (POST body)
 
 ```json
@@ -187,7 +263,7 @@ Returns payloads that failed to insert (dead letter table). Use for debugging an
     "job_id": {
       "type": "string",
       "format": "uuid",
-      "description": "Job this application is for"
+      "description": "Job this application is for (must exist in Aiviue DB)"
     },
     "correlation_id": {
       "type": ["string", "null"],
@@ -198,12 +274,7 @@ Returns payloads that failed to insert (dead letter table). Use for debugging an
       "type": "object",
       "required": ["phone", "name"],
       "properties": {
-        "phone": {
-          "type": "string",
-          "minLength": 10,
-          "maxLength": 20,
-          "description": "10-digit Indian mobile"
-        },
+        "phone": { "type": "string", "minLength": 10, "maxLength": 20 },
         "name": { "type": "string", "minLength": 1, "maxLength": 255 },
         "email": { "type": ["string", "null"], "format": "email" },
         "current_location": { "type": ["string", "null"], "maxLength": 255 },
@@ -233,43 +304,12 @@ Returns payloads that failed to insert (dead letter table). Use for debugging an
 
 ---
 
-## Field Mapping (API → Platform DB)
-
-| Your Field | Platform Field |
-|------------|----------------|
-| phone | mobile |
-| file_url | pdf_url |
-
----
-
-## Example cURL
-
-```bash
-# Submit application
-curl -X POST "https://your-platform.com/api/v1/screening/applications" \
-  -H "Content-Type: application/json" \
-  -H "X-Api-Key: your-api-key" \
-  -d '{
-    "job_id": "8fadd86b-0cdf-4e95-bdc0-81c8db73e923",
-    "candidate": {
-      "phone": "9876543210",
-      "name": "Test Candidate"
-    }
-  }'
-
-# List failed requests
-curl "https://your-platform.com/api/v1/screening/failed-requests" \
-  -H "X-Api-Key: your-api-key"
-```
-
----
-
 ## Idempotency
 
-POST is idempotent: if the same candidate (by phone) has already applied to the same job, the API returns the existing application with `already_applied: true`.
+POST is idempotent: if the same candidate (by phone) has already applied to the same job, the API returns the existing application with `already_applied: true`. Safe to retry.
 
 ---
 
 ## Failed Payloads
 
-When a request fails (validation, job not found, DB error), the payload is stored in a dead letter table. Use GET `/screening/failed-requests` to inspect and retry after fixing issues.
+When a request fails (validation, job not found, DB error), the payload is stored in a dead letter table. Use GET `/screening/failed-requests` to inspect and retry after fixing issues (e.g. correct job_id, fix validation errors).
