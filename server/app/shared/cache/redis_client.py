@@ -32,6 +32,10 @@ from app.shared.logging import get_logger
 logger = get_logger(__name__)
 
 
+class RedisStreamsNotSupportedError(Exception):
+    """Raised when the Redis server does not support Streams (XREAD/XADD). Redis 5.0+ required."""
+
+
 # Global Redis connection pool
 _redis_pool: Optional[redis.ConnectionPool] = None
 _redis_client: Optional[Redis] = None
@@ -66,10 +70,22 @@ async def init_redis() -> Redis:
         # Test connection
         await _redis_client.ping()
         
-        logger.info(
-            "Redis connection established",
-            extra={"redis_url": mask_redis_url(settings.redis_url)},
-        )
+        # Log Redis version (helps debug Streams/XREAD: Redis 5.0+ required)
+        try:
+            info = await _redis_client.info("server")
+            redis_version = info.get("redis_version", "?")
+            logger.info(
+                "Redis connection established",
+                extra={
+                    "redis_url": mask_redis_url(settings.redis_url),
+                    "redis_version": redis_version,
+                },
+            )
+        except Exception:
+            logger.info(
+                "Redis connection established",
+                extra={"redis_url": mask_redis_url(settings.redis_url)},
+            )
         
         return _redis_client
     
@@ -385,6 +401,13 @@ class RedisClient:
             
             return messages
         except redis.RedisError as e:
+            err_msg = str(e).lower()
+            if "unknown command" in err_msg and "xread" in err_msg:
+                raise RedisStreamsNotSupportedError(
+                    "Redis server does not support XREAD (Redis Streams). "
+                    "Redis 5.0+ is required for event streams. "
+                    "Upgrade Redis or disable the notification consumer."
+                ) from e
             logger.error(f"Stream read failed for {stream_name}: {e}")
             return []
     
@@ -397,3 +420,27 @@ class RedisClient:
             return True
         except redis.RedisError:
             return False
+
+    @staticmethod
+    async def streams_supported(redis_instance: Redis) -> tuple[bool, str]:
+        """
+        Check if this Redis connection supports Streams (XREAD).
+        Returns (supported, redis_version_string).
+        """
+        version = "?"
+        try:
+            info = await redis_instance.info("server")
+            version = info.get("redis_version", "?")
+        except Exception:
+            pass
+        try:
+            await redis_instance.xread(
+                {"_stream_check": "0"},
+                count=1,
+            )
+            return (True, version)
+        except redis.RedisError as e:
+            err_msg = str(e).lower()
+            if "unknown command" in err_msg and "xread" in err_msg:
+                return (False, version)
+            raise

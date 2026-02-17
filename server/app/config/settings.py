@@ -39,6 +39,16 @@ class Settings(BaseSettings):
     # Feature Flags
     enable_screening_events: bool = False  # Set True when Screening Agent is ready
 
+    # WATI (WhatsApp) - for notification module
+    wati_api_endpoint: str | None = None  # e.g. https://live-mt-server.wati.io/105961
+    wati_api_token: str | None = None  # Bearer token
+    wati_channel_number: str | None = None  # Sender WhatsApp number (E.164)
+    wati_template_job_published: str = "welcome"  # Template name for job published notification
+    default_phone_country_code: str = "91"  # E.164 country code when normalizing phone numbers (e.g. India)
+
+    # Notification module - consume job.published from stream and send WhatsApp
+    enable_notification_consumer: bool = True  # Set False to disable in-process consumer
+
     # Screening Agent API - when set, screening endpoints require X-Api-Key header
     screening_api_key: str | None = None
 

@@ -9,6 +9,7 @@ FastAPI application with:
 - CORS configuration
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -72,11 +73,68 @@ async def lifespan(app: FastAPI):
         logger.info("Redis connected", extra={"redis_url": mask_redis_url(settings.redis_url)})
     except Exception as e:
         logger.warning(f"Redis not available: {e}")
+
+    # Start notification consumer (listens for job.published, sends WhatsApp via WATI)
+    notification_consumer_task = None
+    if getattr(settings, "enable_notification_consumer", True):
+        try:
+            from app.shared.cache import get_redis_client
+            from app.shared.cache.redis_client import RedisClient
+            from app.domains.notification.services import WATIClient, NotificationService
+            from app.domains.notification.consumers import run_job_events_notification_consumer
+
+            redis_raw = await get_redis_client()
+            streams_ok, redis_version = await RedisClient.streams_supported(redis_raw)
+            if not streams_ok:
+                logger.warning(
+                    "Notification consumer disabled: Redis at %s (version %s) does not support Streams (XREAD). "
+                    "Ensure the app uses the same Redis as your Docker container (aiviue-redis). "
+                    "Check REDIS_URL and that no other Redis is bound to that host:port.",
+                    settings.redis_url,
+                    redis_version,
+                    extra={"event": "notification_consumer_skipped", "redis_version": redis_version},
+                )
+            else:
+                redis_wrapper = RedisClient(redis_raw)
+                default_cc = getattr(settings, "default_phone_country_code", "91")
+                wati_client = None
+                if settings.wati_api_endpoint and settings.wati_api_token and settings.wati_channel_number:
+                    wati_client = WATIClient(
+                        base_url=settings.wati_api_endpoint,
+                        bearer_token=settings.wati_api_token,
+                        channel_number=settings.wati_channel_number,
+                        default_phone_country_code=default_cc,
+                    )
+                notification_service = NotificationService(
+                    wati_client=wati_client,
+                    template_job_published=getattr(settings, "wati_template_job_published", "welcome"),
+                    default_phone_country_code=default_cc,
+                )
+                notification_consumer_task = asyncio.create_task(
+                    run_job_events_notification_consumer(
+                        notification_service=notification_service,
+                        redis_client=redis_wrapper,
+                    ),
+                )
+                logger.info(
+                    "Notification consumer started (job.published -> WhatsApp)",
+                    extra={"redis_version": redis_version},
+                )
+        except Exception as e:
+            logger.warning(f"Notification consumer not started: {e}")
     
     yield
     
     # ==================== SHUTDOWN ====================
     logger.info("Shutting down...")
+
+    if notification_consumer_task and not notification_consumer_task.done():
+        notification_consumer_task.cancel()
+        try:
+            await notification_consumer_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Notification consumer stopped")
     
     # Close Redis
     try:

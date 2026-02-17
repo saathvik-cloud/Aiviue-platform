@@ -29,6 +29,7 @@ from app.shared.utils.pagination import (
     MAX_PAGE_SIZE,
 )
 from app.shared.utils.location import normalize_location
+from app.shared.utils.phone import normalize_phone_to_e164
 
 __all__ = [
     # Sanitization
@@ -48,4 +49,5 @@ __all__ = [
     "DEFAULT_PAGE_SIZE",
     "MAX_PAGE_SIZE",
     "normalize_location",
+    "normalize_phone_to_e164",
 ]

@@ -1,0 +1,92 @@
+1) candidates — fields missing in your JSON
+
+(Please add these to your candidates table / payload)
+
+job_id — uuid
+Why: to link candidates to specific jobs for screening and job-specific scoring.
+
+name — varchar
+Why: display and identification.
+
+email — varchar
+Why: communication / notifications / identity.
+
+phone — varchar
+Why: outbound contact / matching with WATI contacts.
+
+profile_completion_percentage — int4
+Why: UX indicator and filter for complete profiles.
+
+video_profile_created — bool
+Why: used by our screening flow to decide if video tasks should be triggered.
+
+current_location — varchar
+Why: location-based filtering and suitability checks.
+
+expected_salary — numeric
+Why: automated fitment / compensation checks.
+
+years_experience — int4
+Why: quick eligibility checks and scoring.
+
+relevant_skills — text
+Why: used by model to compute fitment and skill matching.
+
+job_title — text
+Why: candidate’s current title, used in scoring and display.
+
+work_preference — varchar
+Why: remote/onsite/shifts filter for matching.
+
+is_fresher — bool
+Why: screening rules differ for freshers.
+
+expected_salary_text — text
+Why: human-friendly compensation string (optional but useful).
+
+language_preference — varchar
+Why: used to select message templates and screening language.
+
+current_broadcast_run_id — uuid
+Why: links candidate to an active broadcast run for messaging audits.
+
+original_broadcast_run_id — uuid
+Why: original run reference for historical reporting.
+
+resume_summary — text
+Why: LLM/parsed resume summary we generate — useful to show on UI without re-parsing resumes.
+
+fit_score_details — jsonb
+Why: structured scoring output (skills match, weights, gaps). We index this for quick queries. Example structure:
+
+{
+  "overall": 78,
+  "skill_match": {"python": 0.9, "sql": 0.7},
+  "experience_match": 0.8,
+  "notes": "Relevant exp in ETL"
+}
+
+2) candidate_resumes — fields missing in your JSON
+
+(Please add these to your candidate_resumes table / payload)
+
+file_type — varchar
+Why: distinguish resume types (pdf, docx, parsed-json).
+
+file_url — text (your JSON has pdf_url — please map to file_url or keep both)
+Why: canonical storage URL we use across UI and processors.
+
+file_name — text
+Why: display and audit.
+
+file_size — int4
+Why: storage/processing metrics and validation.
+
+mime_type — varchar
+Why: validation and downstream parsing logic.
+
+upload_status — varchar
+Why: tracks whether resume is uploaded/processing/failed.
+
+processed_at — timestamptz
+Why: when parsing / resume-to-json processing completed.

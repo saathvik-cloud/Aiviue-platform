@@ -23,6 +23,7 @@ Usage:
 
 from app.shared.cache.redis_client import (
     RedisClient,
+    RedisStreamsNotSupportedError,
     get_redis,
     get_redis_client,
     init_redis,
@@ -39,6 +40,7 @@ from app.shared.cache.cache import (
 __all__ = [
     # Redis client
     "RedisClient",
+    "RedisStreamsNotSupportedError",
     "get_redis",
     "get_redis_client",
     "init_redis",

@@ -32,30 +32,40 @@ echo ""
 # ===========================================
 echo "🔄 [1/4] Checking Redis..."
 
+# Force recreate Redis if requested (e.g. after upgrading to redis:latest for Streams/XREAD)
+if [ -n "${FORCE_REDIS_RECREATE:-}" ]; then
+    echo "🔄 Forcing Redis container recreate (FORCE_REDIS_RECREATE is set)..."
+    docker rm -f aiviue-redis 2>/dev/null || true
+fi
+
 if docker ps | grep -q "aiviue-redis"; then
     echo "✅ Redis already running!"
 else
-    echo "🐳 Starting Redis container..."
+    echo "🐳 Starting Redis container (redis:latest for Streams support)..."
     
     # Remove old container if exists
     docker rm -f aiviue-redis 2>/dev/null
     
-    # Start Redis
+    # Use port 6380 so the app avoids Windows Redis 3.x on 6379 (REDIS_URL=redis://localhost:6380/0)
     docker run -d \
         --name aiviue-redis \
-        -p 6379:6379 \
-        redis:7-alpine \
+        -p 6380:6379 \
+        redis:latest \
         redis-server --appendonly yes
     
     # Wait for Redis to be ready
     sleep 2
     
     if docker ps | grep -q "aiviue-redis"; then
-        echo "✅ Redis started successfully!"
+        echo "✅ Redis started successfully! (port 6380)"
     else
         echo "❌ Failed to start Redis. Check Docker."
         exit 1
     fi
+fi
+# Remind to use 6380 in .env if another Redis is on 6379
+if [ -f .env ] && grep -q "6379" .env 2>/dev/null; then
+    echo "💡 Tip: If the app reports Redis 3.x, set in .env: REDIS_URL=redis://localhost:6380/0"
 fi
 echo ""
 
@@ -107,7 +117,7 @@ echo "------------------------------------------"
 echo "🌐 Server:    http://localhost:8000"
 echo "📋 API Docs:  http://localhost:8000/docs"
 echo "❤️  Health:   http://localhost:8000/health"
-echo "🔴 Redis:     localhost:6379"
+echo "🔴 Redis:     localhost:6380 (set REDIS_URL=redis://localhost:6380/0 in .env)"
 echo "------------------------------------------"
 echo ""
 echo "⚠️  NOTE: Run ./worker.sh in another terminal"
