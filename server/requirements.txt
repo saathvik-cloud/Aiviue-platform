@@ -49,6 +49,7 @@ supabase
 
 # UTILITIES
 python-dateutil
+tzdata  # IANA timezone data for zoneinfo on Windows (interview scheduling slot generation)
 
 # TESTING
 pytest

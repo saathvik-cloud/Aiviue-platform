@@ -76,12 +76,11 @@ async def set_availability(
     service: AvailabilityService = Depends(get_availability_service),
 ):
     employer_id = UUID(current_employer["employer_id"])
-    existed = await service.get_availability(employer_id) is not None
     result = await service.set_availability(employer_id, body)
-    status_code = status.HTTP_201_CREATED if not existed else status.HTTP_200_OK
+    status_code = status.HTTP_201_CREATED if result.created else status.HTTP_200_OK
     return JSONResponse(
         status_code=status_code,
-        content=result.model_dump(mode="json"),
+        content=result.response.model_dump(mode="json"),
     )
 
 
@@ -98,7 +97,8 @@ async def update_availability(
 ):
     employer_id = UUID(current_employer["employer_id"])
     try:
-        return await service.set_availability(employer_id, body)
+        result = await service.set_availability(employer_id, body)
+        return result.response
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

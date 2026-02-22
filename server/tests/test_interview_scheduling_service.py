@@ -38,11 +38,12 @@ async def test_set_availability_create_then_get(
     body = EmployerAvailabilityCreate(**SAMPLE_AVAILABILITY)
     async with db_session_factory() as session:
         service = AvailabilityService(session)
-        created = await service.set_availability(eid, body)
+        result = await service.set_availability(eid, body)
         await session.commit()
-        assert created.employer_id == eid
-        assert created.timezone == "Asia/Kolkata"
-        assert created.slot_duration_minutes == 30
+        assert result.created is True
+        assert result.response.employer_id == eid
+        assert result.response.timezone == "Asia/Kolkata"
+        assert result.response.slot_duration_minutes == 30
     async with db_session_factory() as session:
         service = AvailabilityService(session)
         found = await service.get_availability(eid)
@@ -64,10 +65,11 @@ async def test_set_availability_update_existing(
     updated_payload = {**SAMPLE_AVAILABILITY, "timezone": "America/New_York", "buffer_minutes": 15}
     async with db_session_factory() as session:
         service = AvailabilityService(session)
-        updated = await service.set_availability(eid, EmployerAvailabilityCreate(**updated_payload))
+        result = await service.set_availability(eid, EmployerAvailabilityCreate(**updated_payload))
         await session.commit()
-        assert updated.timezone == "America/New_York"
-        assert updated.buffer_minutes == 15
+        assert result.created is False
+        assert result.response.timezone == "America/New_York"
+        assert result.response.buffer_minutes == 15
 
 
 @pytest.mark.asyncio
@@ -98,10 +100,10 @@ async def test_set_availability_partial_update_success(
         await session.commit()
     async with db_session_factory() as session:
         service = AvailabilityService(session)
-        updated = await service.set_availability(eid, EmployerAvailabilityUpdate(**SAMPLE_AVAILABILITY_UPDATE))
+        result = await service.set_availability(eid, EmployerAvailabilityUpdate(**SAMPLE_AVAILABILITY_UPDATE))
         await session.commit()
-        assert updated.timezone == "America/New_York"
-        assert updated.buffer_minutes == 15
+        assert result.response.timezone == "America/New_York"
+        assert result.response.buffer_minutes == 15
 
 
 @pytest.mark.asyncio

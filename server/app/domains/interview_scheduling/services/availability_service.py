@@ -2,6 +2,7 @@
 Employer availability service: get and set (upsert) availability.
 """
 
+from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +13,13 @@ from app.domains.interview_scheduling.schemas import (
     EmployerAvailabilityUpdate,
     EmployerAvailabilityResponse,
 )
+
+
+@dataclass
+class SetAvailabilityResult:
+    """Result of set_availability: response and whether a new row was created (for correct HTTP 201 vs 200)."""
+    response: EmployerAvailabilityResponse
+    created: bool
 
 
 class AvailabilityService:
@@ -30,11 +38,12 @@ class AvailabilityService:
         self,
         employer_id: UUID,
         body: EmployerAvailabilityCreate | EmployerAvailabilityUpdate,
-    ) -> EmployerAvailabilityResponse:
+    ) -> SetAvailabilityResult:
         """
         Create or update availability for the employer.
         If body is EmployerAvailabilityCreate, full replace (upsert).
         If body is EmployerAvailabilityUpdate, partial update (only provided fields).
+        Returns response plus created flag so the API can return 201 vs 200 atomically.
         """
         existing = await self._repo.get_by_employer_id(employer_id)
 
@@ -51,6 +60,7 @@ class AvailabilityService:
                     buffer_minutes=data["buffer_minutes"],
                 )
                 row = await self._repo.get_by_employer_id(employer_id)
+                created = False
             else:
                 row = await self._repo.create(
                     employer_id,
@@ -61,9 +71,13 @@ class AvailabilityService:
                     slot_duration_minutes=data["slot_duration_minutes"],
                     buffer_minutes=data["buffer_minutes"],
                 )
+                created = True
             if not row:
                 raise ValueError("Availability record missing after save.")
-            return EmployerAvailabilityResponse.model_validate(row)
+            return SetAvailabilityResult(
+                response=EmployerAvailabilityResponse.model_validate(row),
+                created=created,
+            )
         else:
             # EmployerAvailabilityUpdate - only set provided fields
             if not existing:
@@ -87,4 +101,7 @@ class AvailabilityService:
             row = await self._repo.get_by_employer_id(employer_id)
             if not row:
                 raise ValueError("Availability record missing after update.")
-            return EmployerAvailabilityResponse.model_validate(row)
+            return SetAvailabilityResult(
+                response=EmployerAvailabilityResponse.model_validate(row),
+                created=False,
+            )

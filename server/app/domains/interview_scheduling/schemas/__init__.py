@@ -20,6 +20,9 @@ from app.domains.interview_scheduling.schemas.offered_slot import (
     OfferedSlotResponse,
     OfferedSlotCreate,
 )
+from app.domains.interview_scheduling.schemas.slots import (
+    GeneratedSlotResponse,
+)
 
 __all__ = [
     "EmployerAvailabilityCreate",
@@ -32,4 +35,5 @@ __all__ = [
     "OfferedSlotStatusEnum",
     "OfferedSlotResponse",
     "OfferedSlotCreate",
+    "GeneratedSlotResponse",
 ]
