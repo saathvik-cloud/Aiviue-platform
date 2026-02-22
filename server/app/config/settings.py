@@ -52,6 +52,17 @@ class Settings(BaseSettings):
     # Screening Agent API - when set, screening endpoints require X-Api-Key header
     screening_api_key: str | None = None
 
+    # Interview scheduling - Google Calendar + Meet
+    google_calendar_id: str | None = None  # Shared calendar ID (e.g. xxx@group.calendar.google.com)
+    google_service_account_json: str | None = None  # Full JSON string; if set, used for Calendar API
+
+    # Interview scheduling - WATI template names (optional until templates approved)
+    # When set, interview flow will send WhatsApp messages via these templates; when empty, in-app only
+    wati_template_interview_slots_offered: str | None = None
+    wati_template_interview_meet_link: str | None = None
+    wati_template_interview_candidate_chose_slot: str | None = None
+    wati_template_interview_cancelled: str | None = None
+
     # Storage (optional - for resume PDF upload)
     supabase_url: str | None = None
     supabase_service_role_key: str | None = None
