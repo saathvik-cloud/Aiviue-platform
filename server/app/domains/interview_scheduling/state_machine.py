@@ -4,6 +4,7 @@ Interview schedule state machine.
 Valid transitions:
 - slots_offered -> candidate_picked_slot (candidate chose a slot)
 - candidate_picked_slot -> employer_confirmed (employer confirmed choice)
+- candidate_picked_slot -> scheduled (employer confirmed + calendar event created in one step)
 - employer_confirmed -> scheduled (calendar event created, meeting_link set)
 - any non-cancelled -> cancelled
 
@@ -20,6 +21,7 @@ _TRANSITIONS: dict[str, set[InterviewState]] = {
     },
     InterviewState.CANDIDATE_PICKED_SLOT.value: {
         InterviewState.EMPLOYER_CONFIRMED,
+        InterviewState.SCHEDULED,  # when employer confirms and we create Meet in one step
         InterviewState.CANCELLED,
     },
     InterviewState.EMPLOYER_CONFIRMED.value: {

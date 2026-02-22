@@ -1,14 +1,17 @@
 """
-Tests for interview scheduling employer flow: available-slots and send-offer.
+Tests for interview scheduling employer flow: available-slots, send-offer, confirm-slot, employer-cancel.
 
-GET /api/v1/interview-scheduling/applications/{application_id}/available-slots
+GET  /api/v1/interview-scheduling/applications/{application_id}/available-slots
 POST /api/v1/interview-scheduling/applications/{application_id}/send-offer
+POST /api/v1/interview-scheduling/applications/{application_id}/confirm-slot
+POST /api/v1/interview-scheduling/applications/{application_id}/employer-cancel
 
 Requires: employer + availability, published job, candidate applied (application_id).
 Run: pytest tests/test_interview_scheduling_send_offer_api.py -v
 """
 
 import pytest
+from unittest.mock import AsyncMock, patch, MagicMock
 from tests.test_data import (
     SAMPLE_AVAILABILITY,
     SAMPLE_EMPLOYER_MINIMAL,
@@ -192,3 +195,144 @@ class TestSendOffer:
             headers=emp_headers,
         )
         assert r.status_code == 422
+
+
+class TestEmployerConfirmSlot:
+    """POST /applications/{application_id}/confirm-slot. Schedule must be in candidate_picked_slot."""
+
+    def test_without_auth_returns_401(self, api_client, interview_setup):
+        _, _, application_id, _, _, _ = interview_setup
+        r = api_client.post(f"{API_PREFIX}/applications/{application_id}/confirm-slot")
+        assert_response_error(r, 401)
+
+    def test_no_schedule_returns_404(self, api_client, interview_setup):
+        import uuid
+        _, _, _, emp_headers, _, _ = interview_setup
+        r = api_client.post(
+            f"{API_PREFIX}/applications/{uuid.uuid4()}/confirm-slot",
+            headers=emp_headers,
+        )
+        assert r.status_code == 404
+
+    @patch("app.domains.interview_scheduling.services.interview_schedule_service.GoogleCalendarClient")
+    def test_success_returns_scheduled_when_google_configured(self, mock_gcal_clients, api_client, interview_setup):
+        """Send offer -> candidate pick slot -> employer confirm. Google Calendar is mocked so no real API call."""
+        from app.domains.interview_scheduling.clients.google_calendar import CreateEventResult
+        mock_client = MagicMock()
+        mock_client.is_configured.return_value = True
+        mock_client.create_event = AsyncMock(
+            return_value=CreateEventResult(
+                event_id="test-google-event-id",
+                meeting_link="https://meet.google.com/test-abc-def",
+            )
+        )
+        mock_gcal_clients.return_value = mock_client
+
+        _, _, application_id, emp_headers, _, cand_headers = interview_setup
+        slots_r = api_client.get(
+            f"{API_PREFIX}/applications/{application_id}/available-slots",
+            headers=emp_headers,
+        )
+        if slots_r.status_code != 200:
+            pytest.skip("No available slots")
+        slots = slots_r.json()
+        if not slots:
+            pytest.skip("No available slots")
+        send_r = api_client.post(
+            f"{API_PREFIX}/applications/{application_id}/send-offer",
+            json={"slots": [{"start_utc": slots[0]["start_utc"], "end_utc": slots[0]["end_utc"]}]},
+            headers=emp_headers,
+        )
+        assert send_r.status_code == 201
+        schedule_id = send_r.json()["id"]
+        get_r = api_client.get(
+            f"{API_PREFIX}/candidate/offers/{schedule_id}",
+            headers=cand_headers,
+        )
+        assert get_r.status_code == 200
+        slot_id = get_r.json()["slots"][0]["id"]
+        pick_r = api_client.post(
+            f"{API_PREFIX}/candidate/offers/{schedule_id}/pick-slot",
+            json={"slot_id": slot_id},
+            headers=cand_headers,
+        )
+        assert pick_r.status_code == 200
+        confirm_r = api_client.post(
+            f"{API_PREFIX}/applications/{application_id}/confirm-slot",
+            headers=emp_headers,
+        )
+        assert_response_success(confirm_r, 200)
+        data = confirm_r.json()
+        assert data["state"] == "scheduled"
+        assert data.get("meeting_link") == "https://meet.google.com/test-abc-def"
+        assert data.get("google_event_id") == "test-google-event-id"
+
+    def test_confirm_before_candidate_picks_returns_409(self, api_client, interview_setup):
+        """Confirm when state is still slots_offered -> 409 or 400 (no Google call)."""
+        _, _, application_id, emp_headers, _, _ = interview_setup
+        slots_r = api_client.get(
+            f"{API_PREFIX}/applications/{application_id}/available-slots",
+            headers=emp_headers,
+        )
+        slots = slots_r.json() or []
+        if not slots:
+            pytest.skip("No available slots")
+        api_client.post(
+            f"{API_PREFIX}/applications/{application_id}/send-offer",
+            json={"slots": [{"start_utc": slots[0]["start_utc"], "end_utc": slots[0]["end_utc"]}]},
+            headers=emp_headers,
+        )
+        r = api_client.post(
+            f"{API_PREFIX}/applications/{application_id}/confirm-slot",
+            headers=emp_headers,
+        )
+        assert r.status_code in (409, 400)
+
+    def test_confirm_wrong_application_returns_404(self, api_client, interview_setup):
+        import uuid
+        _, _, _, emp_headers, _, _ = interview_setup
+        r = api_client.post(
+            f"{API_PREFIX}/applications/{uuid.uuid4()}/confirm-slot",
+            headers=emp_headers,
+        )
+        assert r.status_code == 404
+
+
+class TestEmployerCancel:
+    """POST /applications/{application_id}/employer-cancel"""
+
+    def test_without_auth_returns_401(self, api_client, interview_setup):
+        _, _, application_id, _, _, _ = interview_setup
+        r = api_client.post(f"{API_PREFIX}/applications/{application_id}/employer-cancel")
+        assert_response_error(r, 401)
+
+    def test_no_schedule_returns_404(self, api_client, interview_setup):
+        import uuid
+        _, _, _, emp_headers, _, _ = interview_setup
+        r = api_client.post(
+            f"{API_PREFIX}/applications/{uuid.uuid4()}/employer-cancel",
+            headers=emp_headers,
+        )
+        assert r.status_code == 404
+
+    def test_success_returns_cancelled(self, api_client, interview_setup):
+        _, _, application_id, emp_headers, _, _ = interview_setup
+        slots_r = api_client.get(
+            f"{API_PREFIX}/applications/{application_id}/available-slots",
+            headers=emp_headers,
+        )
+        if not slots_r.json():
+            pytest.skip("No available slots")
+        api_client.post(
+            f"{API_PREFIX}/applications/{application_id}/send-offer",
+            json={"slots": [{"start_utc": slots_r.json()[0]["start_utc"], "end_utc": slots_r.json()[0]["end_utc"]}]},
+            headers=emp_headers,
+        )
+        r = api_client.post(
+            f"{API_PREFIX}/applications/{application_id}/employer-cancel",
+            headers=emp_headers,
+        )
+        assert_response_success(r, 200)
+        data = r.json()
+        assert data["state"] == "cancelled"
+        assert data.get("source_of_cancellation") == "employer"

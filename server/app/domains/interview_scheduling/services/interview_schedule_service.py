@@ -1,16 +1,19 @@
 """
-Interview schedule service: available slots for an application, send offer; candidate list/pick/cancel.
+Interview schedule service: available slots, send offer; employer confirm/cancel; candidate list/pick/cancel.
 
-Employer flow: get available slots for a job application (must own the job),
-then send selected slots to the candidate (creates InterviewSchedule + InterviewOfferedSlot rows).
+Employer flow: get available slots, send offer, confirm slot (create Meet -> scheduled), cancel.
 Candidate flow: list offers, get offer with slots, pick slot, cancel.
 """
 
+import logging
 from datetime import date, datetime, timezone
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.candidate.repository import CandidateRepository
+from app.domains.employer.repository import EmployerRepository
+from app.domains.interview_scheduling.clients.google_calendar import GoogleCalendarClient
 from app.domains.interview_scheduling.enums import InterviewState, OfferedSlotStatus, SourceOfCancellation
 from app.domains.interview_scheduling.repository import (
     InterviewOfferedSlotRepository,
@@ -27,9 +30,11 @@ from app.domains.interview_scheduling.services.slot_service import SlotService
 from app.domains.interview_scheduling.state_machine import can_transition
 from app.domains.job_application.repository import JobApplicationRepository
 
+logger = logging.getLogger(__name__)
+
 
 class InterviewScheduleService:
-    """Business logic for interview schedule: available slots per application, send offer."""
+    """Business logic for interview schedule: available slots, send offer, employer confirm/cancel, candidate pick/cancel."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -37,6 +42,9 @@ class InterviewScheduleService:
         self._schedule_repo = InterviewScheduleRepository(session)
         self._offered_slot_repo = InterviewOfferedSlotRepository(session)
         self._slot_service = SlotService(session)
+        self._employer_repo = EmployerRepository(session)
+        self._candidate_repo = CandidateRepository(session)
+        self._calendar_client = GoogleCalendarClient()
 
     async def get_available_slots_for_application(
         self,
@@ -95,6 +103,107 @@ class InterviewScheduleService:
         )
         slot_tuples = [(s[0], s[1]) for s in slots]
         await self._offered_slot_repo.create_many(schedule.id, slot_tuples)
+        await self._session.refresh(schedule)
+        return InterviewScheduleResponse.model_validate(schedule)
+
+    # ----- Employer confirm & cancel -----
+
+    async def employer_confirm_slot(
+        self,
+        employer_id: UUID,
+        application_id: UUID,
+    ) -> InterviewScheduleResponse:
+        """
+        Employer confirms the candidate's chosen slot: create Google Meet event, store link, transition to scheduled.
+        Schedule must be in candidate_picked_slot. Requires employer to own the application's job.
+        If Google Calendar is not configured, raises ValueError.
+        """
+        application = await self._job_app_repo.get_by_id_with_job(application_id)
+        if not application:
+            raise ValueError("Application not found")
+        if not application.job:
+            raise ValueError("Application has no job")
+        if application.job.employer_id != employer_id:
+            raise ValueError("Application does not belong to your job")
+        schedule = await self._schedule_repo.get_by_application_id(application_id)
+        if not schedule:
+            raise ValueError("No interview schedule found for this application")
+        if schedule.employer_id != employer_id:
+            raise ValueError("This schedule does not belong to you")
+        if not can_transition(schedule.state, InterviewState.SCHEDULED):
+            raise ValueError("This interview cannot be confirmed (wrong state or already scheduled/cancelled)")
+        if not schedule.chosen_slot_start_utc or not schedule.chosen_slot_end_utc:
+            raise ValueError("No slot chosen by candidate yet")
+        if schedule.google_event_id:
+            raise ValueError("Interview is already scheduled (event already created)")
+
+        employer = await self._employer_repo.get_by_id(employer_id)
+        if not employer:
+            raise ValueError("Employer not found")
+        candidate = await self._candidate_repo.get_by_id(schedule.candidate_id)
+        if not candidate:
+            raise ValueError("Candidate not found")
+        employer_email = employer.email
+        candidate_email = candidate.email or f"cand-{schedule.candidate_id}@placeholder.aiviue.in"
+
+        if not self._calendar_client.is_configured():
+            raise ValueError("Google Calendar is not configured; cannot create Meet link")
+
+        request_id = f"interview-{schedule.id}"
+        try:
+            result = await self._calendar_client.create_event(
+                start_utc=schedule.chosen_slot_start_utc,
+                end_utc=schedule.chosen_slot_end_utc,
+                employer_email=employer_email,
+                candidate_email=candidate_email,
+                request_id=request_id,
+                summary="Interview",
+            )
+        except Exception as e:
+            logger.exception("Google Calendar create_event failed for schedule %s", schedule.id)
+            raise ValueError(f"Failed to create calendar event: {e}") from e
+
+        await self._schedule_repo.update_state_by_row(
+            schedule,
+            InterviewState.SCHEDULED,
+            meeting_link=result.meeting_link,
+            google_event_id=result.event_id,
+        )
+        await self._session.refresh(schedule)
+        return InterviewScheduleResponse.model_validate(schedule)
+
+    async def employer_cancel(
+        self,
+        employer_id: UUID,
+        application_id: UUID,
+    ) -> InterviewScheduleResponse:
+        """Employer cancels the interview for this application. Transition to cancelled, source=employer."""
+        application = await self._job_app_repo.get_by_id_with_job(application_id)
+        if not application:
+            raise ValueError("Application not found")
+        if not application.job:
+            raise ValueError("Application has no job")
+        if application.job.employer_id != employer_id:
+            raise ValueError("Application does not belong to your job")
+        schedule = await self._schedule_repo.get_by_application_id(application_id)
+        if not schedule:
+            raise ValueError("No interview schedule found for this application")
+        if schedule.employer_id != employer_id:
+            raise ValueError("This schedule does not belong to you")
+        if not can_transition(schedule.state, InterviewState.CANCELLED):
+            raise ValueError("This interview cannot be cancelled")
+
+        if schedule.google_event_id and self._calendar_client.is_configured():
+            try:
+                await self._calendar_client.patch_cancelled(schedule.google_event_id)
+            except Exception as e:
+                logger.warning("Failed to patch Google event %s to cancelled: %s", schedule.google_event_id, e)
+
+        await self._schedule_repo.update_state_by_row(
+            schedule,
+            InterviewState.CANCELLED,
+            source_of_cancellation=SourceOfCancellation.EMPLOYER,
+        )
         await self._session.refresh(schedule)
         return InterviewScheduleResponse.model_validate(schedule)
 
@@ -183,6 +292,11 @@ class InterviewScheduleService:
             raise ValueError("This offer does not belong to you")
         if not can_transition(schedule.state, InterviewState.CANCELLED):
             raise ValueError("This offer cannot be cancelled")
+        if schedule.google_event_id and self._calendar_client.is_configured():
+            try:
+                await self._calendar_client.patch_cancelled(schedule.google_event_id)
+            except Exception as e:
+                logger.warning("Failed to patch Google event %s to cancelled: %s", schedule.google_event_id, e)
         await self._schedule_repo.update_state_by_row(
             schedule,
             InterviewState.CANCELLED,

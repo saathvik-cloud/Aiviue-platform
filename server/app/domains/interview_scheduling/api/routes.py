@@ -180,6 +180,54 @@ async def send_offer(
     return schedule
 
 
+@router.post(
+    "/applications/{application_id}/confirm-slot",
+    response_model=InterviewScheduleResponse,
+    summary="Confirm candidate's chosen slot (employer)",
+    description="Create Google Meet event, store link, transition to scheduled. Schedule must be in candidate_picked_slot. Requires Google Calendar configured.",
+)
+async def employer_confirm_slot(
+    application_id: UUID,
+    current_employer: dict = Depends(get_current_employer_from_token),
+    service: InterviewScheduleService = Depends(get_interview_schedule_service),
+):
+    employer_id = UUID(current_employer["employer_id"])
+    try:
+        return await service.employer_confirm_slot(employer_id=employer_id, application_id=application_id)
+    except ValueError as e:
+        err = str(e).lower()
+        if "not found" in err or "do not own" in err or "no interview schedule" in err:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        if "cannot be confirmed" in err or "already scheduled" in err:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        if "not configured" in err or "failed to create" in err:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/applications/{application_id}/employer-cancel",
+    response_model=InterviewScheduleResponse,
+    summary="Cancel interview (employer)",
+    description="Cancel the interview for this application. Source of cancellation is recorded as employer. If a Google event exists, it is patched to cancelled.",
+)
+async def employer_cancel(
+    application_id: UUID,
+    current_employer: dict = Depends(get_current_employer_from_token),
+    service: InterviewScheduleService = Depends(get_interview_schedule_service),
+):
+    employer_id = UUID(current_employer["employer_id"])
+    try:
+        return await service.employer_cancel(employer_id=employer_id, application_id=application_id)
+    except ValueError as e:
+        err = str(e).lower()
+        if "not found" in err or "do not own" in err or "no interview schedule" in err:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        if "cannot be cancelled" in err:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
 # ----- Candidate flow (Step 8) -----
 
 
