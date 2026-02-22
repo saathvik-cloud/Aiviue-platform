@@ -11,12 +11,8 @@ from uuid import UUID
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.interview_scheduling.enums import OfferedSlotStatus
 from app.domains.interview_scheduling.models import InterviewOfferedSlot
-from app.domains.interview_scheduling.models.interview_offered_slot import (
-    OFFERED_SLOT_STATUS_OFFERED,
-    OFFERED_SLOT_STATUS_CONFIRMED,
-    OFFERED_SLOT_STATUS_RELEASED,
-)
 
 
 class InterviewOfferedSlotRepository:
@@ -48,7 +44,7 @@ class InterviewOfferedSlotRepository:
                 interview_schedule_id=interview_schedule_id,
                 slot_start_utc=start_utc,
                 slot_end_utc=end_utc,
-                status=OFFERED_SLOT_STATUS_OFFERED,
+                status=OfferedSlotStatus.OFFERED.value,
             )
             self._session.add(row)
             created.append(row)
@@ -68,7 +64,7 @@ class InterviewOfferedSlotRepository:
         await self._session.execute(
             update(InterviewOfferedSlot)
             .where(InterviewOfferedSlot.interview_schedule_id == interview_schedule_id)
-            .values(status=OFFERED_SLOT_STATUS_RELEASED)
+            .values(status=OfferedSlotStatus.RELEASED.value)
         )
         # Set the chosen one to confirmed
         await self._session.execute(
@@ -77,7 +73,7 @@ class InterviewOfferedSlotRepository:
                 InterviewOfferedSlot.id == confirmed_slot_id,
                 InterviewOfferedSlot.interview_schedule_id == interview_schedule_id,
             )
-            .values(status=OFFERED_SLOT_STATUS_CONFIRMED)
+            .values(status=OfferedSlotStatus.CONFIRMED.value)
         )
         await self._session.flush()
         row = await self._session.get(InterviewOfferedSlot, confirmed_slot_id)
@@ -92,11 +88,11 @@ class InterviewOfferedSlotRepository:
             .where(
                 InterviewOfferedSlot.interview_schedule_id == interview_schedule_id,
                 InterviewOfferedSlot.status.in_([
-                    OFFERED_SLOT_STATUS_OFFERED,
-                    OFFERED_SLOT_STATUS_CONFIRMED,
+                    OfferedSlotStatus.OFFERED.value,
+                    OfferedSlotStatus.CONFIRMED.value,
                 ]),
             )
-            .values(status=OFFERED_SLOT_STATUS_RELEASED)
+            .values(status=OfferedSlotStatus.RELEASED.value)
         )
         await self._session.flush()
         return result.rowcount or 0

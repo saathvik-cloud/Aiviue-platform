@@ -10,12 +10,8 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.interview_scheduling.enums import InterviewState, OfferedSlotStatus
 from app.domains.interview_scheduling.models import InterviewSchedule, InterviewOfferedSlot
-from app.domains.interview_scheduling.models.interview_schedule import INTERVIEW_SCHEDULE_STATE_SCHEDULED
-from app.domains.interview_scheduling.models.interview_offered_slot import (
-    OFFERED_SLOT_STATUS_OFFERED,
-    OFFERED_SLOT_STATUS_CONFIRMED,
-)
 
 
 class SlotRepository:
@@ -48,7 +44,7 @@ class SlotRepository:
             InterviewSchedule.chosen_slot_end_utc,
         ).where(
             InterviewSchedule.employer_id == employer_id,
-            InterviewSchedule.state == INTERVIEW_SCHEDULE_STATE_SCHEDULED,
+            InterviewSchedule.state == InterviewState.SCHEDULED.value,
             InterviewSchedule.chosen_slot_start_utc.isnot(None),
             InterviewSchedule.chosen_slot_end_utc.isnot(None),
             InterviewSchedule.chosen_slot_start_utc < to_utc,
@@ -68,7 +64,7 @@ class SlotRepository:
             InterviewOfferedSlot.interview_schedule_id == InterviewSchedule.id,
         ).where(
             InterviewSchedule.employer_id == employer_id,
-            InterviewOfferedSlot.status.in_([OFFERED_SLOT_STATUS_OFFERED, OFFERED_SLOT_STATUS_CONFIRMED]),
+            InterviewOfferedSlot.status.in_([OfferedSlotStatus.OFFERED.value, OfferedSlotStatus.CONFIRMED.value]),
             InterviewOfferedSlot.slot_start_utc < to_utc,
             InterviewOfferedSlot.slot_end_utc > from_utc,
         )

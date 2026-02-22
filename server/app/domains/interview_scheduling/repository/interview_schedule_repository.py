@@ -2,6 +2,7 @@
 Repository for interview_schedules.
 
 Get by id or application_id, create (initial state slots_offered), update state and related fields.
+Use update_state_by_row when you already have the row to avoid a second SELECT.
 Caller handles transaction (commit/rollback).
 """
 
@@ -11,10 +12,47 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.interview_scheduling.enums import InterviewState, SourceOfCancellation
 from app.domains.interview_scheduling.models import InterviewSchedule
-from app.domains.interview_scheduling.models.interview_schedule import (
-    INTERVIEW_SCHEDULE_STATE_SLOTS_OFFERED,
-)
+
+
+def _apply_state_update(
+    row: InterviewSchedule,
+    new_state: InterviewState,
+    *,
+    state_version_increment: int = 1,
+    source_of_cancellation: SourceOfCancellation | str | None = None,
+    chosen_slot_start_utc: datetime | None = None,
+    chosen_slot_end_utc: datetime | None = None,
+    offer_sent_at: datetime | None = None,
+    candidate_confirmed_at: datetime | None = None,
+    meeting_link: str | None = None,
+    google_event_id: str | None = None,
+    interview_locked_until: datetime | None = None,
+) -> None:
+    """Mutate row with new state and optional fields. Caller flushes/refreshes."""
+    row.state = new_state.value
+    row.state_version += state_version_increment
+    if source_of_cancellation is not None:
+        row.source_of_cancellation = (
+            source_of_cancellation.value
+            if isinstance(source_of_cancellation, SourceOfCancellation)
+            else source_of_cancellation
+        )
+    if chosen_slot_start_utc is not None:
+        row.chosen_slot_start_utc = chosen_slot_start_utc
+    if chosen_slot_end_utc is not None:
+        row.chosen_slot_end_utc = chosen_slot_end_utc
+    if offer_sent_at is not None:
+        row.offer_sent_at = offer_sent_at
+    if candidate_confirmed_at is not None:
+        row.candidate_confirmed_at = candidate_confirmed_at
+    if meeting_link is not None:
+        row.meeting_link = meeting_link
+    if google_event_id is not None:
+        row.google_event_id = google_event_id
+    if interview_locked_until is not None:
+        row.interview_locked_until = interview_locked_until
 
 
 class InterviewScheduleRepository:
@@ -46,7 +84,7 @@ class InterviewScheduleRepository:
         application_id: UUID,
         employer_id: UUID,
         candidate_id: UUID,
-        state: str = INTERVIEW_SCHEDULE_STATE_SLOTS_OFFERED,
+        state: InterviewState = InterviewState.SLOTS_OFFERED,
     ) -> InterviewSchedule:
         """Create one interview schedule (initial state slots_offered). Caller commits."""
         row = InterviewSchedule(
@@ -54,7 +92,7 @@ class InterviewScheduleRepository:
             application_id=application_id,
             employer_id=employer_id,
             candidate_id=candidate_id,
-            state=state,
+            state=state.value,
             state_version=1,
         )
         self._session.add(row)
@@ -65,10 +103,10 @@ class InterviewScheduleRepository:
     async def update_state(
         self,
         schedule_id: UUID,
-        new_state: str,
+        new_state: InterviewState,
         *,
         state_version_increment: int = 1,
-        source_of_cancellation: str | None = None,
+        source_of_cancellation: SourceOfCancellation | str | None = None,
         chosen_slot_start_utc: datetime | None = None,
         chosen_slot_end_utc: datetime | None = None,
         offer_sent_at: datetime | None = None,
@@ -79,29 +117,60 @@ class InterviewScheduleRepository:
     ) -> InterviewSchedule | None:
         """
         Update schedule state and optional fields. Increments state_version.
-        Returns updated row or None if not found.
+        Returns updated row or None if not found. Fires one SELECT.
         """
         row = await self.get_by_id(schedule_id)
         if not row:
             return None
-        row.state = new_state
-        row.state_version += state_version_increment
-        if source_of_cancellation is not None:
-            row.source_of_cancellation = source_of_cancellation
-        if chosen_slot_start_utc is not None:
-            row.chosen_slot_start_utc = chosen_slot_start_utc
-        if chosen_slot_end_utc is not None:
-            row.chosen_slot_end_utc = chosen_slot_end_utc
-        if offer_sent_at is not None:
-            row.offer_sent_at = offer_sent_at
-        if candidate_confirmed_at is not None:
-            row.candidate_confirmed_at = candidate_confirmed_at
-        if meeting_link is not None:
-            row.meeting_link = meeting_link
-        if google_event_id is not None:
-            row.google_event_id = google_event_id
-        if interview_locked_until is not None:
-            row.interview_locked_until = interview_locked_until
+        _apply_state_update(
+            row,
+            new_state,
+            state_version_increment=state_version_increment,
+            source_of_cancellation=source_of_cancellation,
+            chosen_slot_start_utc=chosen_slot_start_utc,
+            chosen_slot_end_utc=chosen_slot_end_utc,
+            offer_sent_at=offer_sent_at,
+            candidate_confirmed_at=candidate_confirmed_at,
+            meeting_link=meeting_link,
+            google_event_id=google_event_id,
+            interview_locked_until=interview_locked_until,
+        )
+        await self._session.flush()
+        await self._session.refresh(row)
+        return row
+
+    async def update_state_by_row(
+        self,
+        row: InterviewSchedule,
+        new_state: InterviewState,
+        *,
+        state_version_increment: int = 1,
+        source_of_cancellation: SourceOfCancellation | str | None = None,
+        chosen_slot_start_utc: datetime | None = None,
+        chosen_slot_end_utc: datetime | None = None,
+        offer_sent_at: datetime | None = None,
+        candidate_confirmed_at: datetime | None = None,
+        meeting_link: str | None = None,
+        google_event_id: str | None = None,
+        interview_locked_until: datetime | None = None,
+    ) -> InterviewSchedule:
+        """
+        Update state and optional fields on an already-fetched row. No extra SELECT.
+        Use when caller has already loaded the row (e.g. for validation).
+        """
+        _apply_state_update(
+            row,
+            new_state,
+            state_version_increment=state_version_increment,
+            source_of_cancellation=source_of_cancellation,
+            chosen_slot_start_utc=chosen_slot_start_utc,
+            chosen_slot_end_utc=chosen_slot_end_utc,
+            offer_sent_at=offer_sent_at,
+            candidate_confirmed_at=candidate_confirmed_at,
+            meeting_link=meeting_link,
+            google_event_id=google_event_id,
+            interview_locked_until=interview_locked_until,
+        )
         await self._session.flush()
         await self._session.refresh(row)
         return row

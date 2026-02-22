@@ -3,6 +3,9 @@ Interview schedule model.
 
 One per job application when scheduling or scheduled. State machine with state_version
 and source_of_cancellation. Partial unique index prevents double booking (employer_id + slot where state=scheduled).
+
+State and source_of_cancellation are stored as strings in DB; use app.domains.interview_scheduling.enums
+(InterviewState, SourceOfCancellation) in Python.
 """
 
 from datetime import datetime
@@ -13,19 +16,6 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.shared.database import Base, TimestampMixin, UUIDMixin
-
-
-# State and cancellation enums (stored as strings in DB)
-INTERVIEW_SCHEDULE_STATE_SLOTS_OFFERED = "slots_offered"
-INTERVIEW_SCHEDULE_STATE_CANDIDATE_PICKED = "candidate_picked_slot"
-INTERVIEW_SCHEDULE_STATE_EMPLOYER_CONFIRMED = "employer_confirmed"
-INTERVIEW_SCHEDULE_STATE_SCHEDULED = "scheduled"
-INTERVIEW_SCHEDULE_STATE_CANCELLED = "cancelled"
-
-SOURCE_OF_CANCELLATION_EMPLOYER = "employer"
-SOURCE_OF_CANCELLATION_CANDIDATE = "candidate"
-SOURCE_OF_CANCELLATION_SYSTEM_TIMEOUT = "system_timeout"
-SOURCE_OF_CANCELLATION_GOOGLE_EXTERNAL = "google_external"
 
 
 class InterviewSchedule(Base, UUIDMixin, TimestampMixin):
