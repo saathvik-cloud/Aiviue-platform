@@ -9,6 +9,10 @@ from datetime import date, datetime, timedelta, time, timezone
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
+# End-of-day for window boundary: full microsecond precision so the occupied-range
+# query includes the entire last day and UTC conversion is unambiguous.
+END_OF_DAY = time(23, 59, 59, 999999)
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.interview_scheduling.constants import SLOT_GENERATION_DAYS
@@ -55,9 +59,12 @@ class SlotService:
             from_date = datetime.now(tz).date()
         window_end_date = from_date + timedelta(days=SLOT_GENERATION_DAYS)
 
-        # Build UTC bounds for occupied query (whole window)
+        # Build UTC bounds for occupied query (whole window). Use END_OF_DAY with
+        # microsecond precision so the window unambiguously includes the full last day
+        # and slot boundaries convert correctly to UTC (avoids slots extending into
+        # the next UTC day at the boundary).
         start_of_window_local = datetime.combine(from_date, time(0, 0), tzinfo=tz)
-        end_of_window_local = datetime.combine(window_end_date, time(23, 59, 59), tzinfo=tz)
+        end_of_window_local = datetime.combine(window_end_date, END_OF_DAY, tzinfo=tz)
         from_utc = start_of_window_local.astimezone(timezone.utc)
         to_utc = end_of_window_local.astimezone(timezone.utc)
 
@@ -76,6 +83,7 @@ class SlotService:
                 current_date += timedelta(days=1)
                 continue
 
+            # Employer's start/end in local time; slots must end at or before day_end_local.
             day_start_local = datetime.combine(current_date, start_time, tzinfo=tz)
             day_end_local = datetime.combine(current_date, end_time, tzinfo=tz)
             slot_start_local = day_start_local
