@@ -73,14 +73,14 @@ def _create_event_sync(
     Uses request_id so Google can deduplicate (same requestId returns same Meet, no duplicate event).
     """
     service = _get_credentials_and_service()
-    # RFC3339 with Z suffix for UTC
+    # RFC3339 with Z suffix = UTC; do not set timeZone when using Z to avoid API ignoring the datetime
     start_str = start_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
     end_str = end_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     body = {
         "summary": summary,
-        "start": {"dateTime": start_str, "timeZone": "UTC"},
-        "end": {"dateTime": end_str, "timeZone": "UTC"},
+        "start": {"dateTime": start_str},
+        "end": {"dateTime": end_str},
         "attendees": [
             {"email": employer_email},
             {"email": candidate_email},
