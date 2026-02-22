@@ -3,17 +3,21 @@ Interview scheduling API routes.
 
 Employer: availability (Step 4), slots, send offer, confirm, cancel (Step 7).
 Candidate: view slots, pick slot, cancel (Step 8).
+WATI: when template names are set, send WhatsApp after send offer, confirm, pick, cancel.
 """
 
+import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import API_V1_PREFIX
 from app.shared.auth import get_current_candidate_from_token, get_current_employer_from_token
 from app.shared.database import get_db
+from app.domains.candidate.repository import CandidateRepository
+from app.domains.employer.repository import EmployerRepository
 from app.domains.interview_scheduling.schemas import (
     EmployerAvailabilityCreate,
     EmployerAvailabilityUpdate,
@@ -26,6 +30,15 @@ from app.domains.interview_scheduling.schemas import (
     SendOfferRequest,
 )
 from app.domains.interview_scheduling.services import AvailabilityService, InterviewScheduleService
+from app.domains.interview_scheduling.wati_sender import (
+    format_slot_datetime_utc,
+    send_candidate_chose_slot_to_employer,
+    send_interview_cancelled,
+    send_meet_link,
+    send_slots_offered_to_candidate,
+)
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(
@@ -50,6 +63,11 @@ def get_interview_schedule_service(
     session: AsyncSession = Depends(get_db),
 ) -> InterviewScheduleService:
     return InterviewScheduleService(session)
+
+
+def get_wati_client(request: Request):
+    """Return WATI client from app state if configured, else None."""
+    return getattr(request.app.state, "wati_client", None)
 
 
 @router.get(
@@ -161,6 +179,8 @@ async def send_offer(
     body: SendOfferRequest,
     current_employer: dict = Depends(get_current_employer_from_token),
     service: InterviewScheduleService = Depends(get_interview_schedule_service),
+    session: AsyncSession = Depends(get_db),
+    wati_client=Depends(get_wati_client),
 ):
     employer_id = UUID(current_employer["employer_id"])
     slots_tuples = [(s.start_utc, s.end_utc) for s in body.slots]
@@ -177,6 +197,13 @@ async def send_offer(
         if "already been sent" in err.lower():
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=err)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err)
+    if wati_client:
+        try:
+            candidate = await CandidateRepository(session).get_by_id(schedule.candidate_id)
+            if candidate and (candidate.mobile or "").strip():
+                await send_slots_offered_to_candidate(wati_client, candidate.mobile.strip())
+        except Exception as e:
+            logger.warning("WATI slots_offered send failed: %s", e, extra={"schedule_id": str(schedule.id)})
     return schedule
 
 
@@ -190,10 +217,12 @@ async def employer_confirm_slot(
     application_id: UUID,
     current_employer: dict = Depends(get_current_employer_from_token),
     service: InterviewScheduleService = Depends(get_interview_schedule_service),
+    session: AsyncSession = Depends(get_db),
+    wati_client=Depends(get_wati_client),
 ):
     employer_id = UUID(current_employer["employer_id"])
     try:
-        return await service.employer_confirm_slot(employer_id=employer_id, application_id=application_id)
+        schedule = await service.employer_confirm_slot(employer_id=employer_id, application_id=application_id)
     except ValueError as e:
         err = str(e).lower()
         if "not found" in err or "do not own" in err or "no interview schedule" in err:
@@ -203,6 +232,18 @@ async def employer_confirm_slot(
         if "not configured" in err or "failed to create" in err:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    if wati_client and schedule.meeting_link:
+        slot_str = format_slot_datetime_utc(schedule.chosen_slot_start_utc, schedule.chosen_slot_end_utc)
+        try:
+            candidate = await CandidateRepository(session).get_by_id(schedule.candidate_id)
+            if candidate and (candidate.mobile or "").strip():
+                await send_meet_link(wati_client, candidate.mobile.strip(), schedule.meeting_link, slot_str)
+            employer = await EmployerRepository(session).get_by_id(schedule.employer_id)
+            if employer and (employer.phone or "").strip():
+                await send_meet_link(wati_client, employer.phone.strip(), schedule.meeting_link, slot_str)
+        except Exception as e:
+            logger.warning("WATI meet_link send failed: %s", e, extra={"schedule_id": str(schedule.id)})
+    return schedule
 
 
 @router.post(
@@ -215,10 +256,12 @@ async def employer_cancel(
     application_id: UUID,
     current_employer: dict = Depends(get_current_employer_from_token),
     service: InterviewScheduleService = Depends(get_interview_schedule_service),
+    session: AsyncSession = Depends(get_db),
+    wati_client=Depends(get_wati_client),
 ):
     employer_id = UUID(current_employer["employer_id"])
     try:
-        return await service.employer_cancel(employer_id=employer_id, application_id=application_id)
+        schedule = await service.employer_cancel(employer_id=employer_id, application_id=application_id)
     except ValueError as e:
         err = str(e).lower()
         if "not found" in err or "do not own" in err or "no interview schedule" in err:
@@ -226,6 +269,16 @@ async def employer_cancel(
         if "cannot be cancelled" in err:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    if wati_client:
+        try:
+            candidate = await CandidateRepository(session).get_by_id(schedule.candidate_id)
+            if candidate and (candidate.mobile or "").strip():
+                await send_interview_cancelled(
+                    wati_client, candidate.mobile.strip(), "The employer cancelled the interview."
+                )
+        except Exception as e:
+            logger.warning("WATI cancelled (employer) send failed: %s", e, extra={"schedule_id": str(schedule.id)})
+    return schedule
 
 
 # ----- Candidate flow (Step 8) -----
@@ -277,10 +330,12 @@ async def pick_slot(
     body: PickSlotRequest,
     current_candidate: dict = Depends(get_current_candidate_from_token),
     service: InterviewScheduleService = Depends(get_interview_schedule_service),
+    session: AsyncSession = Depends(get_db),
+    wati_client=Depends(get_wati_client),
 ):
     candidate_id = UUID(current_candidate["candidate_id"])
     try:
-        return await service.candidate_pick_slot(
+        schedule = await service.candidate_pick_slot(
             candidate_id=candidate_id,
             schedule_id=schedule_id,
             slot_id=body.slot_id,
@@ -292,6 +347,15 @@ async def pick_slot(
         if "no longer" in err or "not available" in err or "cannot" in err:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    if wati_client:
+        try:
+            employer = await EmployerRepository(session).get_by_id(schedule.employer_id)
+            if employer and (employer.phone or "").strip():
+                slot_str = format_slot_datetime_utc(schedule.chosen_slot_start_utc, schedule.chosen_slot_end_utc)
+                await send_candidate_chose_slot_to_employer(wati_client, employer.phone.strip(), slot_str)
+        except Exception as e:
+            logger.warning("WATI candidate_chose_slot send failed: %s", e, extra={"schedule_id": str(schedule.id)})
+    return schedule
 
 
 @router.post(
@@ -304,10 +368,12 @@ async def cancel_my_offer(
     schedule_id: UUID,
     current_candidate: dict = Depends(get_current_candidate_from_token),
     service: InterviewScheduleService = Depends(get_interview_schedule_service),
+    session: AsyncSession = Depends(get_db),
+    wati_client=Depends(get_wati_client),
 ):
     candidate_id = UUID(current_candidate["candidate_id"])
     try:
-        return await service.candidate_cancel(candidate_id=candidate_id, schedule_id=schedule_id)
+        schedule = await service.candidate_cancel(candidate_id=candidate_id, schedule_id=schedule_id)
     except ValueError as e:
         err = str(e).lower()
         if "not found" in err or "does not belong" in err:
@@ -315,3 +381,36 @@ async def cancel_my_offer(
         if "cannot be cancelled" in err:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    if wati_client:
+        try:
+            employer = await EmployerRepository(session).get_by_id(schedule.employer_id)
+            if employer and (employer.phone or "").strip():
+                await send_interview_cancelled(
+                    wati_client, employer.phone.strip(), "The candidate cancelled the interview."
+                )
+        except Exception as e:
+            logger.warning("WATI cancelled (candidate) send failed: %s", e, extra={"schedule_id": str(schedule.id)})
+    return schedule
+
+
+# ----- WATI webhook (button events, etc.) -----
+
+
+@router.post(
+    "/wati-webhook",
+    status_code=status.HTTP_200_OK,
+    summary="WATI webhook",
+    description="Receives WATI events (button clicks, messages). Return 200 quickly; process async if needed. Configure this URL in WATI dashboard.",
+)
+async def wati_webhook(request: Request):
+    """
+    WATI sends events (e.g. button_click, message) to this URL.
+    v1: acknowledge with 200; optional parsing for future interview actions (e.g. confirm/cancel from WhatsApp).
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    # Log for debugging; in future parse body.get("type"), body.get("payload") and dispatch to interview actions
+    logger.debug("WATI webhook received", extra={"keys": list(body.keys()) if isinstance(body, dict) else []})
+    return {}

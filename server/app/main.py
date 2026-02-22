@@ -74,13 +74,33 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Redis not available: {e}")
 
+    # WATI client (shared by notification consumer and interview scheduling routes)
+    wati_client = None
+    if settings.wati_api_endpoint and settings.wati_api_token and settings.wati_channel_number:
+        try:
+            from app.domains.notification.services import WATIClient
+            default_cc = getattr(settings, "default_phone_country_code", "91")
+            wati_client = WATIClient(
+                base_url=settings.wati_api_endpoint,
+                bearer_token=settings.wati_api_token,
+                channel_number=settings.wati_channel_number,
+                default_phone_country_code=default_cc,
+            )
+            app.state.wati_client = wati_client
+            logger.info("WATI client configured", extra={"event": "wati_configured"})
+        except Exception as e:
+            logger.warning(f"WATI client not created: {e}")
+            app.state.wati_client = None
+    else:
+        app.state.wati_client = None
+
     # Start notification consumer (listens for job.published, sends WhatsApp via WATI)
     notification_consumer_task = None
     if getattr(settings, "enable_notification_consumer", True):
         try:
             from app.shared.cache import get_redis_client
             from app.shared.cache.redis_client import RedisClient
-            from app.domains.notification.services import WATIClient, NotificationService
+            from app.domains.notification.services import NotificationService
             from app.domains.notification.consumers import run_job_events_notification_consumer
 
             redis_raw = await get_redis_client()
@@ -97,16 +117,8 @@ async def lifespan(app: FastAPI):
             else:
                 redis_wrapper = RedisClient(redis_raw)
                 default_cc = getattr(settings, "default_phone_country_code", "91")
-                wati_client = None
-                if settings.wati_api_endpoint and settings.wati_api_token and settings.wati_channel_number:
-                    wati_client = WATIClient(
-                        base_url=settings.wati_api_endpoint,
-                        bearer_token=settings.wati_api_token,
-                        channel_number=settings.wati_channel_number,
-                        default_phone_country_code=default_cc,
-                    )
                 notification_service = NotificationService(
-                    wati_client=wati_client,
+                    wati_client=getattr(app.state, "wati_client", None),
                     template_job_published=getattr(settings, "wati_template_job_published", "welcome"),
                     default_phone_country_code=default_cc,
                 )
