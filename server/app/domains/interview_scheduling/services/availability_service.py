@@ -61,6 +61,8 @@ class AvailabilityService:
                     slot_duration_minutes=data["slot_duration_minutes"],
                     buffer_minutes=data["buffer_minutes"],
                 )
+            if not row:
+                raise ValueError("Availability record missing after save.")
             return EmployerAvailabilityResponse.model_validate(row)
         else:
             # EmployerAvailabilityUpdate - only set provided fields
@@ -83,4 +85,6 @@ class AvailabilityService:
                 update_kw["buffer_minutes"] = body.buffer_minutes
             await self._repo.update(employer_id, **update_kw)
             row = await self._repo.get_by_employer_id(employer_id)
+            if not row:
+                raise ValueError("Availability record missing after update.")
             return EmployerAvailabilityResponse.model_validate(row)
