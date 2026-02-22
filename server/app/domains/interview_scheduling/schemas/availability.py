@@ -10,6 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.domains.interview_scheduling.constants import BUFFER_CHOICES, SLOT_DURATION_CHOICES
 
 
+VALID_WORKING_DAYS = set(range(7))  # ISO weekday 0=Monday .. 6=Sunday
+
+
 class EmployerAvailabilityBase(BaseModel):
     """Base fields for availability (working_days 0=Mon .. 6=Sun)."""
     working_days: list[int] = Field(
@@ -29,6 +32,16 @@ class EmployerAvailabilityBase(BaseModel):
         ...,
         description="Gap between slots in minutes",
     )
+
+    @field_validator("working_days")
+    @classmethod
+    def validate_working_days(cls, v: list[int]) -> list[int]:
+        invalid = [d for d in v if d not in VALID_WORKING_DAYS]
+        if invalid:
+            raise ValueError(
+                f"working_days must contain only ISO weekday numbers 0-6 (0=Mon .. 6=Sun); invalid: {invalid}"
+            )
+        return v
 
     @field_validator("slot_duration_minutes")
     @classmethod
@@ -58,6 +71,18 @@ class EmployerAvailabilityUpdate(BaseModel):
     timezone: str | None = Field(None, min_length=1, max_length=64)
     slot_duration_minutes: int | None = None
     buffer_minutes: int | None = None
+
+    @field_validator("working_days")
+    @classmethod
+    def validate_working_days(cls, v: list[int] | None) -> list[int] | None:
+        if v is None:
+            return v
+        invalid = [d for d in v if d not in VALID_WORKING_DAYS]
+        if invalid:
+            raise ValueError(
+                f"working_days must contain only ISO weekday numbers 0-6 (0=Mon .. 6=Sun); invalid: {invalid}"
+            )
+        return v
 
     @field_validator("slot_duration_minutes")
     @classmethod

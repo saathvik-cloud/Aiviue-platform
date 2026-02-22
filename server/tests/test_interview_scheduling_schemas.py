@@ -66,6 +66,14 @@ class TestEmployerAvailabilityCreate:
         with pytest.raises(ValidationError):
             EmployerAvailabilityCreate(**data)
 
+    @pytest.mark.parametrize("invalid_days", [[0, 1, 2, 3, 9], [-1, 7], [7], [-1]])
+    def test_working_days_invalid_iso_weekday_raises(self, invalid_days):
+        """working_days must be ISO weekday 0-6; values outside raise ValidationError."""
+        data = {**SAMPLE_AVAILABILITY, "working_days": invalid_days}
+        with pytest.raises(ValidationError) as exc_info:
+            EmployerAvailabilityCreate(**data)
+        assert "working_days" in str(exc_info.value).lower() or "0-6" in str(exc_info.value)
+
     def test_timezone_empty_raises(self):
         """Empty timezone raises."""
         data = {**SAMPLE_AVAILABILITY, "timezone": ""}
@@ -103,6 +111,12 @@ class TestEmployerAvailabilityUpdate:
         """Partial update with invalid buffer_minutes raises."""
         with pytest.raises(ValidationError):
             EmployerAvailabilityUpdate(buffer_minutes=7)
+
+    def test_invalid_working_days_in_partial_raises(self):
+        """Partial update with working_days outside 0-6 raises."""
+        with pytest.raises(ValidationError) as exc_info:
+            EmployerAvailabilityUpdate(working_days=[0, 1, 2, 3, 9])
+        assert "working_days" in str(exc_info.value).lower() or "0-6" in str(exc_info.value)
 
 
 class TestEmployerAvailabilityResponse:

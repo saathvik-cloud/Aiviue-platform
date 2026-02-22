@@ -34,7 +34,10 @@ async def _try_advisory_lock(session: AsyncSession, lock_id: int) -> bool:
         {"id": lock_id},
     )
     row = result.scalar_one_or_none()
-    return row is not None and row[0] is True
+    if row is None:
+        return False
+    # Driver may return a Row (row[0]) or the scalar bool directly
+    return row is True if isinstance(row, bool) else row[0] is True
 
 
 async def _advisory_unlock(session: AsyncSession, lock_id: int) -> None:
@@ -174,9 +177,6 @@ async def interview_scheduling_jobs_loop(
     interval_seconds = max(60, interval_minutes * 60)
     while not stop.is_set():
         try:
-            await asyncio.sleep(interval_seconds)
-            if stop.is_set():
-                break
             result = await run_all_interview_scheduling_jobs(session_factory)
             if any(result.values()):
                 logger.debug(
@@ -184,6 +184,9 @@ async def interview_scheduling_jobs_loop(
                     result,
                     extra={"jobs_result": result},
                 )
+            await asyncio.sleep(interval_seconds)
+            if stop.is_set():
+                break
         except asyncio.CancelledError:
             break
         except Exception as e:
