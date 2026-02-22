@@ -199,6 +199,7 @@ class InterviewScheduleService:
             except Exception as e:
                 logger.warning("Failed to patch Google event %s to cancelled: %s", schedule.google_event_id, e)
 
+        await self._offered_slot_repo.release_all(schedule.id)
         await self._schedule_repo.update_state_by_row(
             schedule,
             InterviewState.CANCELLED,
@@ -297,6 +298,7 @@ class InterviewScheduleService:
                 await self._calendar_client.patch_cancelled(schedule.google_event_id)
             except Exception as e:
                 logger.warning("Failed to patch Google event %s to cancelled: %s", schedule.google_event_id, e)
+        await self._offered_slot_repo.release_all(schedule.id)
         await self._schedule_repo.update_state_by_row(
             schedule,
             InterviewState.CANCELLED,
