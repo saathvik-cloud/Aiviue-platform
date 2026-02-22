@@ -1,7 +1,10 @@
 """
 Interview scheduling API routes.
 
-Employer flow (slots, send offer, confirm, cancel) and candidate flow in Steps 7–8.
+Employer: availability, slots, send offer, confirm, cancel.
+Candidate: view slots, pick slot, cancel.
 """
 
-__all__: list[str] = []
+from app.domains.interview_scheduling.api.routes import router
+
+__all__ = ["router"]

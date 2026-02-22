@@ -59,6 +59,20 @@ class EmployerAvailabilityUpdate(BaseModel):
     slot_duration_minutes: int | None = None
     buffer_minutes: int | None = None
 
+    @field_validator("slot_duration_minutes")
+    @classmethod
+    def validate_slot_duration(cls, v: int | None) -> int | None:
+        if v is not None and v not in SLOT_DURATION_CHOICES:
+            raise ValueError(f"slot_duration_minutes must be one of {SLOT_DURATION_CHOICES}")
+        return v
+
+    @field_validator("buffer_minutes")
+    @classmethod
+    def validate_buffer(cls, v: int | None) -> int | None:
+        if v is not None and v not in BUFFER_CHOICES:
+            raise ValueError(f"buffer_minutes must be one of {BUFFER_CHOICES}")
+        return v
+
 
 class EmployerAvailabilityResponse(BaseModel):
     """Availability response (from DB)."""

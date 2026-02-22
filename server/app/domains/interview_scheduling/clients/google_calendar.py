@@ -185,8 +185,8 @@ class GoogleCalendarClient:
     def is_configured(self) -> bool:
         """Return True if Google Calendar is configured (calendar id + service account JSON)."""
         return bool(
-            settings.google_calendar_id
-            and settings.google_service_account_json
+            settings.google_service_account_json
+            and self._calendar_id
         )
 
     async def create_event(
