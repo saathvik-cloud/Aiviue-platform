@@ -8,7 +8,7 @@ Used for slot locking (offered slots not shown to other candidates).
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -52,6 +52,7 @@ class InterviewOfferedSlot(Base, UUIDMixin, TimestampMixin):
         String(20),
         nullable=False,
         default=OFFERED_SLOT_STATUS_OFFERED,
+        server_default=text("'offered'"),
         index=True,
         comment="offered | confirmed | released",
     )
