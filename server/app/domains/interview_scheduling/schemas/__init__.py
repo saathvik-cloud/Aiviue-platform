@@ -14,6 +14,8 @@ from app.domains.interview_scheduling.schemas.interview_schedule import (
     SourceOfCancellationEnum,
     InterviewScheduleResponse,
     InterviewScheduleListResponse,
+    PickSlotRequest,
+    OfferWithSlotsResponse,
 )
 from app.domains.interview_scheduling.schemas.offered_slot import (
     OfferedSlotStatusEnum,
@@ -22,6 +24,8 @@ from app.domains.interview_scheduling.schemas.offered_slot import (
 )
 from app.domains.interview_scheduling.schemas.slots import (
     GeneratedSlotResponse,
+    SlotChoice,
+    SendOfferRequest,
 )
 
 __all__ = [
@@ -32,8 +36,12 @@ __all__ = [
     "SourceOfCancellationEnum",
     "InterviewScheduleResponse",
     "InterviewScheduleListResponse",
+    "PickSlotRequest",
+    "OfferWithSlotsResponse",
     "OfferedSlotStatusEnum",
     "OfferedSlotResponse",
     "OfferedSlotCreate",
     "GeneratedSlotResponse",
+    "SlotChoice",
+    "SendOfferRequest",
 ]

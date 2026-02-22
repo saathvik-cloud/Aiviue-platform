@@ -2,11 +2,15 @@
 Pydantic schemas for interview schedule.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.domains.interview_scheduling.schemas.offered_slot import OfferedSlotResponse
 
 
 class InterviewScheduleStateEnum(str, Enum):
@@ -50,3 +54,14 @@ class InterviewScheduleResponse(BaseModel):
 class InterviewScheduleListResponse(BaseModel):
     """List of interview schedules."""
     items: list[InterviewScheduleResponse] = Field(default_factory=list)
+
+
+class PickSlotRequest(BaseModel):
+    """Candidate picks one offered slot by id."""
+    slot_id: UUID
+
+
+class OfferWithSlotsResponse(BaseModel):
+    """Interview schedule with its offered slots (for candidate view/pick)."""
+    schedule: InterviewScheduleResponse
+    slots: list[OfferedSlotResponse] = Field(default_factory=list)

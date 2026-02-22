@@ -77,6 +77,23 @@ class InterviewScheduleRepository:
         )
         return result.scalar_one_or_none()
 
+    async def list_by_candidate_id(
+        self,
+        candidate_id: UUID,
+        states: list[InterviewState] | None = None,
+    ) -> list[InterviewSchedule]:
+        """Return schedules for this candidate, optionally filtered by state(s). Newest first."""
+        query = select(InterviewSchedule).where(
+            InterviewSchedule.candidate_id == candidate_id
+        )
+        if states:
+            query = query.where(
+                InterviewSchedule.state.in_([s.value for s in states])
+            )
+        query = query.order_by(InterviewSchedule.created_at.desc())
+        result = await self._session.execute(query)
+        return list(result.scalars().all())
+
     async def create(
         self,
         *,
@@ -85,6 +102,7 @@ class InterviewScheduleRepository:
         employer_id: UUID,
         candidate_id: UUID,
         state: InterviewState = InterviewState.SLOTS_OFFERED,
+        offer_sent_at: datetime | None = None,
     ) -> InterviewSchedule:
         """Create one interview schedule (initial state slots_offered). Caller commits."""
         row = InterviewSchedule(
@@ -94,6 +112,7 @@ class InterviewScheduleRepository:
             candidate_id=candidate_id,
             state=state.value,
             state_version=1,
+            offer_sent_at=offer_sent_at,
         )
         self._session.add(row)
         await self._session.flush()

@@ -53,6 +53,16 @@ class JobApplicationRepository:
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
+    async def get_by_id_with_job(self, application_id: UUID) -> Optional[JobApplication]:
+        """Get application by ID with job loaded (for employer_id check)."""
+        query = (
+            select(JobApplication)
+            .where(JobApplication.id == application_id)
+            .options(joinedload(JobApplication.job))
+        )
+        result = await self.session.execute(query)
+        return result.unique().scalar_one_or_none()
+
     async def get_by_job_and_candidate(
         self,
         job_id: UUID,
