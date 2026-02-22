@@ -8,6 +8,7 @@ Candidate: view slots, pick slot, cancel (Step 8).
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import API_V1_PREFIX
@@ -75,7 +76,13 @@ async def set_availability(
     service: AvailabilityService = Depends(get_availability_service),
 ):
     employer_id = UUID(current_employer["employer_id"])
-    return await service.set_availability(employer_id, body)
+    existed = await service.get_availability(employer_id) is not None
+    result = await service.set_availability(employer_id, body)
+    status_code = status.HTTP_201_CREATED if not existed else status.HTTP_200_OK
+    return JSONResponse(
+        status_code=status_code,
+        content=result.model_dump(mode="json"),
+    )
 
 
 @router.patch(

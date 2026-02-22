@@ -327,6 +327,38 @@ EXTRACTION_RESPONSE_FIELDS = [
 
 
 # =============================================================================
+# INTERVIEW SCHEDULING - AVAILABILITY TEST DATA
+# =============================================================================
+
+# working_days: 0=Mon .. 6=Sun; Mon-Fri = [0,1,2,3,4]
+SAMPLE_AVAILABILITY = {
+    "working_days": [0, 1, 2, 3, 4],
+    "start_time": "09:00",
+    "end_time": "17:00",
+    "timezone": "Asia/Kolkata",
+    "slot_duration_minutes": 30,
+    "buffer_minutes": 10,
+}
+
+SAMPLE_AVAILABILITY_UPDATE = {
+    "timezone": "America/New_York",
+    "buffer_minutes": 15,
+}
+
+# Invalid: slot_duration not in (15, 30, 45); buffer not in (5, 10, 15, 30)
+INVALID_AVAILABILITY_PAYLOADS = [
+    {"working_days": [0, 1, 2, 3, 4], "start_time": "09:00", "end_time": "17:00", "timezone": "Asia/Kolkata", "slot_duration_minutes": 20, "buffer_minutes": 10},
+    {"working_days": [0, 1, 2, 3, 4], "start_time": "09:00", "end_time": "17:00", "timezone": "Asia/Kolkata", "slot_duration_minutes": 30, "buffer_minutes": 7},
+    {"working_days": [], "start_time": "09:00", "end_time": "17:00", "timezone": "Asia/Kolkata", "slot_duration_minutes": 30, "buffer_minutes": 10},
+]
+
+AVAILABILITY_RESPONSE_FIELDS = [
+    "id", "employer_id", "working_days", "start_time", "end_time",
+    "timezone", "slot_duration_minutes", "buffer_minutes",
+]
+
+
+# =============================================================================
 # ERROR CODES
 # =============================================================================
 
