@@ -59,6 +59,15 @@ def _get_credentials_and_service():
     return service
 
 
+def _extract_meeting_link(event: dict) -> str:
+    """Extract Meet/video link from a Calendar event response."""
+    if event.get("conferenceData", {}).get("entryPoints"):
+        for ep in event["conferenceData"]["entryPoints"]:
+            if ep.get("entryPointType") == "video":
+                return ep.get("uri", "")
+    return event.get("hangoutLink") or ""
+
+
 def _create_event_sync(
     calendar_id: str,
     start_utc: datetime,
@@ -69,22 +78,23 @@ def _create_event_sync(
     summary: str = "Interview",
 ) -> CreateEventResult:
     """
-    Create a calendar event with Google Meet (sync).
-    Uses request_id so Google can deduplicate (same requestId returns same Meet, no duplicate event).
+    Create a calendar event, attempting Google Meet first.
+
+    hangoutsMeet only works on a Google Workspace user's primary calendar.
+    On group calendars or free-account service accounts it returns 400
+    "Invalid conference type value." — in that case we retry without
+    conferenceData so the event (and its time-block) is still created.
+    The Meet link will be empty; the platform can share a separate link
+    via WATI / in-app, or upgrade to Workspace later for automatic Meet.
     """
     service = _get_credentials_and_service()
-    # RFC3339 with Z suffix = UTC; do not set timeZone when using Z to avoid API ignoring the datetime
     start_str = start_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
     end_str = end_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    body = {
+    body_with_meet = {
         "summary": summary,
         "start": {"dateTime": start_str},
         "end": {"dateTime": end_str},
-        "attendees": [
-            {"email": employer_email},
-            {"email": candidate_email},
-        ],
         "conferenceData": {
             "createRequest": {
                 "requestId": request_id,
@@ -93,30 +103,50 @@ def _create_event_sync(
         },
     }
 
-    event = (
-        service.events()
-        .insert(
-            calendarId=calendar_id,
-            body=body,
-            sendUpdates="all",
-            conferenceDataVersion=1,
+    try:
+        event = (
+            service.events()
+            .insert(
+                calendarId=calendar_id,
+                body=body_with_meet,
+                sendUpdates="none",
+                conferenceDataVersion=1,
+            )
+            .execute()
         )
-        .execute()
-    )
+    except Exception as first_err:
+        err_msg = str(first_err).lower()
+        is_conference_error = "invalid conference type" in err_msg or "conference" in err_msg
+        if not is_conference_error:
+            raise
+
+        logger.warning(
+            "Meet conference not supported on this calendar — creating event without Meet. "
+            "Upgrade to Google Workspace and use the primary calendar for automatic Meet links. "
+            "Original error: %s",
+            first_err,
+        )
+        body_no_meet = {
+            "summary": summary,
+            "start": {"dateTime": start_str},
+            "end": {"dateTime": end_str},
+        }
+        event = (
+            service.events()
+            .insert(
+                calendarId=calendar_id,
+                body=body_no_meet,
+                sendUpdates="none",
+            )
+            .execute()
+        )
 
     event_id = event.get("id")
-    meeting_link = None
-    if event.get("conferenceData", {}).get("entryPoints"):
-        for ep in event["conferenceData"]["entryPoints"]:
-            if ep.get("entryPointType") == "video":
-                meeting_link = ep.get("uri")
-                break
-    if not meeting_link:
-        meeting_link = event.get("hangoutLink") or ""
+    meeting_link = _extract_meeting_link(event)
 
     if not event_id:
         raise RuntimeError("Google Calendar API did not return event id")
-    return CreateEventResult(event_id=event_id, meeting_link=meeting_link or "")
+    return CreateEventResult(event_id=event_id, meeting_link=meeting_link)
 
 
 def _patch_cancelled_sync(calendar_id: str, event_id: str) -> None:
@@ -127,7 +157,7 @@ def _patch_cancelled_sync(calendar_id: str, event_id: str) -> None:
         calendarId=calendar_id,
         eventId=event_id,
         body=body,
-        sendUpdates="all",
+        sendUpdates="none",
     ).execute()
 
 
@@ -154,19 +184,10 @@ def _get_event_sync(calendar_id: str, event_id: str) -> EventInfo | None:
             return None
         raise
 
-    meeting_link = None
-    if event.get("conferenceData", {}).get("entryPoints"):
-        for ep in event["conferenceData"]["entryPoints"]:
-            if ep.get("entryPointType") == "video":
-                meeting_link = ep.get("uri")
-                break
-    if not meeting_link:
-        meeting_link = event.get("hangoutLink")
-
     return EventInfo(
         event_id=event.get("id", event_id),
         status=event.get("status", "confirmed"),
-        meeting_link=meeting_link,
+        meeting_link=_extract_meeting_link(event) or None,
     )
 
 

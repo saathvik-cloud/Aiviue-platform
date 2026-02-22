@@ -7,6 +7,7 @@ import { getInitials } from '@/lib/utils';
 import { useAuthStore } from '@/stores';
 import {
   Briefcase,
+  CalendarClock,
   ChevronDown,
   ClipboardList,
   HelpCircle,
@@ -27,6 +28,7 @@ const iconMap = {
   LayoutDashboard,
   Briefcase,
   ClipboardList,
+  CalendarClock,
   User,
 };
 
@@ -126,7 +128,7 @@ export default function DashboardLayout({
             // Profile should only be active on exact match
             const isActive = item.href === ROUTES.DASHBOARD
               ? pathname === item.href
-              : item.href === ROUTES.DASHBOARD_PROFILE
+              : item.href === ROUTES.DASHBOARD_PROFILE || item.href === ROUTES.DASHBOARD_AVAILABILITY
                 ? pathname === item.href
                 : item.href === ROUTES.APPLICATIONS
                   ? pathname === item.href || pathname.startsWith(item.href + '/')
@@ -234,6 +236,7 @@ export default function DashboardLayout({
               {pathname === ROUTES.APPLICATIONS && 'Application Management'}
               {pathname.match(/\/dashboard\/applications\/jobs\/[^/]+$/) && !pathname.includes('/candidates/') && 'Applicants'}
               {pathname.includes('/dashboard/applications/jobs/') && pathname.includes('/candidates/') && 'Candidate Profile'}
+              {pathname === ROUTES.DASHBOARD_AVAILABILITY && 'Interview availability'}
               {pathname === ROUTES.DASHBOARD_PROFILE && 'Profile'}
               {pathname.match(/\/dashboard\/jobs\/[^/]+$/) && !pathname.includes('/edit') && !pathname.includes('/new') && 'Job Details'}
               {pathname.includes('/edit') && 'Edit Job'}

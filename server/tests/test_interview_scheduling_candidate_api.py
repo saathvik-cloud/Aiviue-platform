@@ -217,3 +217,31 @@ class TestCancelMyOffer:
         data = r.json()
         assert data["state"] == "cancelled"
         assert data.get("source_of_cancellation") == "candidate"
+
+    def test_candidate_cancel_releases_slots_so_they_reappear_in_available_slots(self, api_client, offer_sent_setup):
+        """After candidate cancel, offered slots are released and show up again in available-slots for that application."""
+        _, _, application_id, schedule_id, _, emp_headers, _, cand_headers = offer_sent_setup
+        offer = api_client.get(
+            f"{API_PREFIX}/candidate/offers/{schedule_id}",
+            headers=cand_headers,
+        ).json()
+        if not offer.get("slots"):
+            pytest.skip("No slots in offer")
+        # OfferedSlotResponse uses slot_start_utc / slot_end_utc; available-slots use start_utc / end_utc
+        start_utc = offer["slots"][0]["slot_start_utc"]
+        end_utc = offer["slots"][0]["slot_end_utc"]
+        after_send = api_client.get(
+            f"{API_PREFIX}/applications/{application_id}/available-slots",
+            headers=emp_headers,
+        ).json()
+        assert not any(s["start_utc"] == start_utc and s["end_utc"] == end_utc for s in after_send), "slot should be absent while offered"
+        cancel_r = api_client.post(
+            f"{API_PREFIX}/candidate/offers/{schedule_id}/cancel",
+            headers=cand_headers,
+        )
+        assert cancel_r.status_code == 200
+        after_cancel = api_client.get(
+            f"{API_PREFIX}/applications/{application_id}/available-slots",
+            headers=emp_headers,
+        ).json()
+        assert any(s["start_utc"] == start_utc and s["end_utc"] == end_utc for s in after_cancel), "slot should reappear after cancel (released)"

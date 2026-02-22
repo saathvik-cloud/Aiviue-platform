@@ -106,6 +106,22 @@ class InterviewScheduleService:
         await self._session.refresh(schedule)
         return InterviewScheduleResponse.model_validate(schedule)
 
+    async def get_schedule_for_application(
+        self,
+        employer_id: UUID,
+        application_id: UUID,
+    ) -> InterviewScheduleResponse | None:
+        """
+        Return the interview schedule for this application if it exists and belongs to employer's job; else None.
+        """
+        application = await self._job_app_repo.get_by_id_with_job(application_id)
+        if not application or not application.job or application.job.employer_id != employer_id:
+            return None
+        schedule = await self._schedule_repo.get_by_application_id(application_id)
+        if not schedule or schedule.employer_id != employer_id:
+            return None
+        return InterviewScheduleResponse.model_validate(schedule)
+
     # ----- Employer confirm & cancel -----
 
     async def employer_confirm_slot(

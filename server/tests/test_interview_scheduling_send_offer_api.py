@@ -336,3 +336,36 @@ class TestEmployerCancel:
         data = r.json()
         assert data["state"] == "cancelled"
         assert data.get("source_of_cancellation") == "employer"
+
+    def test_employer_cancel_releases_slots_so_they_reappear_in_available_slots(self, api_client, interview_setup):
+        """After employer cancel, offered slots are released and show up again in available-slots."""
+        _, _, application_id, emp_headers, _, _ = interview_setup
+        slots_r = api_client.get(
+            f"{API_PREFIX}/applications/{application_id}/available-slots",
+            headers=emp_headers,
+        )
+        if not slots_r.json():
+            pytest.skip("No available slots")
+        slot = slots_r.json()[0]
+        start_utc, end_utc = slot["start_utc"], slot["end_utc"]
+        send_r = api_client.post(
+            f"{API_PREFIX}/applications/{application_id}/send-offer",
+            json={"slots": [{"start_utc": start_utc, "end_utc": end_utc}]},
+            headers=emp_headers,
+        )
+        assert send_r.status_code == 201
+        after_send = api_client.get(
+            f"{API_PREFIX}/applications/{application_id}/available-slots",
+            headers=emp_headers,
+        ).json()
+        assert not any(s["start_utc"] == start_utc and s["end_utc"] == end_utc for s in after_send), "slot should be absent while offered"
+        cancel_r = api_client.post(
+            f"{API_PREFIX}/applications/{application_id}/employer-cancel",
+            headers=emp_headers,
+        )
+        assert cancel_r.status_code == 200
+        after_cancel = api_client.get(
+            f"{API_PREFIX}/applications/{application_id}/available-slots",
+            headers=emp_headers,
+        ).json()
+        assert any(s["start_utc"] == start_utc and s["end_utc"] == end_utc for s in after_cancel), "slot should reappear after cancel (released)"

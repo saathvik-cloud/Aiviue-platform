@@ -141,6 +141,30 @@ async def update_availability(
 
 
 @router.get(
+    "/applications/{application_id}/schedule",
+    response_model=InterviewScheduleResponse,
+    summary="Get schedule for application (employer)",
+    description="Return the interview schedule for this application if one exists. 404 if none.",
+)
+async def get_schedule_for_application(
+    application_id: UUID,
+    current_employer: dict = Depends(get_current_employer_from_token),
+    service: InterviewScheduleService = Depends(get_interview_schedule_service),
+):
+    employer_id = UUID(current_employer["employer_id"])
+    schedule = await service.get_schedule_for_application(
+        employer_id=employer_id,
+        application_id=application_id,
+    )
+    if schedule is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No interview schedule for this application.",
+        )
+    return schedule
+
+
+@router.get(
     "/applications/{application_id}/available-slots",
     response_model=list[GeneratedSlotResponse],
     summary="Get available slots for an application",
