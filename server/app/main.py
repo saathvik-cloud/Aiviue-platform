@@ -122,11 +122,43 @@ async def lifespan(app: FastAPI):
                 )
         except Exception as e:
             logger.warning(f"Notification consumer not started: {e}")
+
+    # Start interview scheduling background jobs (offer expiry, employer timeout, calendar poll)
+    interview_scheduling_jobs_task = None
+    interview_scheduling_stop: asyncio.Event | None = None
+    if getattr(settings, "enable_interview_scheduling_jobs", True):
+        try:
+            from app.shared.database import async_session_factory
+            from app.domains.interview_scheduling.jobs.runner import interview_scheduling_jobs_loop
+
+            interview_scheduling_stop = asyncio.Event()
+            interview_scheduling_jobs_task = asyncio.create_task(
+                interview_scheduling_jobs_loop(
+                    session_factory=async_session_factory,
+                    stop_event=interview_scheduling_stop,
+                ),
+            )
+            logger.info(
+                "Interview scheduling jobs started (offer expiry, employer timeout, calendar poll)",
+                extra={"event": "interview_scheduling_jobs_started"},
+            )
+        except Exception as e:
+            logger.warning(f"Interview scheduling jobs not started: {e}")
     
     yield
     
     # ==================== SHUTDOWN ====================
     logger.info("Shutting down...")
+
+    if interview_scheduling_stop is not None:
+        interview_scheduling_stop.set()
+    if interview_scheduling_jobs_task and not interview_scheduling_jobs_task.done():
+        interview_scheduling_jobs_task.cancel()
+        try:
+            await interview_scheduling_jobs_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Interview scheduling jobs stopped")
 
     if notification_consumer_task and not notification_consumer_task.done():
         notification_consumer_task.cancel()

@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     wati_template_interview_meet_link: str | None = None
     wati_template_interview_candidate_chose_slot: str | None = None
     wati_template_interview_cancelled: str | None = None
+    enable_interview_scheduling_jobs: bool = True  # Background jobs: offer expiry, employer timeout, calendar poll
 
     # Storage (optional - for resume PDF upload)
     supabase_url: str | None = None
