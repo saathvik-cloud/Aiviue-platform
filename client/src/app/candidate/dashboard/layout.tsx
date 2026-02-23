@@ -6,6 +6,7 @@ import { getInitials } from '@/lib/utils';
 import { useCandidateAuthStore } from '@/stores';
 import {
     Briefcase,
+    CalendarCheck,
     ChevronDown,
     FileText,
     HelpCircle,
@@ -29,6 +30,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string; style?: 
   LayoutDashboard,
   FileText,
   Briefcase,
+  CalendarCheck,
   User,
 };
 
@@ -43,6 +45,7 @@ const PAGE_TITLE_MAP: Record<string, string> = {
   [ROUTES.CANDIDATE_DASHBOARD_RESUME_NEW]: 'Build Resume',
   [ROUTES.CANDIDATE_DASHBOARD_PROFILE]: 'Profile',
   [ROUTES.CANDIDATE_DASHBOARD_JOBS]: 'Jobs',
+  [ROUTES.CANDIDATE_DASHBOARD_INTERVIEWS]: 'Interviews',
 };
 
 function getPageTitle(pathname: string): string {

@@ -74,13 +74,33 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Redis not available: {e}")
 
+    # WATI client (shared by notification consumer and interview scheduling routes)
+    wati_client = None
+    if settings.wati_api_endpoint and settings.wati_api_token and settings.wati_channel_number:
+        try:
+            from app.domains.notification.services import WATIClient
+            default_cc = getattr(settings, "default_phone_country_code", "91")
+            wati_client = WATIClient(
+                base_url=settings.wati_api_endpoint,
+                bearer_token=settings.wati_api_token,
+                channel_number=settings.wati_channel_number,
+                default_phone_country_code=default_cc,
+            )
+            app.state.wati_client = wati_client
+            logger.info("WATI client configured", extra={"event": "wati_configured"})
+        except Exception as e:
+            logger.warning(f"WATI client not created: {e}")
+            app.state.wati_client = None
+    else:
+        app.state.wati_client = None
+
     # Start notification consumer (listens for job.published, sends WhatsApp via WATI)
     notification_consumer_task = None
     if getattr(settings, "enable_notification_consumer", True):
         try:
             from app.shared.cache import get_redis_client
             from app.shared.cache.redis_client import RedisClient
-            from app.domains.notification.services import WATIClient, NotificationService
+            from app.domains.notification.services import NotificationService
             from app.domains.notification.consumers import run_job_events_notification_consumer
 
             redis_raw = await get_redis_client()
@@ -97,16 +117,8 @@ async def lifespan(app: FastAPI):
             else:
                 redis_wrapper = RedisClient(redis_raw)
                 default_cc = getattr(settings, "default_phone_country_code", "91")
-                wati_client = None
-                if settings.wati_api_endpoint and settings.wati_api_token and settings.wati_channel_number:
-                    wati_client = WATIClient(
-                        base_url=settings.wati_api_endpoint,
-                        bearer_token=settings.wati_api_token,
-                        channel_number=settings.wati_channel_number,
-                        default_phone_country_code=default_cc,
-                    )
                 notification_service = NotificationService(
-                    wati_client=wati_client,
+                    wati_client=getattr(app.state, "wati_client", None),
                     template_job_published=getattr(settings, "wati_template_job_published", "welcome"),
                     default_phone_country_code=default_cc,
                 )
@@ -122,11 +134,43 @@ async def lifespan(app: FastAPI):
                 )
         except Exception as e:
             logger.warning(f"Notification consumer not started: {e}")
+
+    # Start interview scheduling background jobs (offer expiry, employer timeout, calendar poll)
+    interview_scheduling_jobs_task = None
+    interview_scheduling_stop: asyncio.Event | None = None
+    if getattr(settings, "enable_interview_scheduling_jobs", True):
+        try:
+            from app.shared.database import async_session_factory
+            from app.domains.interview_scheduling.jobs.runner import interview_scheduling_jobs_loop
+
+            interview_scheduling_stop = asyncio.Event()
+            interview_scheduling_jobs_task = asyncio.create_task(
+                interview_scheduling_jobs_loop(
+                    session_factory=async_session_factory,
+                    stop_event=interview_scheduling_stop,
+                ),
+            )
+            logger.info(
+                "Interview scheduling jobs started (offer expiry, employer timeout, calendar poll)",
+                extra={"event": "interview_scheduling_jobs_started"},
+            )
+        except Exception as e:
+            logger.warning(f"Interview scheduling jobs not started: {e}")
     
     yield
     
     # ==================== SHUTDOWN ====================
     logger.info("Shutting down...")
+
+    if interview_scheduling_stop is not None:
+        interview_scheduling_stop.set()
+    if interview_scheduling_jobs_task and not interview_scheduling_jobs_task.done():
+        interview_scheduling_jobs_task.cancel()
+        try:
+            await interview_scheduling_jobs_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Interview scheduling jobs stopped")
 
     if notification_consumer_task and not notification_consumer_task.done():
         notification_consumer_task.cancel()
@@ -222,6 +266,7 @@ from app.domains.candidate import candidate_router
 from app.domains.candidate_chat import candidate_chat_router, candidate_chat_ws_router
 from app.domains.job_master import job_master_router
 from app.domains.screening import router as screening_router
+from app.domains.interview_scheduling.api import router as interview_scheduling_router
 
 app.include_router(employer_router)
 app.include_router(job_router)
@@ -231,6 +276,7 @@ app.include_router(candidate_chat_router)
 app.include_router(candidate_chat_ws_router)  # WebSocket kept for future use (streaming/server push); client uses HTTP
 app.include_router(job_master_router)
 app.include_router(screening_router)
+app.include_router(interview_scheduling_router)
 
 
 # ==================== ROOT ENDPOINT ====================
@@ -256,6 +302,7 @@ async def root():
             "candidate_chat_ws": f"ws://localhost:8000{API_V1_PREFIX}/candidate-chat/ws/{{session_id}}",
             "job_master": f"{API_V1_PREFIX}/job-master",
             "screening": f"{API_V1_PREFIX}/screening",
+            "interview_scheduling": f"{API_V1_PREFIX}/interview-scheduling",
         },
     }
 

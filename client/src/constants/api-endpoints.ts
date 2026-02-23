@@ -70,6 +70,28 @@ export const API_ENDPOINTS = {
       `${typeof window !== 'undefined' ? (window.location.protocol === 'https:' ? 'wss:' : 'ws:') : 'ws:'}//${typeof window !== 'undefined' ? window.location.host : 'localhost:8000'}/api/${API_VERSION}/candidate-chat/ws/${sessionId}?candidate_id=${candidateId}`,
   },
 
+  // Interview scheduling (employer: availability, slots, send offer, confirm, cancel; candidate: offers, pick, cancel)
+  INTERVIEW_SCHEDULING: {
+    AVAILABILITY: `/api/${API_VERSION}/interview-scheduling/availability`,
+    SCHEDULE_BY_APPLICATION: (applicationId: string) =>
+      `/api/${API_VERSION}/interview-scheduling/applications/${applicationId}/schedule`,
+    AVAILABLE_SLOTS: (applicationId: string) =>
+      `/api/${API_VERSION}/interview-scheduling/applications/${applicationId}/available-slots`,
+    SEND_OFFER: (applicationId: string) =>
+      `/api/${API_VERSION}/interview-scheduling/applications/${applicationId}/send-offer`,
+    CONFIRM_SLOT: (applicationId: string) =>
+      `/api/${API_VERSION}/interview-scheduling/applications/${applicationId}/confirm-slot`,
+    EMPLOYER_CANCEL: (applicationId: string) =>
+      `/api/${API_VERSION}/interview-scheduling/applications/${applicationId}/employer-cancel`,
+    CANDIDATE_OFFERS: `/api/${API_VERSION}/interview-scheduling/candidate/offers`,
+    CANDIDATE_OFFER_BY_ID: (scheduleId: string) =>
+      `/api/${API_VERSION}/interview-scheduling/candidate/offers/${scheduleId}`,
+    CANDIDATE_PICK_SLOT: (scheduleId: string) =>
+      `/api/${API_VERSION}/interview-scheduling/candidate/offers/${scheduleId}/pick-slot`,
+    CANDIDATE_CANCEL: (scheduleId: string) =>
+      `/api/${API_VERSION}/interview-scheduling/candidate/offers/${scheduleId}/cancel`,
+  },
+
   // Job Master Endpoints (Categories, Roles)
   JOB_MASTER: {
     CATEGORIES: `/api/${API_VERSION}/job-master/categories`,

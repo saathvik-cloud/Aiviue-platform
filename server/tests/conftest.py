@@ -23,6 +23,7 @@ load_dotenv()
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
+from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 from app.main import app
@@ -58,10 +59,11 @@ def event_loop():
 
 @pytest.fixture(scope="session")
 def db_engine():
-    """Create async database engine."""
+    """Create async database engine. NullPool avoids connection reuse that can cause 'another operation in progress' on Windows."""
     engine = create_async_engine(
         get_test_database_url(),
         echo=False,
+        poolclass=NullPool,
         connect_args={
             "statement_cache_size": 0,
             "prepared_statement_cache_size": 0
@@ -144,6 +146,59 @@ def unique_email() -> str:
 def unique_uuid() -> str:
     """Generate a unique UUID."""
     return generate_uuid()
+
+
+@pytest.fixture
+def employer_id_for_availability(api_client, sync_db_engine):
+    """
+    Create one employer via API for interview scheduling API tests.
+    Yields employer_id (UUID string). Cleans up employer_availability and employer after test.
+    Do NOT use this in tests that use db_session_factory (async) - use employer_id_sync_for_availability instead.
+    """
+    from tests.test_data import SAMPLE_EMPLOYER_MINIMAL
+    from sqlalchemy import text
+    data = SAMPLE_EMPLOYER_MINIMAL.copy()
+    data["email"] = generate_unique_email("avail")
+    data["phone"] = generate_unique_phone()
+    r = api_client.post("/api/v1/employers", json=data)
+    assert r.status_code == 201
+    employer = r.json()
+    yield employer["id"]
+    with sync_db_engine.connect() as conn:
+        conn.execute(text("DELETE FROM employer_availability WHERE employer_id = :id"), {"id": employer["id"]})
+        conn.commit()
+    api_client.delete(
+        f"/api/v1/employers/{employer['id']}?version={employer['version']}",
+        headers={"X-Employer-Id": employer["id"]},
+    )
+
+
+@pytest.fixture
+def employer_id_sync_for_availability(sync_db_engine):
+    """
+    Create one employer via sync SQL for interview scheduling repository/service tests.
+    Use this when the test uses db_session_factory (async) to avoid sharing the async engine with TestClient.
+    Yields employer_id (UUID string). Cleans up employer_availability and employer after test.
+    """
+    from sqlalchemy import text
+    import uuid
+    employer_id = str(uuid.uuid4())
+    email = generate_unique_email("avail_sync")
+    phone = generate_unique_phone()
+    with sync_db_engine.connect() as conn:
+        conn.execute(
+            text("""
+                INSERT INTO employers (id, name, email, phone, company_name, is_verified, is_active, version)
+                VALUES (CAST(:id AS uuid), 'Test Employer', :email, :phone, 'Test Co', false, true, 1)
+            """),
+            {"id": employer_id, "email": email, "phone": phone},
+        )
+        conn.commit()
+    yield employer_id
+    with sync_db_engine.connect() as conn:
+        conn.execute(text("DELETE FROM employer_availability WHERE employer_id = :id"), {"id": employer_id})
+        conn.execute(text("DELETE FROM employers WHERE id = :id"), {"id": employer_id})
+        conn.commit()
 
 
 # =============================================================================

@@ -24,6 +24,9 @@ export const ROUTES = {
   APPLICATIONS_JOB_CANDIDATE: (jobId: string, applicationId: string) =>
     `/dashboard/applications/jobs/${jobId}/candidates/${applicationId}`,
 
+  // Interview scheduling – employer availability
+  DASHBOARD_AVAILABILITY: '/dashboard/availability',
+
   // Candidate Public Routes
   CANDIDATE_HOME: '/candidate',
   CANDIDATE_LOGIN: '/candidate/login',
@@ -39,6 +42,7 @@ export const ROUTES = {
     `/candidate/dashboard/resume/history/${resumeId}`,
   CANDIDATE_DASHBOARD_PROFILE: '/candidate/dashboard/profile',
   CANDIDATE_DASHBOARD_JOBS: '/candidate/dashboard/jobs',
+  CANDIDATE_DASHBOARD_INTERVIEWS: '/candidate/dashboard/interviews',
 } as const;
 
 // Navigation items for employer sidebar
@@ -57,6 +61,11 @@ export const NAV_ITEMS = [
     label: 'Application Management',
     href: ROUTES.APPLICATIONS,
     icon: 'ClipboardList',
+  },
+  {
+    label: 'Interview Scheduling',
+    href: ROUTES.DASHBOARD_AVAILABILITY,
+    icon: 'CalendarClock',
   },
   {
     label: 'Profile',
@@ -81,6 +90,11 @@ export const CANDIDATE_NAV_ITEMS = [
     label: 'Jobs',
     href: ROUTES.CANDIDATE_DASHBOARD_JOBS,
     icon: 'Briefcase',
+  },
+  {
+    label: 'Interviews',
+    href: ROUTES.CANDIDATE_DASHBOARD_INTERVIEWS,
+    icon: 'CalendarCheck',
   },
   {
     label: 'Profile',

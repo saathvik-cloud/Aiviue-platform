@@ -37,6 +37,11 @@ from app.domains.candidate.models import Candidate, CandidateResume
 from app.domains.candidate_chat.models.db_models import CandidateChatSession, CandidateChatMessage
 from app.domains.job_application.models import JobApplication
 from app.domains.screening.models import ScreeningDeadLetter
+from app.domains.interview_scheduling.models import (
+    EmployerAvailability,
+    InterviewSchedule,
+    InterviewOfferedSlot,
+)
 
 
 # Alembic Config object

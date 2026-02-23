@@ -17,6 +17,10 @@ redis
 # LLM - GOOGLE GEMINI
 google-genai
 
+# Google Calendar API (interview scheduling - create Meet, patch cancel, get)
+google-auth
+google-api-python-client
+
 # DATA VALIDATION & SETTINGS
 pydantic
 pydantic-settings
@@ -45,6 +49,7 @@ supabase
 
 # UTILITIES
 python-dateutil
+tzdata  # IANA timezone data for zoneinfo on Windows (interview scheduling slot generation)
 
 # TESTING
 pytest

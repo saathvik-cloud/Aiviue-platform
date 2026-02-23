@@ -85,4 +85,7 @@ Thumbs.db
 *.db
 *.sqlite3
 
-/docs
+#docs
+docs/docs/
+docs/aiviue-interview-scheduler-26d4b8a0a3bf.json
+docs/

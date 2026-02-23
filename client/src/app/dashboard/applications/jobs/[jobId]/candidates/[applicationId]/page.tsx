@@ -2,19 +2,34 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ROUTES, PRIMARY_GRADIENT } from '@/constants';
 import { useApplicationDetail } from '@/lib/hooks';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatDateTime } from '@/lib/utils';
+import { getErrorMessage } from '@/lib/api';
+import {
+  getScheduleForApplication,
+  getAvailableSlotsForApplication,
+  sendOffer,
+  employerConfirmSlot,
+  employerCancel,
+} from '@/services/interview-scheduling.service';
 import { LoadingContent } from '@/components/ui/loading-content';
 import {
   ArrowLeft,
+  Calendar,
+  CalendarCheck,
   Download,
   FileText,
+  Loader2,
   Mail,
   MapPin,
   Phone,
   User,
+  XCircle,
 } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 const RESUME_CARD_STYLE = {
   background:
@@ -143,6 +158,249 @@ function renderResumeSections(data: Record<string, unknown> | null) {
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+/** Schedule interview: send slots or show status + confirm/cancel */
+function ScheduleInterviewSection({
+  jobId,
+  applicationId,
+}: {
+  jobId: string;
+  applicationId: string;
+}) {
+  const queryClient = useQueryClient();
+  const [showSlotPicker, setShowSlotPicker] = useState(false);
+  const [selectedSlots, setSelectedSlots] = useState<{ start_utc: string; end_utc: string }[]>([]);
+
+  const { data: schedule, isLoading: scheduleLoading } = useQuery({
+    queryKey: ['interview-schedule', applicationId],
+    queryFn: () => getScheduleForApplication(applicationId),
+  });
+
+  const { data: availableSlots = [], isLoading: slotsLoading } = useQuery({
+    queryKey: ['interview-available-slots', applicationId],
+    queryFn: () => getAvailableSlotsForApplication(applicationId),
+    enabled: showSlotPicker,
+  });
+
+  const sendOfferMutation = useMutation({
+    mutationFn: () => sendOffer(applicationId, { slots: selectedSlots }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['interview-schedule', applicationId] });
+      setShowSlotPicker(false);
+      setSelectedSlots([]);
+      toast.success('Interview slots sent to candidate.');
+    },
+    onError: (e) => toast.error(getErrorMessage(e)),
+  });
+
+  const confirmMutation = useMutation({
+    mutationFn: () => employerConfirmSlot(applicationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['interview-schedule', applicationId] });
+      toast.success('Interview confirmed. Meet link created.');
+    },
+    onError: (e) => toast.error(getErrorMessage(e)),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: () => employerCancel(applicationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['interview-schedule', applicationId] });
+      toast.success('Interview cancelled.');
+    },
+    onError: (e) => toast.error(getErrorMessage(e)),
+  });
+
+  const toggleSlot = (slot: { start_utc: string; end_utc: string }) => {
+    setSelectedSlots((prev) => {
+      const exists = prev.some((s) => s.start_utc === slot.start_utc && s.end_utc === slot.end_utc);
+      if (exists) return prev.filter((s) => !(s.start_utc === slot.start_utc && s.end_utc === slot.end_utc));
+      return [...prev, slot];
+    });
+  };
+
+  const stateLabels: Record<string, string> = {
+    slots_offered: 'Slots sent – waiting for candidate',
+    candidate_picked_slot: 'Candidate chose a slot',
+    employer_confirmed: 'Confirmed',
+    scheduled: 'Scheduled',
+    cancelled: 'Cancelled',
+  };
+
+  if (scheduleLoading) {
+    return (
+      <div className="glass-card rounded-xl sm:rounded-2xl p-4 sm:p-6">
+        <div className="flex items-center gap-2 text-sm min-h-[44px]" style={{ color: 'var(--neutral-gray)' }}>
+          <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+          Loading schedule…
+        </div>
+      </div>
+    );
+  }
+
+  if (!schedule) {
+    return (
+      <div className="glass-card rounded-xl sm:rounded-2xl p-4 sm:p-6">
+        <h2 className="text-base sm:text-lg font-bold mb-2" style={{ color: 'var(--neutral-dark)' }}>
+          Schedule interview
+        </h2>
+        <p className="text-xs sm:text-sm mb-4" style={{ color: 'var(--neutral-gray)' }}>
+          Send available time slots to the candidate. Set your availability first in Interview availability.
+        </p>
+        {!showSlotPicker ? (
+          <button
+            type="button"
+            onClick={() => setShowSlotPicker(true)}
+            className="btn-gradient inline-flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px] px-4 py-3 rounded-xl text-sm font-semibold touch-manipulation"
+          >
+            <Calendar className="w-4 h-4 flex-shrink-0" />
+            Send interview slots
+          </button>
+        ) : (
+          <div className="space-y-4">
+            {slotsLoading ? (
+              <div className="flex items-center gap-2 text-sm min-h-[44px]" style={{ color: 'var(--neutral-gray)' }}>
+                <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+                Loading slots…
+              </div>
+            ) : availableSlots.length === 0 ? (
+              <p className="text-xs sm:text-sm" style={{ color: 'var(--neutral-gray)' }}>
+                No slots available. Set your interview availability (working days and time window).
+              </p>
+            ) : (
+              <>
+                <p className="text-xs sm:text-sm" style={{ color: 'var(--neutral-gray)' }}>
+                  Select one or more slots to offer (UTC):
+                </p>
+                <div className="max-h-40 sm:max-h-48 overflow-y-auto overflow-x-hidden space-y-1 overscroll-contain -webkit-overflow-scrolling-touch">
+                  {availableSlots.map((slot) => {
+                    const selected = selectedSlots.some(
+                      (s) => s.start_utc === slot.start_utc && s.end_utc === slot.end_utc
+                    );
+                    return (
+                      <label
+                        key={`${slot.start_utc}-${slot.end_utc}`}
+                        className="flex items-center gap-3 p-3 sm:p-2 rounded-lg cursor-pointer hover:bg-white/60 active:bg-white/70 min-h-[44px] sm:min-h-0 touch-manipulation"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleSlot(slot)}
+                          className="w-5 h-5 sm:w-4 sm:h-4 flex-shrink-0 rounded"
+                        />
+                        <span className="text-xs sm:text-sm break-words" style={{ color: 'var(--neutral-dark)' }}>
+                          {formatDateTime(slot.start_utc)} – {formatDateTime(slot.end_utc)}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => sendOfferMutation.mutate()}
+                    disabled={selectedSlots.length === 0 || sendOfferMutation.isPending}
+                    className="btn-gradient inline-flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px] px-4 py-3 rounded-xl text-sm font-semibold touch-manipulation"
+                  >
+                    {sendOfferMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CalendarCheck className="w-4 h-4" />
+                    )}
+                    Send offer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSlotPicker(false);
+                      setSelectedSlots([]);
+                    }}
+                    className="btn-glass w-full sm:w-auto min-h-[44px] px-4 py-3 rounded-xl text-sm font-medium touch-manipulation"
+                    style={{ color: 'var(--neutral-gray)' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const isCancelled = schedule.state === 'cancelled';
+  const canConfirm = schedule.state === 'candidate_picked_slot';
+
+  return (
+    <div className="glass-card rounded-xl sm:rounded-2xl p-4 sm:p-6">
+      <h2 className="text-base sm:text-lg font-bold mb-2" style={{ color: 'var(--neutral-dark)' }}>
+        Schedule interview
+      </h2>
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <span
+          className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium"
+          style={{
+            backgroundColor: isCancelled ? 'rgba(239,68,68,0.12)' : 'var(--primary-50)',
+            color: isCancelled ? 'var(--status-closed)' : 'var(--primary)',
+          }}
+        >
+          <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+          <span className="break-words">{stateLabels[schedule.state] ?? schedule.state}</span>
+        </span>
+        {schedule.chosen_slot_start_utc && schedule.chosen_slot_end_utc && !isCancelled && (
+          <span className="text-xs sm:text-sm w-full sm:w-auto" style={{ color: 'var(--neutral-gray)' }}>
+            {formatDateTime(schedule.chosen_slot_start_utc)} – {formatDateTime(schedule.chosen_slot_end_utc)}
+          </span>
+        )}
+        {schedule.meeting_link && (
+          <a
+            href={schedule.meeting_link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs sm:text-sm font-medium inline-flex items-center min-h-[44px] sm:min-h-0 touch-manipulation"
+            style={{ color: 'var(--primary)' }}
+          >
+            Join Meet
+          </a>
+        )}
+      </div>
+      <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-3">
+        {canConfirm && (
+          <button
+            type="button"
+            onClick={() => confirmMutation.mutate()}
+            disabled={confirmMutation.isPending}
+            className="btn-gradient inline-flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px] px-4 py-3 rounded-xl text-sm font-semibold touch-manipulation"
+          >
+            {confirmMutation.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <CalendarCheck className="w-4 h-4" />
+            )}
+            Confirm slot (create Meet link)
+          </button>
+        )}
+        {!isCancelled && (
+          <button
+            type="button"
+            onClick={() => cancelMutation.mutate()}
+            disabled={cancelMutation.isPending}
+            className="inline-flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px] px-4 py-3 rounded-xl text-sm font-medium border touch-manipulation"
+            style={{ color: 'var(--status-closed)', borderColor: 'var(--status-closed)' }}
+          >
+            {cancelMutation.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <XCircle className="w-4 h-4" />
+            )}
+            Cancel interview
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -282,6 +540,12 @@ export default function ApplicationCandidateDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Schedule interview */}
+        <ScheduleInterviewSection
+          jobId={jobId}
+          applicationId={applicationId}
+        />
 
         {/* Resume card + download */}
         <div
