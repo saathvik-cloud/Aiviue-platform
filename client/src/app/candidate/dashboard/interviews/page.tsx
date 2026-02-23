@@ -155,7 +155,17 @@ function InterviewOfferCard({
             )}
           </div>
         </div>
-        <div className="flex items-center shrink-0">
+        <div className="flex items-center shrink-0 gap-2 flex-wrap">
+          {schedule.meeting_link && !isCancelled && (
+            <a
+              href={schedule.meeting_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-gradient inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-3 rounded-xl text-sm font-semibold touch-manipulation"
+            >
+              Join Meet
+            </a>
+          )}
           {canPickSlot && (
             <button
               type="button"

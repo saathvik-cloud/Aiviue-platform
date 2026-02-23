@@ -53,8 +53,16 @@ class Settings(BaseSettings):
     screening_api_key: str | None = None
 
     # Interview scheduling - Google Calendar + Meet
-    google_calendar_id: str | None = None  # Shared calendar ID (e.g. xxx@group.calendar.google.com)
-    google_service_account_json: str | None = None  # Full JSON string; if set, used for Calendar API
+    # Flag: True = use service account (Workspace), False = use OAuth (client ID + secret + refresh token)
+    google_use_service_account: bool = False
+    # OAuth 2.0 credentials (when google_use_service_account=False): full Meet + attendees + email invites
+    google_oauth_client_id: str | None = None
+    google_oauth_client_secret: str | None = None
+    google_oauth_refresh_token: str | None = None
+    # Service Account credentials (when google_use_service_account=True): limited Meet/attendees
+    google_service_account_json: str | None = None
+    # Calendar ID: use "primary" for OAuth, or a specific calendar ID for service accounts
+    google_calendar_id: str = "primary"
 
     # Interview scheduling - WATI template names (optional until templates approved)
     # When set, interview flow will send WhatsApp messages via these templates; when empty, in-app only
